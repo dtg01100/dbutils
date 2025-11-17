@@ -10,10 +10,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = [
-    "ruff>=0.1.0",
-    "pytest>=7.0.0"
-]
+ dev = [
+     "ruff>=0.1.0",
+     "pytest>=7.0.0"
+ ]
+ cython = [
+     "cython>=3.0.0",
+     "numpy>=1.21.0"
+ ]
 
 [project.scripts]
 db-relate = "dbutils.db_relate:main"
@@ -69,4 +73,11 @@ select = [
     "I001",   # Allow imports in try blocks without sorting
     "C901",   # Allow complex functions for search functionality
     "E501"    # Allow long lines for mock data definitions
+]
+
+[dependency-groups]
+dev = [
+    "cython>=3.2.1",
+    "numpy>=2.3.5",
+    "setuptools>=80.9.0",
 ]
