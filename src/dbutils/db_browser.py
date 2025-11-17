@@ -1707,6 +1707,10 @@ if TEXTUAL_AVAILABLE:
             # Result limiting for performance
             self.max_displayed_results = 200  # Maximum rows to display in tables
             self.search_debounce_delay = 0.2  # Search debounce delay in seconds
+            # Scroll-based loading state
+            self._scroll_load_triggered = False
+            self._current_displayed_count = 0
+            self._total_available_results = 0
             # Fast search index using trie
             self.search_index = SearchIndex()
             # Pre-computed lowercase fields for faster searching (fallback)
@@ -2116,30 +2120,34 @@ if TEXTUAL_AVAILABLE:
                         filtered_tables = self.filter_tables(self.tables, self.search_query)
                         self._set_cached("tables", self.search_query, {"filtered_tables": filtered_tables})
 
-                # Limit displayed results for performance
-                displayed_tables = filtered_tables[: self.max_displayed_results]
-                has_more_results = len(filtered_tables) > self.max_displayed_results
+                # Determine how many results to display
+                total_available_results = len(filtered_tables)
+                search_result_count = total_available_results
+
+                # If we have a small result set that fits comfortably on screen, load everything
+                small_result_threshold = 50  # If <= 50 results, load all available
+                if (
+                    total_available_results <= small_result_threshold
+                    and not self.all_tables_loaded
+                    and self.search_query
+                ):
+                    # Load all available data for small result sets
+                    self._background_load_task = asyncio.create_task(self._load_all_for_small_search(self.search_query))
+                    # For now, show what we have
+                    displayed_tables = filtered_tables
+                    has_more_results = False
+                else:
+                    # Use normal display limit
+                    displayed_tables = filtered_tables[: self.max_displayed_results]
+                    has_more_results = len(filtered_tables) > self.max_displayed_results
 
                 # Add rows
                 for table in displayed_tables:
                     tables_table.add_row(table.name, table.remarks or "", key=f"{table.schema}.{table.name}")
 
-                # Automatically load more data in background if we have search results approaching the limit
-                search_result_count = len(filtered_tables)
-                if (
-                    search_result_count >= self.max_displayed_results * 0.8  # 80% of limit reached
-                    and not self.all_tables_loaded  # More data available to load
-                    and self.search_query  # We have an active search
-                    and not hasattr(self, "_background_load_task")  # No background load in progress
-                    or (
-                        hasattr(self, "_background_load_task")
-                        and (self._background_load_task is None or self._background_load_task.done())
-                    )
-                ):
-                    # Start background loading
-                    self._background_load_task = asyncio.create_task(
-                        self._load_more_for_search(self.search_query, search_result_count)
-                    )
+                # Store information for scroll-based loading
+                self._current_displayed_count = len(displayed_tables)
+                self._total_available_results = total_available_results
 
                 # Show loading indicator if background load is in progress
                 if (
@@ -2222,22 +2230,9 @@ if TEXTUAL_AVAILABLE:
                             tables_table.add_row(*row_data["args"], key=row_data["key"])
                             tables_with_matches.append(table)
 
-                    # Automatically load more data in background for column search
-                    total_column_matches = len(matching_columns)
-                    if (
-                        total_column_matches >= self.max_displayed_results * 0.8  # 80% of limit reached
-                        and not self.all_tables_loaded  # More data available to load
-                        and self.search_query  # We have an active search
-                        and not hasattr(self, "_background_load_task")  # No background load in progress
-                        or (
-                            hasattr(self, "_background_load_task")
-                            and (self._background_load_task is None or self._background_load_task.done())
-                        )
-                    ):
-                        # Start background loading
-                        self._background_load_task = asyncio.create_task(
-                            self._load_more_for_search(self.search_query, total_column_matches)
-                        )
+                    # Store information for scroll-based loading
+                    self._current_displayed_count = len(displayed_columns)
+                    self._total_available_results = len(matching_columns)
 
                     # Show loading indicator if background load is in progress
                     if (
@@ -2698,8 +2693,55 @@ if TEXTUAL_AVAILABLE:
                 except Exception:
                     pass
 
+            # Reset scroll loading state
+            if not hasattr(self, "_scroll_load_triggered"):
+                self._scroll_load_triggered = False
+            self._scroll_load_triggered = False
+
             # Debounce the search update
             self._search_update_task = asyncio.create_task(self._debounced_search_update())
+
+        def _check_scroll_loading(self) -> None:
+            """Check if we should trigger scroll-based loading."""
+            if not self.search_query or self.all_tables_loaded:
+                return
+
+            try:
+                tables_table = self.query_one("#tables-table", DataTable)
+                if tables_table.row_count == 0:
+                    return
+
+                # Check if cursor is near the end (last 3 rows)
+                cursor_near_end = tables_table.cursor_row >= tables_table.row_count - 3
+
+                # Check if we have more results available
+                has_more_available = (
+                    hasattr(self, "_total_available_results")
+                    and hasattr(self, "_current_displayed_count")
+                    and self._total_available_results > self._current_displayed_count
+                )
+
+                # Trigger loading if cursor is near end and more data available
+                if (
+                    cursor_near_end
+                    and has_more_available
+                    and not getattr(self, "_scroll_load_triggered", False)
+                    and not hasattr(self, "_background_load_task")
+                    or (
+                        hasattr(self, "_background_load_task")
+                        and (self._background_load_task is None or self._background_load_task.done())
+                    )
+                ):
+                    self._scroll_load_triggered = True
+                    self._background_load_task = asyncio.create_task(self._load_more_for_scroll(self.search_query))
+
+            except Exception:
+                pass  # Ignore errors in scroll checking
+
+        @on(DataTable.CellSelected, "#tables-table")
+        def on_table_cursor_changed(self, event: DataTable.CellSelected) -> None:
+            """Handle table cursor movement for scroll loading."""
+            self._check_scroll_loading()
 
         async def _debounced_search_update(self) -> None:
             """Debounced search update to avoid excessive UI updates."""
@@ -2780,6 +2822,89 @@ if TEXTUAL_AVAILABLE:
             finally:
                 # Clear the background task reference
                 self._background_load_task = None
+
+        async def _load_all_for_small_search(self, search_query: str) -> None:
+            """Load all available data for small search result sets."""
+            try:
+                # Keep loading until all data is loaded or search changes
+                while not self.all_tables_loaded and search_query == self.search_query:
+                    loaded = await self.load_more_tables(500)  # Load in larger chunks
+                    if not loaded:
+                        break
+
+                    # Re-run search with all the new data
+                    if self.search_mode == "tables":
+                        filtered_tables = self.filter_tables(self.tables, search_query)
+                        # Update cache with complete results
+                        self._set_cached("tables", search_query, {"filtered_tables": filtered_tables})
+                        # Update display
+                        self._apply_search_update()
+
+                    elif self.search_mode == "columns":
+                        # Rebuild column matches with all data
+                        matching_table_counts = {}
+                        matching_columns = []
+                        q = search_query
+                        for col in self.columns:
+                            if self.column_matches_query(col, q):
+                                t_key = f"{col.schema}.{col.table}"
+                                matching_table_counts[t_key] = matching_table_counts.get(t_key, 0) + 1
+                                matching_columns.append(col)
+
+                        # Update cache
+                        self._set_cached(
+                            "columns",
+                            search_query,
+                            {
+                                "matching_table_counts": matching_table_counts,
+                                "matching_columns": matching_columns,
+                            },
+                        )
+                        # Update display
+                        self._apply_search_update()
+
+            except Exception as e:
+                print(f"Background complete loading error: {e}")
+            finally:
+                self._background_load_task = None
+
+        async def _load_more_for_scroll(self, search_query: str) -> None:
+            """Load more data triggered by scrolling to the end."""
+            try:
+                # Load one chunk of data
+                loaded = await self.load_more_tables(100)  # Smaller chunks for scroll loading
+                if loaded and search_query == self.search_query:
+                    # Update the search results with new data
+                    if self.search_mode == "tables":
+                        filtered_tables = self.filter_tables(self.tables, search_query)
+                        self._set_cached("tables", search_query, {"filtered_tables": filtered_tables})
+                        self._apply_search_update()
+
+                    elif self.search_mode == "columns":
+                        matching_table_counts = {}
+                        matching_columns = []
+                        q = search_query
+                        for col in self.columns:
+                            if self.column_matches_query(col, q):
+                                t_key = f"{col.schema}.{col.table}"
+                                matching_table_counts[t_key] = matching_table_counts.get(t_key, 0) + 1
+                                matching_columns.append(col)
+
+                        self._set_cached(
+                            "columns",
+                            search_query,
+                            {
+                                "matching_table_counts": matching_table_counts,
+                                "matching_columns": matching_columns,
+                            },
+                        )
+                        self._apply_search_update()
+
+            except Exception as e:
+                print(f"Scroll loading error: {e}")
+            finally:
+                self._background_load_task = None
+                self._scroll_load_triggered = False
 
         @on(DataTable.RowSelected, "#tables-table")
         def on_table_selected(self, event: DataTable.RowSelected) -> None:
@@ -3021,6 +3146,7 @@ if TEXTUAL_AVAILABLE:
             help_text = (
                 "Navigation: ↑↓/mouse | Search: type | Tab: toggle mode | S: settings | /: focus | Esc: clear | Q: quit"
             )
+            help_text += " | Scroll to bottom: load more results"
             if not self.all_tables_loaded:
                 help_text += " | L: load more tables"
             help_text += " | Ctrl+L: show all current results"
