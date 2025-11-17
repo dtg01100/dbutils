@@ -17,6 +17,10 @@ The following scripts are available as command-line tools after installation:
 - `db-diff`: Compare table schemas between different schemas or databases.
 - `db-health`: Analyze database health, performance metrics, and potential issues.
 - `db-search`: Search for values across multiple tables and columns.
+- `db-table-sizes`: List approximate row counts and page usage for tables (mock or live catalogs).
+- `db-indexes`: List index metadata (unique rule, column count, cardinality) with filtering.
+- `db-inferred-ref-coverage`: Show inferred relationship pairs with heuristic scores (no data scan).
+- `db-inferred-orphans`: Generate orphan-detection SQL for inferred relationships.
 
 All commands call an external `query_runner` binary on PATH. `query_runner` may return JSON, CSV, or tab-separated (TSV) output — `dbutils` will try to parse JSON first and fall back to delimited parsing and normalization.
 
@@ -93,17 +97,45 @@ uvx . db-map
 
 For development, you can install the project in editable mode with its development dependencies.
 
-1.  Install the project and development tools:
+1. Install the project and development tools:
 
     ```bash
     # Using uv
     uv pip install -e .[dev]
     ```
 
-2.  Run the unit tests:
+2. Run the unit tests:
 
     ```bash
     pytest -q
+
+### New Utility Examples
+
+```bash
+# Table sizes (all schemas)
+uvx . db-table-sizes --format table
+
+# Table sizes filtered by schema, JSON output
+uvx . db-table-sizes --schema TEST --format json
+
+# Index list for a single table
+uvx . db-indexes --table ORDERS --format table
+
+# Index list filtered by schema, CSV output
+uvx . db-indexes --schema TEST --format csv
+
+# Relationships raw JSON (for feeding other tools)
+uvx . db-relate SCHEMA1.T1.COL1 SCHEMA2.T2.COL2 --format relationships-json
+
+# Enhanced scored relationships (filter by score)
+uvx . db-relate TEST.USERS.ID TEST.ORDERS.USER_ID --mock --format relationships-json --enhanced --min-score 0.5
+
+# Inferred relationship coverage (scored list)
+uvx . db-inferred-ref-coverage --mock --format table --min-score 0.3
+
+# Orphan SQL generation
+uvx . db-inferred-orphans --mock --json --min-score 0.4
+```
     ```
 
 ## Troubleshooting

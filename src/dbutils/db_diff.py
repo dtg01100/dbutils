@@ -11,76 +11,41 @@ import argparse
 import json
 from typing import Dict, List, Optional
 
+from dbutils import catalog
 from dbutils.utils import query_runner
 
 
 def get_table_schema(table_name: str, schema: str) -> List[Dict]:
     """Get detailed schema information for a table."""
-    candidates = [
-        # DB2 LUW
-        f"""SELECT COLNAME, TYPENAME, LENGTH, SCALE, NULLS, DEFAULT, COLNO,
-                   KEYSEQ, REMARKS
-            FROM SYSCAT.COLUMNS
-            WHERE TABNAME = '{table_name.upper()}' AND TABSCHEMA = '{schema.upper()}'
-            ORDER BY COLNO""",
-        # IBM i
-        f"""SELECT COLUMN_NAME AS COLNAME, DATA_TYPE AS TYPENAME, NUMERIC_PRECISION AS LENGTH,
-                   NUMERIC_SCALE AS SCALE, IS_NULLABLE AS NULLS, COLUMN_DEFAULT AS DEFAULT,
-                   ORDINAL_POSITION AS COLNO, NULL AS KEYSEQ, COLUMN_TEXT AS REMARKS
-            FROM QSYS2.SYSCOLUMNS
-            WHERE TABLE_NAME = '{table_name.upper()}' AND TABLE_SCHEMA = '{schema.upper()}'
-            ORDER BY ORDINAL_POSITION""",
-        # DB2 z/OS
-        f"""SELECT NAME AS COLNAME, COLTYPE AS TYPENAME, LENGTH, SCALE, NULLS, DEFAULT,
-                   COLNO, KEYSEQ, REMARKS
-            FROM SYSIBM.SYSCOLUMNS
-            WHERE TBNAME = '{table_name.upper()}' AND TBCREATOR = '{schema.upper()}'
-            ORDER BY COLNO""",
-    ]
-
-    for sql in candidates:
-        try:
-            result = query_runner(sql)
-            if result:
-                return result
-        except Exception:
-            continue
-    return []
+    return catalog.get_columns(schema=schema, table=table_name)
 
 
 def get_table_list(schema: str) -> List[Dict]:
     """Get list of tables in a schema."""
-    candidates = [
-        # DB2 LUW
-        f"SELECT TABNAME FROM SYSCAT.TABLES WHERE TABSCHEMA = '{schema.upper()}' AND TYPE = 'T'",
-        # IBM i
-        f"SELECT TABLE_NAME AS TABNAME FROM QSYS2.SYSTABLES WHERE TABLE_SCHEMA = '{schema.upper()}' AND TABLE_TYPE = 'T'",
-        # DB2 z/OS
-        f"SELECT NAME AS TABNAME FROM SYSIBM.SYSTABLES WHERE CREATOR = '{schema.upper()}' AND TYPE = 'T'",
-    ]
-
-    for sql in candidates:
-        try:
-            result = query_runner(sql)
-            if result:
-                return result
-        except Exception:
-            continue
-    return []
+    tables = catalog.get_tables(schema=schema)
+    return [{"TABNAME": t["TABNAME"]} for t in tables]
 
 
 def compare_columns(col1: Dict, col2: Dict) -> Dict:
     """Compare two columns and return differences."""
     differences = {}
 
-    fields_to_compare = ["TYPENAME", "LENGTH", "SCALE", "NULLS", "DEFAULT", "KEYSEQ", "REMARKS"]
+    # Map catalog field names to comparison fields
+    fields_to_compare = [
+        ("DATA_TYPE", "DATA_TYPE"),
+        ("CHARACTER_MAXIMUM_LENGTH", "LENGTH"),
+        ("NUMERIC_SCALE", "SCALE"),
+        ("IS_NULLABLE", "NULLS"),
+        ("COLUMN_DEFAULT", "DEFAULT"),
+        ("COLUMN_TEXT", "REMARKS")
+    ]
 
-    for field in fields_to_compare:
-        val1 = str(col1.get(field, ""))
-        val2 = str(col2.get(field, ""))
+    for catalog_field, display_name in fields_to_compare:
+        val1 = str(col1.get(catalog_field, ""))
+        val2 = str(col2.get(catalog_field, ""))
 
         if val1 != val2:
-            differences[field] = {"source": val1, "target": val2}
+            differences[display_name] = {"source": val1, "target": val2}
 
     return differences
 

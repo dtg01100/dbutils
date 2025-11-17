@@ -23,6 +23,10 @@ db-search = "dbutils.db_search:main"
 db-diff = "dbutils.db_diff:main"
 db-health = "dbutils.db_health:main"
 db-browser = "dbutils.db_browser:main"
+db-table-sizes = "dbutils.db_table_sizes:main"
+db-indexes = "dbutils.db_indexes:main"
+db-inferred-ref-coverage = "dbutils.db_inferred_ref_coverage:main"
+db-inferred-orphans = "dbutils.db_inferred_orphans:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

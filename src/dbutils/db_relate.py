@@ -8,43 +8,54 @@ import subprocess
 import tempfile
 from collections import defaultdict, deque
 
+from . import catalog
+
 
 def query_runner(sql):
+    """Run a SQL statement via external query_runner.
+
+    Attempts JSON parse first then falls back to tab-separated parsing.
+    Uses lazy logging formatting for performance.
+    """
     with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
         f.write(sql)
         temp_file = f.name
 
-    logging.debug(f"Executing SQL query: {sql[:100]}...")  # Log first 100 chars of query
+    logging.debug("Executing SQL query (first 100 chars): %s", sql[:100])
 
     try:
-        result = subprocess.run(["query_runner", "-t", "db2", temp_file], capture_output=True, text=True)
+        result = subprocess.run(
+            ["query_runner", "-t", "db2", temp_file], capture_output=True, text=True, check=False
+        )
         if result.returncode != 0:
-            error_msg = f"query_runner failed: {result.stderr}"
+            error_msg = f"query_runner failed: {result.stderr.strip()}"
             logging.error(error_msg)
             raise RuntimeError(error_msg)
 
-        # Log the raw output for debugging if needed
-        logging.debug(f"Raw query output: {result.stdout[:500]}...")  # First 500 chars
+        logging.debug("Raw query output (first 500 chars): %s", result.stdout[:500])
 
         # Try JSON first
         try:
             data = json.loads(result.stdout)
             logging.info(
-                f"Successfully parsed JSON response with {len(data) if isinstance(data, list) else 'N/A'} rows"
+                "Successfully parsed JSON response with %s rows",
+                len(data) if isinstance(data, list) else "N/A",
             )
             return data
         except json.JSONDecodeError:
-            # Assume tab-separated with header
             logging.debug("JSON parsing failed, attempting tab-separated parsing")
             reader = csv.DictReader(io.StringIO(result.stdout), delimiter="\t")
             data = list(reader)
-            logging.info(f"Successfully parsed tab-separated response with {len(data)} rows")
+            logging.info("Successfully parsed tab-separated response with %s rows", len(data))
             return data
-    except Exception as e:
-        logging.error(f"Error running query: {str(e)}")
+    except Exception as e:  # noqa: BLE001 - broad to wrap subprocess/parse errors
+        logging.error("Error running query: %s", e)
         raise
     finally:
-        os.unlink(temp_file)
+        try:
+            os.unlink(temp_file)
+        except OSError:
+            pass
 
 
 def mock_get_tables():
@@ -147,91 +158,39 @@ def mock_get_primary_keys():
 
 
 def get_tables():
-    candidates = [
-        # DB2 LUW
-        "SELECT TABSCHEMA, TABNAME, TYPE FROM SYSCAT.TABLES WHERE TYPE = 'T'",
-        # IBM i
-        "SELECT TABLE_SCHEMA AS TABSCHEMA, TABLE_NAME AS TABNAME, TABLE_TYPE AS TYPE FROM QSYS2.SYSTABLES WHERE TABLE_TYPE = 'T'",
-        # DB2 z/OS
-        "SELECT CREATOR AS TABSCHEMA, NAME AS TABNAME, TYPE FROM SYSIBM.SYSTABLES WHERE TYPE = 'T'",
-    ]
-
-    for sql in candidates:
-        try:
-            result = query_runner(sql)
-            if result:
-                return result
-        except Exception:
-            continue
-    return []
+    """Get tables using IBM i catalog."""
+    return catalog.get_tables()
 
 
 def get_columns():
-    candidates = [
-        # DB2 LUW
-        "SELECT TABSCHEMA, TABNAME, COLNAME, TYPENAME, LENGTH, SCALE, REMARKS FROM SYSCAT.COLUMNS",
-        # IBM i
-        "SELECT TABLE_SCHEMA AS TABSCHEMA, TABLE_NAME AS TABNAME, COLUMN_NAME AS COLNAME, DATA_TYPE AS TYPENAME, NUMERIC_PRECISION AS LENGTH, NUMERIC_SCALE AS SCALE, COLUMN_TEXT AS REMARKS FROM QSYS2.SYSCOLUMNS",
-        # DB2 z/OS
-        "SELECT TBCREATOR AS TABSCHEMA, TBNAME AS TABNAME, NAME AS COLNAME, COLTYPE AS TYPENAME, LENGTH, SCALE, REMARKS FROM SYSIBM.SYSCOLUMNS",
-    ]
-
-    for sql in candidates:
-        try:
-            result = query_runner(sql)
-            if result:
-                return result
-        except Exception:
-            continue
-    return []
+    """Get columns using IBM i catalog."""
+    result = catalog.get_columns()
+    # Normalize TYPENAME field name for compatibility
+    for col in result:
+        if "DATA_TYPE" in col and "TYPENAME" not in col:
+            col["TYPENAME"] = col["DATA_TYPE"]
+    return result
 
 
 def get_primary_keys():
-    candidates = [
-        # DB2 LUW
-        "SELECT TABSCHEMA, TABNAME, COLNAME, TYPENAME FROM SYSCAT.COLUMNS WHERE KEYSEQ > 0",
-        # IBM i - primary keys are harder, try SYSKEYS
-        "SELECT TABLE_SCHEMA AS TABSCHEMA, TABLE_NAME AS TABNAME, COLUMN_NAME AS COLNAME, DATA_TYPE AS TYPENAME FROM QSYS2.SYSKEYS WHERE CONSTRAINT_TYPE = 'PRIMARY KEY'",
-        # DB2 z/OS
-        "SELECT TBCREATOR AS TABSCHEMA, TBNAME AS TABNAME, NAME AS COLNAME, COLTYPE AS TYPENAME FROM SYSIBM.SYSCOLUMNS WHERE KEYSEQ > 0",
-    ]
-
-    for sql in candidates:
-        try:
-            result = query_runner(sql)
-            if result:
-                return result
-        except Exception:
-            continue
-    return []
+    """Get primary keys using IBM i catalog."""
+    result = catalog.get_primary_keys()
+    # Add TYPENAME field by looking up column data type
+    if result:
+        cols = catalog.get_columns()
+        col_types = {
+            (c["TABSCHEMA"], c["TABNAME"], c["COLNAME"]): c.get("DATA_TYPE", "")
+            for c in cols
+        }
+        for pk in result:
+            key = (pk["TABSCHEMA"], pk["TABNAME"], pk["COLNAME"])
+            pk["TYPENAME"] = col_types.get(key, "")
+    return result
 
 
 def get_foreign_keys():
-    candidates = [
-        "SELECT TABSCHEMA, TABNAME, COLNAME, REFTABSCHEMA, REFTABNAME, REFCOLNAME FROM SYSCAT.FOREIGNKEYS",
-        "SELECT TF.TABSCHEMA AS TABSCHEMA, TF.TABNAME AS TABNAME, TF.COLNAME AS COLNAME, TF.REFTABSCHEMA AS REFTABSCHEMA, TF.REFTABNAME AS REFTABNAME, TF.REFCOLNAME AS REFCOLNAME FROM SYSCAT.KEYCOLUSE TF JOIN SYSCAT.TABCONST TC ON TF.TABSCHEMA = TC.TABSCHEMA AND TF.TABNAME = TC.TABNAME AND TF.CONSTNAME = TC.CONSTNAME WHERE TC.TYPE = 'F'",
-        "SELECT CREATOR AS TABSCHEMA, NAME AS TABNAME, COLNAME, REFTBCREATOR AS REFTABSCHEMA, REFTBNAME AS REFTABNAME, REFCOLNAME FROM SYSIBM.SYSRELS",
-    ]
-    for sql in candidates:
-        try:
-            rows = query_runner(sql)
-            if rows:
-                normalized = []
-                for r in rows:
-                    nr = {k.strip().upper(): v for k, v in r.items()}
-                    mapped = {
-                        "TABSCHEMA": nr.get("TABSCHEMA") or nr.get("CREATOR"),
-                        "TABNAME": nr.get("TABNAME") or nr.get("NAME"),
-                        "COLNAME": nr.get("COLNAME"),
-                        "REFTABSCHEMA": nr.get("REFTABSCHEMA") or nr.get("REFTBCREATOR"),
-                        "REFTABNAME": nr.get("REFTABNAME") or nr.get("REFTBNAME"),
-                        "REFCOLNAME": nr.get("REFCOLNAME"),
-                    }
-                    normalized.append(mapped)
-                return normalized
-        except RuntimeError:
-            continue
-    return []
+    """Get foreign keys using IBM i catalog."""
+    return catalog.get_foreign_keys()
 
 
 def mock_get_foreign_keys():
@@ -335,6 +294,78 @@ def infer_relationships(tables, columns, pks, use_mock=False):
     return relationships
 
 
+def score_relationships(relationships, columns, pks):
+    """Assign heuristic scores to relationships.
+
+    Signals used:
+      - name_match: child column name patterns matching parent PK (exact or <table>_id)
+      - remarks_hint: child column REMARKS referencing parent table with keywords
+      - type_match: TYPENAME equality between child col and parent pk
+      - parent_unique: always true for declared/inferred PK list
+
+    Score weights chosen for simplicity. Returns list of enriched relationship dicts.
+    """
+    # Build quick lookup maps
+    pk_types = {
+        (pk["TABSCHEMA"], pk["TABNAME"], pk["COLNAME"]): pk.get("TYPENAME") for pk in pks
+    }
+    col_map = {}
+    for c in columns:
+        col_map[(c["TABSCHEMA"], c["TABNAME"], c["COLNAME"])] = c
+
+    weighted = []
+    for rel in relationships:
+        child_key = (rel["TABSCHEMA"], rel["TABNAME"], rel["COLNAME"])
+        parent_key = (rel["REFTABSCHEMA"], rel["REFTABNAME"], rel["REFCOLNAME"])
+        child_col = col_map.get(child_key, {})
+        parent_col = col_map.get(parent_key, {})
+        parent_pk_type = pk_types.get(parent_key)
+        child_type = child_col.get("TYPENAME")
+
+        # Signals
+        name_match = 0
+        cc_lower = rel["COLNAME"].lower()
+        parent_pk_lower = rel["REFCOLNAME"].lower()
+        parent_table_lower = rel["REFTABNAME"].lower()
+        if cc_lower == parent_pk_lower or cc_lower == f"{parent_table_lower}_id" or (
+            cc_lower.endswith("_id") and cc_lower[:-3] == parent_table_lower
+        ):
+            name_match = 1
+
+        remarks_hint = 0
+        remarks = child_col.get("REMARKS", "") or ""
+        r_lower = remarks.lower()
+        if parent_table_lower in r_lower and any(k in r_lower for k in ("ref", "foreign", "key")):
+            remarks_hint = 1
+
+        type_match = 1 if (child_type and parent_pk_type and child_type == parent_pk_type) else 0
+        parent_unique = 1  # given PK list
+
+        weights = {
+            "name_match": 0.35,
+            "remarks_hint": 0.15,
+            "type_match": 0.25,
+            "parent_unique": 0.25,
+        }
+        score = (
+            name_match * weights["name_match"]
+            + remarks_hint * weights["remarks_hint"]
+            + type_match * weights["type_match"]
+            + parent_unique * weights["parent_unique"]
+        )
+
+        enriched = dict(rel)
+        enriched["score"] = round(score, 4)
+        enriched["signals"] = {
+            "name_match": bool(name_match),
+            "remarks_hint": bool(remarks_hint),
+            "type_match": bool(type_match),
+            "parent_unique": bool(parent_unique),
+        }
+        weighted.append(enriched)
+    return weighted
+
+
 def build_graph(fks):
     graph = defaultdict(dict)
     for fk in fks:
@@ -420,17 +451,32 @@ def main():
     parser.add_argument("--mock", action="store_true", help="Use mock data for testing")
     parser.add_argument(
         "--format",
-        choices=["sql", "dot", "full-select"],
+        choices=["sql", "dot", "full-select", "relationships-json"],
         default="sql",
-        help="Output format: SQL JOIN snippet (default), DOT/Graphviz, or full SELECT statement",
+        help=(
+            "Output format: SQL JOIN snippet (default), DOT/Graphviz, full SELECT statement, "
+            "or raw inferred relationships as JSON"
+        ),
     )
     parser.add_argument("--max-hops", type=int, help="Maximum number of hops to search for a path")
+    parser.add_argument(
+        "--enhanced",
+        action="store_true",
+        help="Enable scoring heuristics for relationships JSON output",
+    )
+    parser.add_argument(
+        "--min-score",
+        type=float,
+        default=0.0,
+        help="Minimum score threshold when --enhanced is used (default: 0.0)",
+    )
     args = parser.parse_args()
 
-    logging.info(f"Starting relationship resolution from {args.start} to {args.end}")
-    logging.info(f"Using format: {args.format}, mock: {args.mock}")
+    logging.info("Starting relationship resolution from %s to %s", args.start, args.end)
+    logging.info("Using format: %s, mock: %s", args.format, args.mock)
     if args.max_hops is not None:
-        logging.info(f"Max hops limit: {args.max_hops}")
+        logging.info("Max hops limit: %s", args.max_hops)
+
 
     # Validate input format
     start_parts = args.start.split(".")
@@ -470,19 +516,33 @@ def main():
             columns = get_columns()
             pks = get_primary_keys()
 
-        logging.info(f"Found {len(tables)} tables, {len(columns)} columns, {len(pks)} primary keys")
+        logging.info(
+            "Found %s tables, %s columns, %s primary keys", len(tables), len(columns), len(pks)
+        )
 
         relationships = infer_relationships(tables, columns, pks, use_mock=args.mock)
-        logging.info(f"Identified {len(relationships)} relationships")
+        logging.info("Identified %s relationships", len(relationships))
 
         graph = build_graph(relationships)
-        logging.info(f"Built graph with {len(graph)} nodes")
+        logging.info("Built graph with %s nodes", len(graph))
 
-        logging.info(f"Searching for path from {start_table}.{start_col} to {end_table}.{end_col}")
-        path, cols = find_path(graph, start_table, start_col, end_table, end_col, args.max_hops)
+        logging.info(
+            "Searching for path from %s.%s to %s.%s", start_table, start_col, end_table, end_col
+        )
+        path, _cols = find_path(graph, start_table, start_col, end_table, end_col, args.max_hops)
+
+        if args.format == "relationships-json":
+            output_rels = relationships
+            if args.enhanced:
+                scored = score_relationships(relationships, columns, pks)
+                if args.min_score > 0:
+                    scored = [r for r in scored if r["score"] >= args.min_score]
+                output_rels = scored
+            print(json.dumps(output_rels, indent=2))
+            return
 
         if path:
-            logging.info(f"Found path with {len(path)} tables: {' -> '.join(path)}")
+            logging.info("Found path with %s tables: %s", len(path), " -> ".join(path))
             if args.format == "sql":
                 output = generate_sql(graph, path)
             elif args.format == "dot":
@@ -492,13 +552,15 @@ def main():
                 start_col_info = {"table": start_table, "column": start_col}
                 end_col_info = {"table": end_table, "column": end_col}
                 output = generate_full_select(graph, path, start_col_info, end_col_info)
+            else:
+                output = ""  # Should not reach here due to argparse choices
             print(output)
         else:
             logging.info("No path found")
             print("No path found")
 
     except Exception as e:
-        logging.error(f"An error occurred during processing: {str(e)}")
+        logging.error("An error occurred during processing: %s", e)
         raise
 
 

@@ -4,13 +4,14 @@ DB2 Database Health Check Tool
 
 Analyze database health, performance metrics, and potential issues.
 
-Uses dbutils.utils.query_runner for consistent SQL execution and parsing.
+Uses dbutils.catalog for IBM i system catalog queries.
 """
 
 import argparse
 import json
 from typing import Dict
 
+from dbutils import catalog
 from dbutils.utils import query_runner
 
 
@@ -39,25 +40,35 @@ def check_database_health() -> Dict:
     except Exception:
         health_report["warnings"].append("Could not retrieve database version info")
 
-    # Get table count and stats
+    # Get table count and stats using catalog
     try:
-        table_stats = query_runner(
-            "SELECT COUNT(*) AS TABLE_COUNT, SUM(CARD) AS TOTAL_ROWS FROM SYSCAT.TABLES WHERE TYPE = 'T'"
-        )
-        if table_stats:
-            health_report["summary"]["table_count"] = table_stats[0].get("TABLE_COUNT", 0)
-            health_report["summary"]["total_rows"] = table_stats[0].get("TOTAL_ROWS", 0)
+        tables = catalog.get_tables()
+        table_sizes = catalog.get_table_sizes()
+        health_report["summary"]["table_count"] = len(tables)
+        health_report["summary"]["total_rows"] = sum(int(t.get("ROWCOUNT", 0)) for t in table_sizes)
     except Exception:
         health_report["warnings"].append("Could not retrieve table statistics")
 
     # Find tables without statistics
     try:
-        stale_stats = query_runner("""
-        SELECT TABSCHEMA, TABNAME, CARD
-        FROM SYSCAT.TABLES
-        WHERE STATS_TIME IS NULL OR STATS_TIME < CURRENT TIMESTAMP - 30 DAYS
-        AND TYPE = 'T'
-        """)
+        # Note: IBM i doesn't have STATS_TIME like LUW, using basic table info
+        tables = catalog.get_tables()
+        table_sizes = catalog.get_table_sizes()
+        
+        # Build dict for quick lookup
+        size_dict = {f"{t.get('TABSCHEMA')}.{t.get('TABNAME')}": t for t in table_sizes}
+        
+        stale_stats = []
+        for table in tables:
+            key = f"{table.get('TABSCHEMA')}.{table.get('TABNAME')}"
+            size_info = size_dict.get(key)
+            if size_info is None:
+                stale_stats.append({
+                    "TABSCHEMA": table.get("TABSCHEMA"),
+                    "TABNAME": table.get("TABNAME"),
+                    "CARD": 0
+                })
+        
         health_report["tables"] = stale_stats
 
         if len(stale_stats) > 10:  # If more than 10 tables with stale stats
@@ -68,11 +79,12 @@ def check_database_health() -> Dict:
 
     # Check for fragmented indexes
     try:
-        fragmented_indexes = query_runner("""
-        SELECT TABSCHEMA, TABNAME, INDNAME, NLEAF, NLEVELS
-        FROM SYSCAT.INDEXES
-        WHERE (NLEAF * 1.0 / NLEVELS) < 10 OR NLEVELS > 4
-        """)
+        # Note: IBM i indexes don't have NLEAF/NLEVELS like LUW
+        # Using basic index info instead
+        all_indexes = catalog.get_indexes()
+        
+        # For IBM i, we can't easily detect fragmentation, so skip this check
+        fragmented_indexes = []
         health_report["indexes"] = fragmented_indexes
 
         if fragmented_indexes:
@@ -83,11 +95,9 @@ def check_database_health() -> Dict:
 
     # Check for long-running transactions
     try:
-        long_tx = query_runner("""
-        SELECT APPL_NAME, APPL_STATUS, TOTAL_CPU_TIME, TOTAL_WAIT_TIME
-        FROM TABLE(SYSPROC.SNAP_GET_APPL_INFO('', -1)) AS T
-        WHERE TOTAL_CPU_TIME > 3600000  -- More than 1 hour CPU time
-        """)
+        # Note: IBM i doesn't have SYSPROC.SNAP_GET_APPL_INFO like LUW
+        # This check is not applicable to IBM i
+        long_tx = []
         if long_tx:
             health_report["warnings"].append(f"{len(long_tx)} potentially long-running transactions found")
             health_report["recommendations"].append("Investigate long-running transactions")
@@ -96,16 +106,13 @@ def check_database_health() -> Dict:
 
     # Check database size and utilization
     try:
-        db_size = query_runner("""
-        SELECT
-            SUM(DATA_SIZE) + SUM(INDEX_SIZE) AS TOTAL_SIZE_KB,
-            AVG(CARD) AS AVG_TABLE_CARDINALITY
-        FROM SYSCAT.TABLES
-        WHERE TYPE = 'T'
-        """)
-        if db_size:
-            health_report["performance_metrics"]["total_db_size_kb"] = db_size[0].get("TOTAL_SIZE_KB", 0)
-            health_report["performance_metrics"]["avg_table_cardinality"] = db_size[0].get("AVG_TABLE_CARDINALITY", 0)
+        table_sizes = catalog.get_table_sizes()
+        
+        total_size_kb = sum(int(t.get("DATA_SIZE", 0)) for t in table_sizes)
+        avg_card = sum(int(t.get("ROWCOUNT", 0)) for t in table_sizes) / len(table_sizes) if table_sizes else 0
+        
+        health_report["performance_metrics"]["total_db_size_kb"] = total_size_kb
+        health_report["performance_metrics"]["avg_table_cardinality"] = avg_card
     except Exception:
         health_report["warnings"].append("Could not retrieve database size information")
 
@@ -134,35 +141,26 @@ def check_schema_health(schema_name: str) -> Dict:
 
     # Get all tables in schema
     try:
-        schema_tables = query_runner(
-            f"SELECT TABNAME FROM SYSCAT.TABLES WHERE TABSCHEMA = '{schema_name.upper()}' AND TYPE = 'T'"
-        )
+        schema_tables = catalog.get_tables(schema=schema_name.upper())
         table_names = [t["TABNAME"] for t in schema_tables]
 
         for table_name in table_names:
             table_data = {"table_name": table_name, "row_count": 0, "columns": 0, "indexes": 0, "last_stats": None}
 
-            # Get table details
-            table_info = query_runner(f"""
-            SELECT CARD, STATS_TIME, COLCOUNT
-            FROM SYSCAT.TABLES
-            WHERE TABSCHEMA = '{schema_name.upper()}' AND TABNAME = '{table_name.upper()}'
-            """)
+            # Get table size info
+            table_sizes = catalog.get_table_sizes(schema=schema_name.upper())
+            size_info = next((t for t in table_sizes if t["TABNAME"] == table_name.upper()), None)
+            
+            if size_info:
+                table_data["row_count"] = int(size_info.get("ROWCOUNT", 0))
 
-            if table_info:
-                table_data["row_count"] = table_info[0].get("CARD", 0)
-                table_data["last_stats"] = table_info[0].get("STATS_TIME")
-                table_data["columns"] = table_info[0].get("COLCOUNT", 0)
+            # Get columns
+            columns = catalog.get_columns(schema=schema_name.upper(), table=table_name.upper())
+            table_data["columns"] = len(columns)
 
             # Get index count
-            index_info = query_runner(f"""
-            SELECT COUNT(*) AS IDX_COUNT
-            FROM SYSCAT.INDEXES
-            WHERE TABSCHEMA = '{schema_name.upper()}' AND TABNAME = '{table_name.upper()}'
-            """)
-
-            if index_info:
-                table_data["indexes"] = index_info[0].get("IDX_COUNT", 0)
+            indexes = catalog.get_indexes(schema=schema_name.upper(), table=table_name.upper())
+            table_data["indexes"] = len(indexes)
 
             schema_report["tables"].append(table_data)
 

@@ -12,87 +12,34 @@ import csv
 import json
 from typing import Dict, List, Optional
 
+from dbutils import catalog
 from dbutils.utils import query_runner
 
 
 def get_tables(schema: Optional[str] = None) -> List[Dict]:
     """Get list of tables in the database."""
-    schema_clause = f" AND TABLE_SCHEMA = '{schema.upper()}'" if schema else ""
-    table_schema_clause = f" AND TABSCHEMA = '{schema.upper()}'" if schema else ""
-    creator_clause = f" AND CREATOR = '{schema.upper()}'" if schema else ""
-    candidates = [
-        # IBM i - try this first since we know it works
-        f"SELECT TABLE_SCHEMA AS TABSCHEMA, TABLE_NAME AS TABNAME FROM QSYS2.SYSTABLES WHERE TABLE_TYPE = 'T'{schema_clause}",
-        # DB2 LUW
-    f"SELECT TABSCHEMA, TABNAME FROM SYSCAT.TABLES WHERE TYPE = 'T'{table_schema_clause}",
-        # DB2 z/OS
-    f"SELECT CREATOR AS TABSCHEMA, NAME AS TABNAME FROM SYSIBM.SYSTABLES WHERE TYPE = 'T'{creator_clause}",
-    ]
-
-    for sql in candidates:
-        try:
-            result = query_runner(sql)
-            if result:
-                # Normalize column names to ensure consistency
-                normalized = []
-                for row in result:
-                    nr = {k.strip().upper(): v for k, v in row.items()}
-                    normalized.append(
-                        {
-                            "TABSCHEMA": nr.get("TABSCHEMA") or nr.get("TABLE_SCHEMA") or nr.get("CREATOR"),
-                            "TABNAME": nr.get("TABNAME") or nr.get("TABLE_NAME") or nr.get("NAME"),
-                        }
-                    )
-                return normalized
-        except Exception:
-            continue
-    return []
+    return catalog.get_tables(schema=schema)
 
 
 def get_columns(table_name: str, schema: str) -> List[Dict]:
     """Get columns for a specific table."""
-    candidates = [
-        # DB2 LUW
-        f"""SELECT COLNAME, TYPENAME
-            FROM SYSCAT.COLUMNS
-            WHERE TABNAME = '{table_name.upper()}'
-            AND TABSCHEMA = '{schema.upper()}'
-            AND TYPENAME IN ('VARCHAR', 'CHAR', 'CLOB', 'INTEGER', 'BIGINT', 'DECIMAL', 'NUMERIC',
-                             'DOUBLE', 'REAL', 'DATE', 'TIME', 'TIMESTAMP')""",
-        # IBM i
-        f"""SELECT COLUMN_NAME AS COLNAME, DATA_TYPE AS TYPENAME
-            FROM QSYS2.SYSCOLUMNS
-            WHERE TABLE_NAME = '{table_name.upper()}'
-            AND TABLE_SCHEMA = '{schema.upper()}'
-            AND DATA_TYPE IN ('VARCHAR', 'CHAR', 'CLOB', 'INTEGER', 'BIGINT', 'DECIMAL', 'NUMERIC',
-                              'DOUBLE', 'REAL', 'DATE', 'TIME', 'TIMESTAMP')""",
-        # DB2 z/OS
-        f"""SELECT NAME AS COLNAME, COLTYPE AS TYPENAME
-            FROM SYSIBM.SYSCOLUMNS
-            WHERE TBNAME = '{table_name.upper()}'
-            AND TBCREATOR = '{schema.upper()}'
-            AND COLTYPE IN ('VARCHAR', 'CHAR', 'CLOB', 'INTEGER', 'BIGINT', 'DECIMAL', 'NUMERIC',
-                            'DOUBLE', 'REAL', 'DATE', 'TIME', 'TIMESTAMP')""",
-    ]
-
-    for sql in candidates:
-        try:
-            result = query_runner(sql)
-            if result:
-                # Normalize column names
-                normalized = []
-                for row in result:
-                    nr = {k.strip().upper(): v for k, v in row.items()}
-                    normalized.append(
-                        {
-                            "COLNAME": nr.get("COLNAME") or nr.get("COLUMN_NAME") or nr.get("NAME"),
-                            "TYPENAME": nr.get("TYPENAME") or nr.get("DATA_TYPE") or nr.get("COLTYPE"),
-                        }
-                    )
-                return normalized
-        except Exception:
-            continue
-    return []
+    columns = catalog.get_columns(schema=schema, table=table_name)
+    
+    # Filter for searchable types
+    searchable_types = ['VARCHAR', 'CHAR', 'CLOB', 'INTEGER', 'BIGINT', 'DECIMAL', 
+                        'NUMERIC', 'DOUBLE', 'REAL', 'DATE', 'TIME', 'TIMESTAMP']
+    
+    filtered = [c for c in columns if c.get("DATA_TYPE") in searchable_types]
+    
+    # Normalize to expected format
+    normalized = []
+    for col in filtered:
+        normalized.append({
+            "COLNAME": col.get("COLNAME"),
+            "TYPENAME": col.get("DATA_TYPE")
+        })
+    
+    return normalized
 
 
 def search_in_table(

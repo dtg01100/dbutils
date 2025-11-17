@@ -3,6 +3,7 @@ import json
 import logging
 from typing import Dict, List
 
+from dbutils import catalog
 from dbutils.utils import query_runner
 
 
@@ -91,114 +92,39 @@ def mock_get_primary_keys() -> List[Dict[str, str]]:
 
 
 def get_tables() -> List[Dict[str, object]]:
-    candidates = [
-        "SELECT TABLE_SCHEMA AS TABSCHEMA, TABLE_NAME AS TABNAME, TABLE_TYPE AS TYPE FROM QSYS2.SYSTABLES WHERE TABLE_TYPE = 'T'",
-        "SELECT TABSCHEMA, TABNAME, TYPE FROM SYSCAT.TABLES WHERE TYPE = 'T'",
-        "SELECT CREATOR AS TABSCHEMA, NAME AS TABNAME, TYPE FROM SYSIBM.SYSTABLES WHERE TYPE = 'T'",
-    ]
-    for sql in candidates:
-        try:
-            rows = query_runner(sql)
-            if rows:
-                # Ensure keys are normalized to TABSCHEMA, TABNAME, TYPE
-                normalized = []
-                for r in rows:
-                    nr = {k.strip().upper(): v for k, v in r.items()}
-                    # Map common names
-                    mapped = {
-                        "TABSCHEMA": nr.get("TABSCHEMA") or nr.get("TABLE_SCHEMA") or nr.get("CREATOR"),
-                        "TABNAME": nr.get("TABNAME") or nr.get("TABLE_NAME") or nr.get("NAME"),
-                        "TYPE": nr.get("TYPE") or nr.get("TABLE_TYPE"),
-                    }
-                    normalized.append(mapped)
-                return normalized
-        except RuntimeError:
-            continue
-    return []
+    """Get tables using IBM i catalog."""
+    return catalog.get_tables()
 
 
 def get_columns() -> List[Dict[str, object]]:
-    candidates = [
-        "SELECT TABLE_SCHEMA AS TABSCHEMA, TABLE_NAME AS TABNAME, COLUMN_NAME AS COLNAME, DATA_TYPE AS TYPENAME, NUMERIC_PRECISION AS LENGTH, NUMERIC_SCALE AS SCALE, COLUMN_TEXT AS REMARKS FROM QSYS2.SYSCOLUMNS",
-        "SELECT TABSCHEMA, TABNAME, COLNAME, TYPENAME, LENGTH, SCALE, REMARKS FROM SYSCAT.COLUMNS",
-        "SELECT TBNAME AS TABNAME, NAME AS COLNAME, COLTYPE AS TYPENAME, LENGTH, SCALE, REMARKS FROM SYSIBM.SYSCOLUMNS",
-    ]
-    for sql in candidates:
-        try:
-            rows = query_runner(sql)
-            if rows:
-                normalized = []
-                for r in rows:
-                    nr = {k.strip().upper(): v for k, v in r.items()}
-                    mapped = {
-                        "TABSCHEMA": nr.get("TABSCHEMA") or nr.get("TABLE_SCHEMA") or nr.get("TBCREATOR"),
-                        "TABNAME": nr.get("TABNAME") or nr.get("TABLE_NAME") or nr.get("TBNAME"),
-                        "COLNAME": nr.get("COLNAME") or nr.get("COLUMN_NAME") or nr.get("NAME"),
-                        "TYPENAME": nr.get("TYPENAME") or nr.get("DATA_TYPE") or nr.get("COLTYPE"),
-                        "LENGTH": nr.get("LENGTH") or nr.get("NUMERIC_PRECISION"),
-                        "SCALE": nr.get("SCALE") or nr.get("NUMERIC_SCALE"),
-                        "REMARKS": nr.get("REMARKS") or nr.get("COLUMN_TEXT") or nr.get("DESCRIPTION"),
-                    }
-                    normalized.append(mapped)
-                return normalized
-        except RuntimeError:
-            continue
-    return []
+    """Get columns using IBM i catalog."""
+    result = catalog.get_columns()
+    # Normalize TYPENAME field name for compatibility
+    for col in result:
+        if "DATA_TYPE" in col and "TYPENAME" not in col:
+            col["TYPENAME"] = col["DATA_TYPE"]
+    return result
 
 
 def get_primary_keys() -> List[Dict[str, object]]:
-    candidates = [
-        # For IBM i, primary keys are complex to query, so we'll skip for now
-        "SELECT K.TABSCHEMA, K.TABNAME, K.COLNAME, C.TYPENAME FROM SYSCAT.KEYCOLUSE K JOIN SYSCAT.COLUMNS C ON K.TABSCHEMA = C.TABSCHEMA AND K.TABNAME = C.TABNAME AND K.COLNAME = C.COLNAME WHERE K.KEYTYPE = 'P'",
-        "SELECT TBNAME AS TABNAME, NAME AS COLNAME, COLTYPE AS TYPENAME FROM SYSIBM.SYSCOLUMNS WHERE KEYSEQ > 0",
-    ]
-    for sql in candidates:
-        try:
-            rows = query_runner(sql)
-            if rows:
-                normalized = []
-                for r in rows:
-                    nr = {k.strip().upper(): v for k, v in r.items()}
-                    mapped = {
-                        "TABSCHEMA": nr.get("TABSCHEMA") or nr.get("TABLE_SCHEMA") or nr.get("TBCREATOR"),
-                        "TABNAME": nr.get("TABNAME") or nr.get("TABLE_NAME") or nr.get("TBNAME"),
-                        "COLNAME": nr.get("COLNAME") or nr.get("COLUMN_NAME") or nr.get("NAME"),
-                        "TYPENAME": nr.get("TYPENAME") or nr.get("DATA_TYPE") or nr.get("COLTYPE"),
-                    }
-                    normalized.append(mapped)
-                return normalized
-        except RuntimeError:
-            continue
-    return []
+    """Get primary keys using IBM i catalog."""
+    result = catalog.get_primary_keys()
+    # Add TYPENAME field by looking up column data type
+    if result:
+        cols = catalog.get_columns()
+        col_types = {
+            (c["TABSCHEMA"], c["TABNAME"], c["COLNAME"]): c.get("DATA_TYPE", "")
+            for c in cols
+        }
+        for pk in result:
+            key = (pk["TABSCHEMA"], pk["TABNAME"], pk["COLNAME"])
+            pk["TYPENAME"] = col_types.get(key, "")
+    return result
 
 
 def get_foreign_keys() -> List[Dict[str, object]]:
-    """Get actual foreign key constraints from database system catalogs."""
-    candidates = [
-        "SELECT TABSCHEMA, TABNAME, COLNAME, REFTABSCHEMA, REFTABNAME, REFCOLNAME FROM SYSCAT.FOREIGNKEYS",
-        "SELECT TF.TABSCHEMA AS TABSCHEMA, TF.TABNAME AS TABNAME, TF.COLNAME AS COLNAME, TF.REFTABSCHEMA AS REFTABSCHEMA, TF.REFTABNAME AS REFTABNAME, TF.REFCOLNAME AS REFCOLNAME FROM SYSCAT.KEYCOLUSE TF JOIN SYSCAT.TABCONST TC ON TF.TABSCHEMA = TC.TABSCHEMA AND TF.TABNAME = TC.TABNAME AND TF.CONSTNAME = TC.CONSTNAME WHERE TC.TYPE = 'F'",
-        "SELECT CREATOR AS TABSCHEMA, NAME AS TABNAME, COLNAME, REFTBCREATOR AS REFTABSCHEMA, REFTBNAME AS REFTABNAME, REFCOLNAME FROM SYSIBM.SYSRELS",
-    ]
-    for sql in candidates:
-        try:
-            rows = query_runner(sql)
-            if rows:
-                normalized = []
-                for r in rows:
-                    nr = {k.strip().upper(): v for k, v in r.items()}
-                    mapped = {
-                        "TABSCHEMA": nr.get("TABSCHEMA") or nr.get("CREATOR"),
-                        "TABNAME": nr.get("TABNAME") or nr.get("NAME"),
-                        "COLNAME": nr.get("COLNAME"),
-                        "REFTABSCHEMA": nr.get("REFTABSCHEMA") or nr.get("REFTBCREATOR"),
-                        "REFTABNAME": nr.get("REFTABNAME") or nr.get("REFTBNAME"),
-                        "REFCOLNAME": nr.get("REFCOLNAME"),
-                    }
-                    normalized.append(mapped)
-                return normalized
-        except RuntimeError:
-            continue
-    return []
+    """Get foreign keys using IBM i catalog."""
+    return catalog.get_foreign_keys()
 
 
 def mock_get_foreign_keys() -> List[Dict[str, str]]:
