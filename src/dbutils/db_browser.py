@@ -2069,9 +2069,7 @@ if TEXTUAL_AVAILABLE:
         def update_tables_display(self) -> None:
             """Update the tables display based on current search mode with caching."""
             # Create cache key for this display state
-            cache_key = (
-                f"tables_display_{self.search_mode}_{self.search_query}_{len(self.tables)}_{self._cache_timestamp}"
-            )
+            cache_key = f"tables_display_{self.search_mode}_{self.search_query}_{len(self.tables)}_{self._cache_timestamp}_{id(self)}"
 
             # Try to get cached display data
             cached_display = self._get_cached_ui_render(cache_key)
@@ -2132,7 +2130,7 @@ if TEXTUAL_AVAILABLE:
                     tables_table.add_row(
                         f"... and {remaining} more tables",
                         "Press Ctrl+L to load all results",
-                        key="load_more_indicator",
+                        key=f"load_more_tables_{self.search_mode}",
                     )
 
                 # Update info text
@@ -2234,7 +2232,7 @@ if TEXTUAL_AVAILABLE:
                             "",
                             "",
                             "Press Ctrl+L to load all results",
-                            key="load_more_columns_indicator",
+                            key=f"load_more_columns_{self.search_mode}",
                         )
 
                     if has_more_columns:
@@ -2625,38 +2623,23 @@ if TEXTUAL_AVAILABLE:
 
         @on(Input.Changed, "#search-input")
         def on_search_changed(self, event: Input.Changed) -> None:
-            """Handle search input changes with progressive rendering."""
+            """Handle search input changes with debouncing."""
             self.search_query = event.value
-            # Cancel any pending progressive search
-            if hasattr(self, "_progressive_search_task") and self._progressive_search_task:
+            # Cancel any pending search update
+            if hasattr(self, "_search_update_task") and self._search_update_task:
                 try:
-                    self._progressive_search_task.cancel()
+                    self._search_update_task.cancel()
                 except Exception:
                     pass
 
-            # Start progressive search
-            self._progressive_search_task = asyncio.create_task(self._progressive_search(event.value))
+            # Debounce the search update
+            self._search_update_task = asyncio.create_task(self._debounced_search_update())
 
-        async def _progressive_search(self, query: str) -> None:
-            """Perform progressive search: fast results first, then slower fuzzy matches."""
+        async def _debounced_search_update(self) -> None:
+            """Debounced search update to avoid excessive UI updates."""
             try:
-                # Phase 1: Immediate trie-based results (fast)
-                if query.strip():
-                    # Update display with fast trie results immediately
-                    self._apply_search_update()
-                    await asyncio.sleep(
-                        min(0.05, self.search_debounce_delay / 4)
-                    )  # Brief pause to show initial results
-
-                    # Phase 2: Add fuzzy matches progressively if needed
-                    if len(query.strip()) >= 2:  # Only for longer queries
-                        # Trigger a more thorough search update
-                        await asyncio.sleep(min(0.1, self.search_debounce_delay / 2))  # Small delay before fuzzy search
-                        self._apply_search_update()  # This will include fuzzy matches
-                else:
-                    # No query - immediate update
-                    self._apply_search_update()
-
+                await asyncio.sleep(self.search_debounce_delay)
+                self._apply_search_update()
             except asyncio.CancelledError:
                 # Search was cancelled, exit gracefully
                 pass
@@ -2759,8 +2742,20 @@ if TEXTUAL_AVAILABLE:
                 search_input.placeholder = "Type to search tables by name or description..."
                 self.notify("📋 TABLE SEARCH MODE: Filter by table name/description", severity="information", timeout=4)
 
-            # Re-run search with new mode
-            self.update_tables_display()
+            # Clear UI cache and reset display when switching modes to prevent stale data and key conflicts
+            self._clear_ui_cache()
+
+            # Clear the tables display to ensure clean state
+            try:
+                tables_table = self.query_one("#tables-table", DataTable)
+                tables_table.clear()
+                columns_table = self.query_one("#columns-table", DataTable)
+                columns_table.clear()
+            except Exception:
+                pass  # UI might not be ready yet
+
+            # Re-run search with new mode (force update even with empty query)
+            self._apply_search_update()
 
             # Restore table selection and update columns display
             if current_table_key:
