@@ -1,10 +1,37 @@
 # Python-generated files
 __pycache__/
-*.py[oc]
+*.py[ocd]
+*.pyo
+*.pyd
+*.so
+
+# Build and packaging
 build/
 dist/
 wheels/
-*.egg-info
+*.egg-info/
+.eggs/
+
+# Test caches
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Virtual environments
-.venv
+.venv/
+venv/
+.env
+.env.*
+
+# IDE/editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project-specific caches
+.cache/
+# dbutils schema cache files
+*.pkl
