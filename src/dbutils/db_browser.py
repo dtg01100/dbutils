@@ -42,6 +42,19 @@ except ImportError:
     TEXTUAL_AVAILABLE = False
 
 from dataclasses import dataclass
+from typing import Dict, Set, Optional as Opt
+import sys
+
+# String interning for memory optimization
+_string_cache: Dict[str, str] = {}
+
+
+def intern_string(s: str) -> str:
+    """Intern a string to reduce memory usage for repeated strings."""
+    if s in _string_cache:
+        return _string_cache[s]
+    _string_cache[s] = s
+    return s
 
 
 @dataclass
@@ -57,6 +70,16 @@ class ColumnInfo:
     nulls: str
     remarks: str
 
+    def __post_init__(self):
+        """Intern strings to reduce memory usage."""
+        self.schema = intern_string(self.schema)
+        self.table = intern_string(self.table)
+        self.name = intern_string(self.name)
+        self.typename = intern_string(self.typename)
+        self.nulls = intern_string(self.nulls)
+        if self.remarks:
+            self.remarks = intern_string(self.remarks)
+
 
 @dataclass
 class TableInfo:
@@ -66,6 +89,147 @@ class TableInfo:
     name: str
     remarks: str
 
+    def __post_init__(self):
+        """Intern strings to reduce memory usage."""
+        self.schema = intern_string(self.schema)
+        self.name = intern_string(self.name)
+        if self.remarks:
+            self.remarks = intern_string(self.remarks)
+
+
+class TrieNode:
+    """A memory-optimized node in the trie data structure for fast prefix matching."""
+
+    __slots__ = ("children", "is_end_of_word", "items")
+
+    def __init__(self):
+        self.children: Dict[str, "TrieNode"] = {}
+        self.is_end_of_word = False
+        self.items: Set[str] = set()  # Store item keys that end at this node
+
+    def insert(self, word: str, item_key: str) -> None:
+        """Insert a word into the trie with associated item key."""
+        node = self
+        for char in word.lower():
+            if char not in node.children:
+                node.children[char] = TrieNode()
+            node = node.children[char]
+        node.is_end_of_word = True
+        node.items.add(item_key)
+
+    def search_prefix(self, prefix: str) -> Set[str]:
+        """Search for all items that start with the given prefix."""
+        node = self
+        for char in prefix.lower():
+            if char not in node.children:
+                return set()
+            node = node.children[char]
+
+        # Collect all items from this node and all descendants
+        result = set()
+        self._collect_all_items(node, result)
+        return result
+
+    def _collect_all_items(self, node: "TrieNode", result: Set[str]) -> None:
+        """Recursively collect all items from this node and descendants."""
+        if node.is_end_of_word:
+            result.update(node.items)
+        for child in node.children.values():
+            self._collect_all_items(child, result)
+
+
+class SearchIndex:
+    """Fast search index using trie data structure."""
+
+    def __init__(self):
+        self.table_trie = TrieNode()
+        self.column_trie = TrieNode()
+        self.table_keys: Dict[str, TableInfo] = {}
+        self.column_keys: Dict[str, ColumnInfo] = {}
+
+    def build_index(self, tables: List[TableInfo], columns: List[ColumnInfo]) -> None:
+        """Build the search index from tables and columns."""
+        # Clear existing index
+        self.table_trie = TrieNode()
+        self.column_trie = TrieNode()
+        self.table_keys.clear()
+        self.column_keys.clear()
+
+        # Index tables
+        for table in tables:
+            table_key = f"{table.schema}.{table.name}"
+            self.table_keys[table_key] = table
+
+            # Index by name, schema, and remarks
+            search_terms = [table.name, table.schema]
+            if table.remarks:
+                search_terms.append(table.remarks)
+
+            for term in search_terms:
+                # Split compound terms and index each word
+                words = term.replace("_", " ").split()
+                for word in words:
+                    if word.strip():
+                        self.table_trie.insert(word.strip(), table_key)
+
+        # Index columns
+        for col in columns:
+            col_key = f"{col.schema}.{col.table}.{col.name}"
+            self.column_keys[col_key] = col
+
+            # Index by name, type, and remarks
+            search_terms = [col.name, col.typename]
+            if col.remarks:
+                search_terms.append(col.remarks)
+
+            for term in search_terms:
+                # Split compound terms and index each word
+                words = term.replace("_", " ").split()
+                for word in words:
+                    if word.strip():
+                        self.column_trie.insert(word.strip(), col_key)
+
+    def search_tables(self, query: str) -> List[TableInfo]:
+        """Fast search for tables matching the query."""
+        if not query.strip():
+            return list(self.table_keys.values())
+
+        query_lower = query.lower().strip()
+        matching_keys = set()
+
+        # For multi-word queries, find intersection of all prefix matches
+        words = query_lower.split()
+        if len(words) == 1:
+            # Single word - use prefix search
+            matching_keys = self.table_trie.search_prefix(query_lower)
+        else:
+            # Multi-word - find tables that match any of the words
+            for word in words:
+                word_matches = self.table_trie.search_prefix(word)
+                matching_keys.update(word_matches)
+
+        return [self.table_keys[key] for key in matching_keys if key in self.table_keys]
+
+    def search_columns(self, query: str) -> List[ColumnInfo]:
+        """Fast search for columns matching the query."""
+        if not query.strip():
+            return list(self.column_keys.values())
+
+        query_lower = query.lower().strip()
+        matching_keys = set()
+
+        # For multi-word queries, find intersection of all prefix matches
+        words = query_lower.split()
+        if len(words) == 1:
+            # Single word - use prefix search
+            matching_keys = self.column_trie.search_prefix(query_lower)
+        else:
+            # Multi-word - find columns that match any of the words
+            for word in words:
+                word_matches = self.column_trie.search_prefix(word)
+                matching_keys.update(word_matches)
+
+        return [self.column_keys[key] for key in matching_keys if key in self.column_keys]
 
 
 def query_runner(sql: str) -> List[Dict]:
@@ -263,12 +427,18 @@ CACHE_DIR = Path.home() / ".cache" / "dbutils"
 CACHE_FILE = CACHE_DIR / "schema_cache.pkl"
 
 
-def get_cache_key(schema_filter: Optional[str]) -> str:
-    """Generate a cache key based on schema filter."""
-    return schema_filter.upper() if schema_filter else "ALL_SCHEMAS"
+def get_cache_key(schema_filter: Optional[str], limit: Optional[int] = None, offset: Optional[int] = None) -> str:
+    """Generate a cache key based on schema filter and pagination."""
+    base_key = schema_filter.upper() if schema_filter else "ALL_SCHEMAS"
+    if limit is not None or offset is not None:
+        pagination = f"_LIMIT{limit or 0}_OFFSET{offset or 0}"
+        return f"{base_key}{pagination}"
+    return base_key
 
 
-def load_from_cache(schema_filter: Optional[str]) -> Optional[tuple[List[TableInfo], List[ColumnInfo]]]:
+def load_from_cache(
+    schema_filter: Optional[str], limit: Optional[int] = None, offset: Optional[int] = None
+) -> Optional[tuple[List[TableInfo], List[ColumnInfo]]]:
     """Load tables and columns from cache if available and recent."""
     if not CACHE_FILE.exists():
         return None
@@ -277,7 +447,7 @@ def load_from_cache(schema_filter: Optional[str]) -> Optional[tuple[List[TableIn
         with open(CACHE_FILE, "rb") as f:
             cache_data = pickle.load(f)
 
-        cache_key = get_cache_key(schema_filter)
+        cache_key = get_cache_key(schema_filter, limit, offset)
         if cache_key not in cache_data:
             return None
 
@@ -293,7 +463,13 @@ def load_from_cache(schema_filter: Optional[str]) -> Optional[tuple[List[TableIn
         return None
 
 
-def save_to_cache(schema_filter: Optional[str], tables: List[TableInfo], columns: List[ColumnInfo]) -> None:
+def save_to_cache(
+    schema_filter: Optional[str],
+    tables: List[TableInfo],
+    columns: List[ColumnInfo],
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+) -> None:
     """Save tables and columns to cache."""
     try:
         # Create cache directory if it doesn't exist
@@ -311,7 +487,7 @@ def save_to_cache(schema_filter: Optional[str], tables: List[TableInfo], columns
         # Update cache
         import time
 
-        cache_key = get_cache_key(schema_filter)
+        cache_key = get_cache_key(schema_filter, limit, offset)
         cache_data[cache_key] = {"timestamp": time.time(), "tables": tables, "columns": columns}
 
         # Save cache
@@ -385,9 +561,349 @@ def schema_exists(schema: str, use_mock: bool = False) -> bool:
         return False
 
 
-def get_all_tables_and_columns(
-    schema_filter: Optional[str] = None, use_mock: bool = False, use_cache: bool = True
+async def get_all_tables_and_columns_async(
+    schema_filter: Optional[str] = None,
+    use_mock: bool = False,
+    use_cache: bool = True,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
 ) -> tuple[List[TableInfo], List[ColumnInfo]]:
+    """Async version that can run queries in parallel."""
+    if use_mock:
+        tables = mock_get_tables()
+        columns = mock_get_columns()
+
+        # Apply schema filter to mock data if needed
+        if schema_filter:
+            tables = [t for t in tables if t.schema.upper() == schema_filter.upper()]
+            columns = [c for c in columns if c.schema.upper() == schema_filter.upper()]
+
+        # Apply pagination to mock data
+        if limit is not None:
+            tables = tables[offset or 0 : offset or 0 + limit]
+            # For columns, only include those for the paginated tables
+            table_keys = {(t.schema, t.name) for t in tables}
+            columns = [c for c in columns if (c.schema, c.table) in table_keys]
+
+        return tables, columns
+
+    # Try to load from cache first
+    if use_cache:
+        cached_data = load_from_cache(schema_filter, limit, offset)
+        if cached_data:
+            return cached_data
+
+    # Build schema filter clause
+    schema_clause = ""
+    if schema_filter:
+        schema_clause = f"AND TABLE_SCHEMA = '{schema_filter.upper()}'"
+
+    # Build pagination clause
+    pagination_clause = ""
+    if limit is not None:
+        pagination_clause = f"FETCH FIRST {limit} ROWS ONLY"
+        if offset is not None and offset > 0:
+            # For DB2, we need to use a subquery for offset
+            pagination_clause = f"LIMIT {limit} OFFSET {offset}"
+
+    # Query for tables (DB2 for i uses QSYS2.SYSTABLES instead of SYSCAT.TABLES)
+    tables_sql = f"""
+        SELECT
+            TABLE_SCHEMA,
+            TABLE_NAME,
+            TABLE_TEXT
+        FROM QSYS2.SYSTABLES
+        WHERE TABLE_TYPE IN ('T', 'P')
+        AND SYSTEM_TABLE = 'N'
+        {schema_clause}
+        ORDER BY TABLE_SCHEMA, TABLE_NAME
+        {pagination_clause}
+    """
+
+    # Run both queries in parallel
+    import asyncio
+
+    async def run_query_async(sql: str) -> List[Dict]:
+        """Run a query asynchronously."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, query_runner, sql)
+
+    try:
+        # Start both queries concurrently
+        tables_task = run_query_async(tables_sql)
+        tables_data = await tables_task
+
+        tables = []
+        for row in tables_data:
+            tables.append(
+                TableInfo(
+                    schema=row.get("TABLE_SCHEMA", ""),
+                    name=row.get("TABLE_NAME", ""),
+                    remarks=row.get("TABLE_TEXT", ""),
+                )
+            )
+
+        # Query for columns based on loaded tables
+        if tables:
+            # Build IN clause for the specific tables we loaded
+            table_conditions = []
+            for table in tables:
+                table_conditions.append(f"(c.TABLE_SCHEMA = '{table.schema}' AND c.TABLE_NAME = '{table.name}')")
+            tables_in_clause = " OR ".join(table_conditions)
+
+            columns_sql = f"""
+                SELECT
+                    c.TABLE_SCHEMA,
+                    c.TABLE_NAME,
+                    c.COLUMN_NAME,
+                    c.DATA_TYPE,
+                    c.LENGTH,
+                    c.NUMERIC_SCALE,
+                    c.IS_NULLABLE,
+                    c.COLUMN_TEXT
+                FROM QSYS2.SYSCOLUMNS c
+                WHERE ({tables_in_clause})
+                ORDER BY c.TABLE_SCHEMA, c.TABLE_NAME, c.ORDINAL_POSITION
+            """
+        else:
+            # Fallback if no tables loaded - use JOIN instead of subquery for better performance
+            columns_sql = f"""
+                SELECT
+                    c.TABLE_SCHEMA,
+                    c.TABLE_NAME,
+                    c.COLUMN_NAME,
+                    c.DATA_TYPE,
+                    c.LENGTH,
+                    c.NUMERIC_SCALE,
+                    c.IS_NULLABLE,
+                    c.COLUMN_TEXT
+                FROM QSYS2.SYSCOLUMNS c
+                INNER JOIN QSYS2.SYSTABLES t ON
+                    c.TABLE_SCHEMA = t.TABLE_SCHEMA AND
+                    c.TABLE_NAME = t.TABLE_NAME
+                WHERE t.TABLE_TYPE IN ('T', 'P')
+                    AND t.SYSTEM_TABLE = 'N' {schema_clause}
+                ORDER BY c.TABLE_SCHEMA, c.TABLE_NAME, c.ORDINAL_POSITION
+            """
+
+        columns_task = run_query_async(columns_sql)
+        columns_data = await columns_task
+
+        columns = []
+        for row in columns_data:
+            # Handle numeric fields that might be strings
+            length = row.get("LENGTH")
+            scale = row.get("NUMERIC_SCALE")
+
+            # Convert to int if they're strings
+            if isinstance(length, str):
+                length = int(length) if length and length.isdigit() else None
+            if isinstance(scale, str):
+                scale = int(scale) if scale and scale.isdigit() else None
+
+            # Map IS_NULLABLE to Y/N format
+            nulls = "Y" if row.get("IS_NULLABLE") == "Y" else "N"
+
+            columns.append(
+                ColumnInfo(
+                    schema=row.get("TABLE_SCHEMA", ""),
+                    table=row.get("TABLE_NAME", ""),
+                    name=row.get("COLUMN_NAME", ""),
+                    typename=row.get("DATA_TYPE", ""),
+                    length=length,
+                    scale=scale,
+                    nulls=nulls,
+                    remarks=row.get("COLUMN_TEXT", ""),
+                )
+            )
+
+    except Exception as e:
+        # If query fails, return empty list (graceful degradation)
+        print(f"Warning: Could not fetch tables/columns: {e}")
+        tables, columns = [], []
+
+    # Save to cache if we got data
+    if use_cache and (tables or columns):
+        save_to_cache(schema_filter, tables, columns, limit, offset)
+
+    return tables, columns
+
+
+def get_all_tables_and_columns(
+    schema_filter: Optional[str] = None,
+    use_mock: bool = False,
+    use_cache: bool = True,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+) -> tuple[List[TableInfo], List[ColumnInfo]]:
+    """Synchronous wrapper for get_all_tables_and_columns_async."""
+    import asyncio
+
+    try:
+        # Check if there's already a running event loop
+        asyncio.get_running_loop()
+        # If we're in an async context, fall back to sync implementation
+        return _get_all_tables_and_columns_sync(schema_filter, use_mock, use_cache, limit, offset)
+    except RuntimeError:
+        # No running loop, we can create one
+        pass
+
+    # Create new event loop (preferred way in Python 3.10+)
+    return asyncio.run(get_all_tables_and_columns_async(schema_filter, use_mock, use_cache, limit, offset))
+
+
+def _get_all_tables_and_columns_sync(
+    schema_filter: Optional[str] = None,
+    use_mock: bool = False,
+    use_cache: bool = True,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+) -> tuple[List[TableInfo], List[ColumnInfo]]:
+    """Synchronous fallback implementation with query optimizations."""
+    if use_mock:
+        tables = mock_get_tables()
+        columns = mock_get_columns()
+
+        # Apply schema filter to mock data if needed
+        if schema_filter:
+            tables = [t for t in tables if t.schema.upper() == schema_filter.upper()]
+            columns = [c for c in columns if c.schema.upper() == schema_filter.upper()]
+
+        # Apply pagination to mock data
+        if limit is not None:
+            tables = tables[offset or 0 : offset or 0 + limit]
+            # For columns, only include those for the paginated tables
+            table_keys = {(t.schema, t.name) for t in tables}
+            columns = [c for c in columns if (c.schema, c.table) in table_keys]
+
+        return tables, columns
+
+    # Try to load from cache first
+    if use_cache:
+        cached_data = load_from_cache(schema_filter, limit, offset)
+        if cached_data:
+            return cached_data
+
+    # Build schema filter clause
+    schema_clause = ""
+    if schema_filter:
+        schema_clause = f"AND TABLE_SCHEMA = '{schema_filter.upper()}'"
+
+    # Build pagination clause
+    pagination_clause = ""
+    if limit is not None:
+        pagination_clause = f"FETCH FIRST {limit} ROWS ONLY"
+        if offset is not None and offset > 0:
+            # For DB2, we need to use a subquery for offset
+            pagination_clause = f"LIMIT {limit} OFFSET {offset}"
+
+    # Query for tables (DB2 for i uses QSYS2.SYSTABLES instead of SYSCAT.TABLES)
+    tables_sql = f"""
+        SELECT
+            TABLE_SCHEMA,
+            TABLE_NAME,
+            TABLE_TEXT
+        FROM QSYS2.SYSTABLES
+        WHERE TABLE_TYPE IN ('T', 'P')
+        AND SYSTEM_TABLE = 'N'
+        {schema_clause}
+        ORDER BY TABLE_SCHEMA, TABLE_NAME
+        {pagination_clause}
+    """
+
+    try:
+        tables_data = query_runner(tables_sql)
+        tables = []
+        for row in tables_data:
+            tables.append(
+                TableInfo(
+                    schema=row.get("TABLE_SCHEMA", ""),
+                    name=row.get("TABLE_NAME", ""),
+                    remarks=row.get("TABLE_TEXT", ""),
+                )
+            )
+
+        # Query for columns based on loaded tables
+        if tables:
+            # Build IN clause for the specific tables we loaded
+            table_conditions = []
+            for table in tables:
+                table_conditions.append(f"(c.TABLE_SCHEMA = '{table.schema}' AND c.TABLE_NAME = '{table.name}')")
+            tables_in_clause = " OR ".join(table_conditions)
+
+            columns_sql = f"""
+                SELECT
+                    c.TABLE_SCHEMA,
+                    c.TABLE_NAME,
+                    c.COLUMN_NAME,
+                    c.DATA_TYPE,
+                    c.LENGTH,
+                    c.NUMERIC_SCALE,
+                    c.IS_NULLABLE,
+                    c.COLUMN_TEXT
+                FROM QSYS2.SYSCOLUMNS c
+                WHERE ({tables_in_clause})
+                ORDER BY c.TABLE_SCHEMA, c.TABLE_NAME, c.ORDINAL_POSITION
+            """
+        else:
+            # Fallback if no tables loaded - use JOIN instead of subquery for better performance
+            columns_sql = f"""
+                SELECT
+                    c.TABLE_SCHEMA,
+                    c.TABLE_NAME,
+                    c.COLUMN_NAME,
+                    c.DATA_TYPE,
+                    c.LENGTH,
+                    c.NUMERIC_SCALE,
+                    c.IS_NULLABLE,
+                    c.COLUMN_TEXT
+                FROM QSYS2.SYSCOLUMNS c
+                INNER JOIN QSYS2.SYSTABLES t ON
+                    c.TABLE_SCHEMA = t.TABLE_SCHEMA AND
+                    c.TABLE_NAME = t.TABLE_NAME
+                WHERE t.TABLE_TYPE IN ('T', 'P')
+                    AND t.SYSTEM_TABLE = 'N' {schema_clause}
+                ORDER BY c.TABLE_SCHEMA, c.TABLE_NAME, c.ORDINAL_POSITION
+            """
+
+        columns_data = query_runner(columns_sql)
+        columns = []
+        for row in columns_data:
+            # Handle numeric fields that might be strings
+            length = row.get("LENGTH")
+            scale = row.get("NUMERIC_SCALE")
+
+            # Convert to int if they're strings
+            if isinstance(length, str):
+                length = int(length) if length and length.isdigit() else None
+            if isinstance(scale, str):
+                scale = int(scale) if scale and scale.isdigit() else None
+
+            # Map IS_NULLABLE to Y/N format
+            nulls = "Y" if row.get("IS_NULLABLE") == "Y" else "N"
+
+            columns.append(
+                ColumnInfo(
+                    schema=row.get("TABLE_SCHEMA", ""),
+                    table=row.get("TABLE_NAME", ""),
+                    name=row.get("COLUMN_NAME", ""),
+                    typename=row.get("DATA_TYPE", ""),
+                    length=length,
+                    scale=scale,
+                    nulls=nulls,
+                    remarks=row.get("COLUMN_TEXT", ""),
+                )
+            )
+    except Exception as e:
+        # If query fails, return empty list (graceful degradation)
+        print(f"Warning: Could not fetch tables/columns: {e}")
+        tables, columns = [], []
+
+    # Save to cache if we got data
+    if use_cache and (tables or columns):
+        save_to_cache(schema_filter, tables, columns, limit, offset)
+
+    return tables, columns
     """Fetch all tables and columns from the database."""
     if use_mock:
         tables = mock_get_tables()
@@ -402,7 +918,7 @@ def get_all_tables_and_columns(
 
     # Try to load from cache first
     if use_cache:
-        cached_data = load_from_cache(schema_filter)
+        cached_data = load_from_cache(schema_filter, limit, offset)
         if cached_data:
             return cached_data
 
@@ -415,6 +931,14 @@ def get_all_tables_and_columns(
     if schema_filter:
         schema_clause = f"AND TABLE_SCHEMA = '{schema_filter.upper()}'"
 
+    # Build pagination clause
+    pagination_clause = ""
+    if limit is not None:
+        pagination_clause = f"FETCH FIRST {limit} ROWS ONLY"
+        if offset is not None and offset > 0:
+            # For DB2, we need to use a subquery for offset
+            pagination_clause = f"LIMIT {limit} OFFSET {offset}"
+
     # Query for tables (DB2 for i uses QSYS2.SYSTABLES instead of SYSCAT.TABLES)
     tables_sql = f"""
         SELECT
@@ -426,6 +950,7 @@ def get_all_tables_and_columns(
         AND SYSTEM_TABLE = 'N'
         {schema_clause}
         ORDER BY TABLE_SCHEMA, TABLE_NAME
+        {pagination_clause}
     """
 
     try:
@@ -443,23 +968,48 @@ def get_all_tables_and_columns(
         print(f"Warning: Could not fetch tables: {e}")
 
     # Query for columns (DB2 for i uses QSYS2.SYSCOLUMNS instead of SYSCAT.COLUMNS)
-    columns_sql = f"""
-        SELECT
-            TABLE_SCHEMA,
-            TABLE_NAME,
-            COLUMN_NAME,
-            DATA_TYPE,
-            LENGTH,
-            NUMERIC_SCALE,
-            IS_NULLABLE,
-            COLUMN_TEXT
-        FROM QSYS2.SYSCOLUMNS
-            WHERE TABLE_SCHEMA IN (
-            SELECT TABLE_SCHEMA FROM QSYS2.SYSTABLES
-            WHERE TABLE_TYPE IN ('T', 'P') AND SYSTEM_TABLE = 'N' {schema_clause}
-        )
-        ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION
-    """
+    # Only load columns for tables that were actually loaded (important for pagination)
+    if tables:
+        # Build IN clause for the specific tables we loaded
+        table_conditions = []
+        for table in tables:
+            table_conditions.append(f"(c.TABLE_SCHEMA = '{table.schema}' AND c.TABLE_NAME = '{table.name}')")
+        tables_in_clause = " OR ".join(table_conditions)
+
+        columns_sql = f"""
+            SELECT
+                c.TABLE_SCHEMA,
+                c.TABLE_NAME,
+                c.COLUMN_NAME,
+                c.DATA_TYPE,
+                c.LENGTH,
+                c.NUMERIC_SCALE,
+                c.IS_NULLABLE,
+                c.COLUMN_TEXT
+            FROM QSYS2.SYSCOLUMNS c
+            WHERE ({tables_in_clause})
+            ORDER BY c.TABLE_SCHEMA, c.TABLE_NAME, c.ORDINAL_POSITION
+        """
+    else:
+        # Fallback if no tables loaded - use JOIN instead of subquery for better performance
+        columns_sql = f"""
+            SELECT
+                c.TABLE_SCHEMA,
+                c.TABLE_NAME,
+                c.COLUMN_NAME,
+                c.DATA_TYPE,
+                c.LENGTH,
+                c.NUMERIC_SCALE,
+                c.IS_NULLABLE,
+                c.COLUMN_TEXT
+            FROM QSYS2.SYSCOLUMNS c
+            INNER JOIN QSYS2.SYSTABLES t ON
+                c.TABLE_SCHEMA = t.TABLE_SCHEMA AND
+                c.TABLE_NAME = t.TABLE_NAME
+            WHERE t.TABLE_TYPE IN ('T', 'P')
+                AND t.SYSTEM_TABLE = 'N' {schema_clause}
+            ORDER BY c.TABLE_SCHEMA, c.TABLE_NAME, c.ORDINAL_POSITION
+        """
 
     try:
         columns_data = query_runner(columns_sql)
@@ -495,7 +1045,7 @@ def get_all_tables_and_columns(
 
     # Save to cache if we got data
     if use_cache and (tables or columns):
-        save_to_cache(schema_filter, tables, columns)
+        save_to_cache(schema_filter, tables, columns, limit, offset)
 
     return tables, columns
 
@@ -503,10 +1053,16 @@ def get_all_tables_and_columns(
 class DBBrowserTUI:
     """TUI for browsing DB2 schemas with search functionality."""
 
-    def __init__(self, schema_filter: Optional[str] = None, use_mock: bool = False):
+    def __init__(self, schema_filter: Optional[str] = None, use_mock: bool = False, initial_load_limit: int = 100):
         self.console = Console() if RICH_AVAILABLE else None
         self.schema_filter = schema_filter
         self.use_mock = use_mock
+        self.initial_load_limit = initial_load_limit
+
+        # Lazy loading state
+        self.all_tables_loaded = False
+        self.current_offset = 0
+        self.total_tables_estimate = None
 
         # Show loading message
         if self.console:
@@ -515,14 +1071,37 @@ class DBBrowserTUI:
             else:
                 self.console.print("[dim]Loading database schema... This may take a moment.[/dim]")
 
+        # Load initial batch of data
+        self._load_initial_data()
+
+        # Initialize state
+        self.search_query = ""
+        self.selected_table = None
+        self.selected_column_name: Optional[str] = None
+        self.filtered_tables = self.tables
+        self.filtered_columns = []
+
+    def _load_initial_data(self):
+        """Load the initial batch of tables and their columns."""
         try:
-            self.tables, self.columns = get_all_tables_and_columns(schema_filter, use_mock)
+            self.tables, self.columns = get_all_tables_and_columns(
+                self.schema_filter, self.use_mock, limit=self.initial_load_limit, offset=0
+            )
             if self.console:
                 self.console.print(f"[green]✓ Loaded {len(self.tables)} tables and {len(self.columns)} columns[/green]")
+
+            # Check if we got fewer results than requested (indicates all data loaded)
+            if len(self.tables) < self.initial_load_limit:
+                self.all_tables_loaded = True
+            else:
+                # Estimate total tables (rough approximation)
+                self._estimate_total_tables()
+
         except Exception as e:
             if self.console:
                 self.console.print(f"[red]Error loading database schema: {e}[/red]")
             self.tables, self.columns = [], []
+            self.all_tables_loaded = True
 
         # Precompute table columns mapping for performance
         self.table_columns = {}
@@ -533,12 +1112,74 @@ class DBBrowserTUI:
                     self.table_columns[table_key] = []
                 self.table_columns[table_key].append(col)
 
-        # Initialize state
-        self.search_query = ""
-        self.selected_table = None
-        self.selected_column_name: Optional[str] = None
-        self.filtered_tables = self.tables
-        self.filtered_columns = []
+    def _estimate_total_tables(self):
+        """Estimate total number of tables for progress indication."""
+        if self.use_mock:
+            self.total_tables_estimate = len(self.tables)  # Mock data is complete
+            return
+
+        try:
+            # Quick count query to estimate total
+            count_sql = f"""
+                SELECT COUNT(*) as TOTAL_COUNT
+                FROM QSYS2.SYSTABLES
+                WHERE TABLE_TYPE IN ('T', 'P')
+                AND SYSTEM_TABLE = 'N'
+                {"AND TABLE_SCHEMA = '" + self.schema_filter.upper() + "'" if self.schema_filter else ""}
+            """
+            count_result = query_runner(count_sql)
+            if count_result and count_result[0].get("TOTAL_COUNT"):
+                self.total_tables_estimate = int(count_result[0]["TOTAL_COUNT"])
+        except Exception:
+            # If count fails, use a rough estimate
+            self.total_tables_estimate = len(self.tables) * 2
+
+    def load_more_tables(self, additional_limit: int = 100) -> bool:
+        """Load additional tables and their columns. Returns True if more data was loaded."""
+        if self.all_tables_loaded:
+            return False
+
+        try:
+            new_offset = self.current_offset + len(self.tables)
+            new_tables, new_columns = get_all_tables_and_columns(
+                self.schema_filter, self.use_mock, limit=additional_limit, offset=new_offset
+            )
+
+            if not new_tables:
+                self.all_tables_loaded = True
+                return False
+
+            # Add new tables and columns
+            self.tables.extend(new_tables)
+            self.columns.extend(new_columns)
+
+            # Update table columns mapping for new data
+            for col in new_columns:
+                if col.schema and col.table:
+                    table_key = f"{col.schema}.{col.table}"
+                    if table_key not in self.table_columns:
+                        self.table_columns[table_key] = []
+                    self.table_columns[table_key].append(col)
+
+            # Update offset
+            self.current_offset = new_offset + len(new_tables)
+
+            # Check if this was the last batch
+            if len(new_tables) < additional_limit:
+                self.all_tables_loaded = True
+
+            if self.console:
+                self.console.print(
+                    f"[green]✓ Loaded {len(new_tables)} additional tables ({len(self.tables)} total)[/green]"
+                )
+
+            return True
+
+        except Exception as e:
+            if self.console:
+                self.console.print(f"[red]Error loading additional data: {e}[/red]")
+            self.all_tables_loaded = True
+            return False
 
     def select_column(self, column: ColumnInfo) -> None:
         """Select a column in the basic TUI: sets the table and shows all columns
@@ -1031,24 +1672,44 @@ if TEXTUAL_AVAILABLE:
             Binding("/", "focus_search", "Search"),
             Binding("tab", "toggle_search_mode", "Toggle Search Mode"),
             Binding("s", "open_settings", "Settings"),
+            Binding("l", "load_more", "Load More Tables"),
+            Binding("ctrl+l", "load_all_results", "Load All Results"),
         ]
 
-        def __init__(self, schema_filter: Optional[str] = None, use_mock: bool = False, use_cache: bool = True):
+        def __init__(
+            self,
+            schema_filter: Optional[str] = None,
+            use_mock: bool = False,
+            use_cache: bool = True,
+            initial_load_limit: int = 100,
+        ):
             super().__init__()
             self.schema_filter = schema_filter
             self.use_mock = use_mock
             self.use_cache = use_cache
+            self.initial_load_limit = initial_load_limit
             self.tables: List[TableInfo] = []
             self.columns: List[ColumnInfo] = []
             self.table_columns: Dict[str, List[ColumnInfo]] = {}
             self.search_query = ""
             self.search_mode = "tables"  # "tables" or "columns"
-            # Search optimization: cache results and debounce updates
-            self._search_cache: Dict[str, Dict[str, Any]] = {}
+            # Lazy loading state
+            self.all_tables_loaded = False
+            self.current_offset = 0
+            self.total_tables_estimate = None
+            # Multi-level caching system
+            self._search_cache: Dict[str, Dict[str, Any]] = {}  # Search results cache
+            self._ui_cache: Dict[str, Any] = {}  # UI rendering cache
             self._last_search_query = ""
             self._last_search_mode = ""
             self._debounce_timer: Optional[asyncio.Task] = None
-            # Pre-computed lowercase fields for faster searching
+            self._cache_timestamp = 0  # Timestamp for cache invalidation
+            # Result limiting for performance
+            self.max_displayed_results = 200  # Maximum rows to display in tables
+            self.search_debounce_delay = 0.2  # Search debounce delay in seconds
+            # Fast search index using trie
+            self.search_index = SearchIndex()
+            # Pre-computed lowercase fields for faster searching (fallback)
             self._table_search_data: Dict[str, str] = {}  # table_key -> lowercase searchable text
             self._column_search_data: Dict[str, str] = {}  # column_key -> lowercase searchable text
 
@@ -1065,9 +1726,93 @@ if TEXTUAL_AVAILABLE:
             self._search_cache[self._cache_key(mode, query)] = value
 
         def _clear_search_cache(self) -> None:
+            """Clear search result cache."""
             self._search_cache.clear()
             self._last_search_query = ""
             self._last_search_mode = ""
+
+        def _clear_ui_cache(self) -> None:
+            """Clear UI rendering cache."""
+            self._ui_cache.clear()
+
+        def _invalidate_all_caches(self) -> None:
+            """Invalidate all caches when data changes."""
+            self._clear_search_cache()
+            self._clear_ui_cache()
+            self._cache_timestamp = asyncio.get_event_loop().time() if asyncio.get_event_loop() else 0
+
+        def _get_cached_ui_render(self, cache_key: str) -> Optional[Any]:
+            """Get cached UI render result if still valid."""
+            if cache_key in self._ui_cache:
+                cached_item = self._ui_cache[cache_key]
+                # Check if cache is still valid (same data timestamp)
+                if cached_item.get("timestamp", 0) >= self._cache_timestamp:
+                    return cached_item["data"]
+            return None
+
+        def _set_cached_ui_render(self, cache_key: str, data: Any) -> None:
+            """Cache UI render result with memory-efficient storage."""
+            # Compress data by removing redundant information
+            compressed_data = self._compress_ui_data(data)
+
+            self._ui_cache[cache_key] = {
+                "data": compressed_data,
+                "timestamp": self._cache_timestamp,
+                "access_count": 0,  # For LRU tracking
+            }
+
+            # Limit UI cache size to prevent memory bloat (more aggressive limit)
+            if len(self._ui_cache) > 30:  # Keep last 30 UI renders
+                # Remove least recently used entries
+                lru_entries = sorted(self._ui_cache.items(), key=lambda x: (x[1]["access_count"], x[1]["timestamp"]))[
+                    :10
+                ]  # Remove 10 LRU entries
+                for key, _ in lru_entries:
+                    del self._ui_cache[key]
+
+        def _compress_ui_data(self, data: Dict) -> Dict:
+            """Compress UI data to reduce memory usage."""
+            compressed = data.copy()
+
+            # Compress table rows by using tuples instead of dicts where possible
+            if "table_rows" in compressed:
+                compressed["table_rows"] = [(row["args"], row.get("key")) for row in compressed["table_rows"]]
+
+            # Compress columns data
+            if "columns_data" in compressed and compressed["columns_data"]:
+                cols_data = compressed["columns_data"]
+                if "rows" in cols_data:
+                    cols_data["rows"] = [(row["args"], row.get("key")) for row in cols_data["rows"]]
+
+            return compressed
+
+        def _get_cached_ui_render(self, cache_key: str) -> Optional[Any]:
+            """Get cached UI render result if still valid (with LRU tracking)."""
+            if cache_key in self._ui_cache:
+                cached_item = self._ui_cache[cache_key]
+                # Check if cache is still valid (same data timestamp)
+                if cached_item.get("timestamp", 0) >= self._cache_timestamp:
+                    # Update access count for LRU
+                    cached_item["access_count"] += 1
+                    # Decompress data
+                    return self._decompress_ui_data(cached_item["data"])
+            return None
+
+        def _decompress_ui_data(self, compressed_data: Dict) -> Dict:
+            """Decompress UI data back to original format."""
+            data = compressed_data.copy()
+
+            # Decompress table rows
+            if "table_rows" in data:
+                data["table_rows"] = [{"args": args, "key": key} for args, key in data["table_rows"]]
+
+            # Decompress columns data
+            if "columns_data" in data and data["columns_data"]:
+                cols_data = data["columns_data"]
+                if "rows" in cols_data:
+                    cols_data["rows"] = [{"args": args, "key": key} for args, key in cols_data["rows"]]
+
+            return data
 
         def _apply_search_update(self) -> None:
             """Apply current search query/mode to UI."""
@@ -1151,40 +1896,51 @@ if TEXTUAL_AVAILABLE:
             self.run_worker(self.load_data, exclusive=True)
 
         async def load_data(self) -> None:
-            """Load data from database in background."""
+            """Load initial batch of data from database in background."""
             try:
-                # Load tables and columns
-                self.tables, self.columns = get_all_tables_and_columns(
-                    self.schema_filter, self.use_mock, self.use_cache
+                # Load initial batch of tables and columns (using async version for parallel queries)
+                self.tables, self.columns = await get_all_tables_and_columns_async(
+                    self.schema_filter, self.use_mock, self.use_cache, limit=self.initial_load_limit, offset=0
                 )
 
-                # Build table-columns mapping and pre-compute search data
+                # Check if we got fewer results than requested (indicates all data loaded)
+                if len(self.tables) < self.initial_load_limit:
+                    self.all_tables_loaded = True
+                else:
+                    # Estimate total tables for progress indication
+                    await self._estimate_total_tables()
+
+                # Build table-columns mapping and search index
                 self.table_columns = {}
                 self._table_search_data = {}
                 self._column_search_data = {}
-                
+
                 for table in self.tables:
                     table_key = f"{table.schema}.{table.name}"
-                    # Pre-compute lowercase searchable text for each table
+                    # Pre-compute lowercase searchable text for each table (fallback)
                     search_text = f"{table.name} {table.schema} {table.remarks or ''}".lower()
                     self._table_search_data[table_key] = search_text
-                
+
                 for col in self.columns:
                     if col.schema and col.table:
                         table_key = f"{col.schema}.{col.table}"
                         if table_key not in self.table_columns:
                             self.table_columns[table_key] = []
                         self.table_columns[table_key].append(col)
-                        
-                        # Pre-compute lowercase searchable text for each column
+
+                        # Pre-compute lowercase searchable text for each column (fallback)
                         col_key = f"{col.schema}.{col.table}.{col.name}"
                         search_text = f"{col.name} {col.typename} {col.remarks or ''}".lower()
                         self._column_search_data[col_key] = search_text
 
+                # Build fast search index
+                self.search_index.build_index(self.tables, self.columns)
+
+                # Update cache timestamp and clear caches
+                self._invalidate_all_caches()
+
                 # Populate tables
                 self.update_tables_display()
-                # Clear any stale search cache after data refresh
-                self._clear_search_cache()
 
                 # Focus search input
                 self.query_one("#search-input", Input).focus()
@@ -1203,20 +1959,152 @@ if TEXTUAL_AVAILABLE:
                     else:
                         self.notify("⚠️ No tables loaded! Check database connection.", severity="warning", timeout=5)
                 else:
+                    load_msg = f"✓ Loaded {table_count} tables"
                     if self.schema_filter:
-                        msg = f"✓ Loaded {table_count} tables from '{self.schema_filter}' ({column_count} columns)"
-                    else:
-                        msg = f"✓ Loaded {table_count} tables from all schemas ({column_count} columns)"
-                    self.notify(msg, severity="information", timeout=3)
+                        load_msg += f" from '{self.schema_filter}'"
+                    load_msg += f" ({column_count} columns)"
+
+                    if not self.all_tables_loaded and self.total_tables_estimate:
+                        load_msg += f" - {self.total_tables_estimate} total estimated"
+                    elif not self.all_tables_loaded:
+                        load_msg += " - more available"
+
+                    self.notify(load_msg, severity="information", timeout=4)
             except Exception as e:
                 self.notify(f"❌ Error loading schema: {e}", severity="error", timeout=10)
                 self.tables, self.columns = [], []
                 self.update_tables_display()
 
+        async def _estimate_total_tables(self):
+            """Estimate total number of tables for progress indication."""
+            if self.use_mock:
+                self.total_tables_estimate = len(self.tables)  # Mock data is complete
+                return
+
+            try:
+                # Quick count query to estimate total
+                count_sql = f"""
+                    SELECT COUNT(*) as TOTAL_COUNT
+                    FROM QSYS2.SYSTABLES
+                    WHERE TABLE_TYPE IN ('T', 'P')
+                    AND SYSTEM_TABLE = 'N'
+                    {"AND TABLE_SCHEMA = '" + self.schema_filter.upper() + "'" if self.schema_filter else ""}
+                """
+                count_result = query_runner(count_sql)
+                if count_result and count_result[0].get("TOTAL_COUNT"):
+                    self.total_tables_estimate = int(count_result[0]["TOTAL_COUNT"])
+            except Exception:
+                # If count fails, use a rough estimate
+                self.total_tables_estimate = len(self.tables) * 2
+
+        async def load_more_tables(self, additional_limit: int = 100) -> bool:
+            """Load additional tables and their columns. Returns True if more data was loaded."""
+            if self.all_tables_loaded:
+                return False
+
+            try:
+                new_offset = len(self.tables)
+                new_tables, new_columns = await get_all_tables_and_columns_async(
+                    self.schema_filter, self.use_mock, self.use_cache, limit=additional_limit, offset=new_offset
+                )
+
+                if not new_tables:
+                    self.all_tables_loaded = True
+                    return False
+
+                # Add new tables and columns
+                self.tables.extend(new_tables)
+                self.columns.extend(new_columns)
+
+                # Update table columns mapping and search data for new data
+                for table in new_tables:
+                    table_key = f"{table.schema}.{table.name}"
+                    # Pre-compute lowercase searchable text for each table
+                    search_text = f"{table.name} {table.schema} {table.remarks or ''}".lower()
+                    self._table_search_data[table_key] = search_text
+
+                for col in new_columns:
+                    if col.schema and col.table:
+                        table_key = f"{col.schema}.{col.table}"
+                        if table_key not in self.table_columns:
+                            self.table_columns[table_key] = []
+                        self.table_columns[table_key].append(col)
+
+                        # Pre-compute lowercase searchable text for each column
+                        col_key = f"{col.schema}.{col.table}.{col.name}"
+                        search_text = f"{col.name} {col.typename} {col.remarks or ''}".lower()
+                        self._column_search_data[col_key] = search_text
+
+                # Update offset
+                self.current_offset = new_offset + len(new_tables)
+
+                # Check if this was the last batch
+                if len(new_tables) < additional_limit:
+                    self.all_tables_loaded = True
+
+                # Rebuild search index with new data
+                self.search_index.build_index(self.tables, self.columns)
+
+                # Update cache timestamp and clear caches
+                self._invalidate_all_caches()
+
+                # Refresh display with new data
+                self.update_tables_display()
+
+                # Show success message
+                table_count = len(self.tables)
+                load_msg = f"✓ Loaded {len(new_tables)} additional tables ({table_count} total)"
+                if not self.all_tables_loaded and self.total_tables_estimate:
+                    remaining = self.total_tables_estimate - table_count
+                    load_msg += f" - {remaining} remaining"
+                self.notify(load_msg, severity="information", timeout=3)
+
+                return True
+
+            except Exception as e:
+                self.notify(f"❌ Error loading additional data: {e}", severity="error", timeout=5)
+                self.all_tables_loaded = True
+                return False
+
         def update_tables_display(self) -> None:
-            """Update the tables display based on current search mode."""
+            """Update the tables display based on current search mode with caching."""
+            # Create cache key for this display state
+            cache_key = (
+                f"tables_display_{self.search_mode}_{self.search_query}_{len(self.tables)}_{self._cache_timestamp}"
+            )
+
+            # Try to get cached display data
+            cached_display = self._get_cached_ui_render(cache_key)
+            if cached_display:
+                # Apply cached display data
+                tables_table = self.query_one("#tables-table", DataTable)
+                tables_table.clear()
+                for row_data in cached_display["table_rows"]:
+                    tables_table.add_row(*row_data["args"], key=row_data.get("key"))
+
+                # Update info texts
+                info = self.query_one("#tables-container .info-text", Static)
+                info.update(cached_display["tables_info"])
+
+                if cached_display.get("columns_data"):
+                    columns_table = self.query_one("#columns-table", DataTable)
+                    columns_table.clear()
+                    for row_data in cached_display["columns_data"]["rows"]:
+                        columns_table.add_row(*row_data["args"], key=row_data.get("key"))
+                    info = self.query_one("#columns-container .info-text", Static)
+                    info.update(cached_display["columns_data"]["info"])
+
+                # Restore cursor position
+                if cached_display.get("cursor_row") is not None:
+                    tables_table.cursor_row = cached_display["cursor_row"]
+
+                return
+
+            # Cache miss - compute display data
             tables_table = self.query_one("#tables-table", DataTable)
             tables_table.clear()
+
+            display_data = {"table_rows": [], "tables_info": "", "cursor_row": None}
 
             if self.search_mode == "tables":
                 # Standard table search - filter tables by name/description
@@ -1230,26 +2118,44 @@ if TEXTUAL_AVAILABLE:
                         filtered_tables = self.filter_tables(self.tables, self.search_query)
                         self._set_cached("tables", self.search_query, {"filtered_tables": filtered_tables})
 
+                # Limit displayed results for performance
+                displayed_tables = filtered_tables[: self.max_displayed_results]
+                has_more_results = len(filtered_tables) > self.max_displayed_results
+
                 # Add rows
-                for table in filtered_tables:
+                for table in displayed_tables:
+                    tables_table.add_row(table.name, table.remarks or "", key=f"{table.schema}.{table.name}")
+
+                # Add indicator for more results if needed
+                if has_more_results:
+                    remaining = len(filtered_tables) - self.max_displayed_results
                     tables_table.add_row(
-                        table.name, table.remarks or "", key=f"{table.schema}.{table.name}"
+                        f"... and {remaining} more tables",
+                        "Press Ctrl+L to load all results",
+                        key="load_more_indicator",
                     )
 
                 # Update info text
+                if has_more_results:
+                    display_data["tables_info"] = (
+                        f"Tables ({len(displayed_tables)}+ matching, {remaining} more available)"
+                    )
+                else:
+                    display_data["tables_info"] = f"Tables ({len(filtered_tables)} matching)"
                 info = self.query_one("#tables-container .info-text", Static)
-                info.update(f"Tables ({len(filtered_tables)} matching)")
+                info.update(display_data["tables_info"])
 
             else:  # search_mode == "columns"
                 # Column-focused search - find tables that contain matching columns
                 if not self.search_query:
                     # Show all tables when no search
                     for table in self.tables:
-                        tables_table.add_row(
-                            table.name, table.remarks or "", key=f"{table.schema}.{table.name}"
-                        )
+                        row_data = {"args": (table.name, table.remarks or ""), "key": f"{table.schema}.{table.name}"}
+                        display_data["table_rows"].append(row_data)
+                        tables_table.add_row(*row_data["args"], key=row_data["key"])
+                    display_data["tables_info"] = f"Tables ({len(self.tables)} total)"
                     info = self.query_one("#tables-container .info-text", Static)
-                    info.update(f"Tables ({len(self.tables)} total)")
+                    info.update(display_data["tables_info"])
                 else:
                     # Try cache first
                     cached = self._get_cached("columns", self.search_query)
@@ -1276,6 +2182,8 @@ if TEXTUAL_AVAILABLE:
 
                     # Display tables that have matching columns
                     tables_with_matches = []
+                    columns_data = {"rows": [], "info": ""}
+
                     for table in self.tables:
                         table_key = f"{table.schema}.{table.name}"
                         if table_key in matching_table_counts:
@@ -1285,20 +2193,25 @@ if TEXTUAL_AVAILABLE:
                                 info_text = f"{info_text} — {match_count} matching column(s)"
                             else:
                                 info_text = f"{match_count} matching column(s)"
-                            tables_table.add_row(
-                                table.name,
-                                info_text,
-                                key=table_key,
-                            )
+                            row_data = {"args": (table.name, info_text), "key": table_key}
+                            display_data["table_rows"].append(row_data)
+                            tables_table.add_row(*row_data["args"], key=row_data["key"])
                             tables_with_matches.append(table)
 
                     # Update info text
+                    display_data["tables_info"] = f"Tables with matching columns ({len(tables_with_matches)} found)"
                     info = self.query_one("#tables-container .info-text", Static)
-                    info.update(f"Tables with matching columns ({len(tables_with_matches)} found)")
-                    # Populate the columns panel with all matches across tables
+                    info.update(display_data["tables_info"])
+
+                    # Populate the columns panel with limited matches across tables
                     columns_table = self.query_one("#columns-table", DataTable)
                     columns_table.clear()
-                    for col in matching_columns:
+
+                    # Limit displayed columns for performance
+                    displayed_columns = matching_columns[: self.max_displayed_results]
+                    has_more_columns = len(matching_columns) > self.max_displayed_results
+
+                    for col in displayed_columns:
                         col_key = f"{col.schema}.{col.table}.{col.name}"
                         type_str = f"{col.typename}"
                         if col.length:
@@ -1306,40 +2219,62 @@ if TEXTUAL_AVAILABLE:
                             if col.scale:
                                 type_str += f",{col.scale}"
                             type_str += ")"
-                        columns_table.add_row(
-                            f"{col.schema}.{col.table}.{col.name}",
-                            type_str,
-                            col.nulls,
-                            col.remarks or "",
-                            key=col_key,
-                        )
-                    info = self.query_one("#columns-container .info-text", Static)
-                    info.update(f"Column matches across tables ({len(matching_columns)} found)")
+                        row_data = {
+                            "args": (f"{col.schema}.{col.table}.{col.name}", type_str, col.nulls, col.remarks or ""),
+                            "key": col_key,
+                        }
+                        columns_data["rows"].append(row_data)
+                        columns_table.add_row(*row_data["args"], key=row_data["key"])
 
-                # If we have a selected table, ensure the DataTable cursor highlights it
-                try:
-                    if self.selected_table:
-                        for idx in range(tables_table.row_count):
-                            row = tables_table.get_row_at(idx)
-                            if row and row[0] == self.selected_table.name:
-                                tables_table.cursor_row = idx
-                                break
-                except Exception:
-                    pass
+                    # Add indicator for more results if needed
+                    if has_more_columns:
+                        remaining = len(matching_columns) - self.max_displayed_results
+                        columns_table.add_row(
+                            f"... and {remaining} more columns",
+                            "",
+                            "",
+                            "Press Ctrl+L to load all results",
+                            key="load_more_columns_indicator",
+                        )
+
+                    if has_more_columns:
+                        columns_data["info"] = (
+                            f"Column matches across tables ({len(displayed_columns)}+ found, {remaining} more available)"
+                        )
+                    else:
+                        columns_data["info"] = f"Column matches across tables ({len(matching_columns)} found)"
+                    info = self.query_one("#columns-container .info-text", Static)
+                    info.update(columns_data["info"])
+                    display_data["columns_data"] = columns_data
+
+            # Set cursor position for selected table
+            try:
+                if self.selected_table:
+                    for idx in range(tables_table.row_count):
+                        row = tables_table.get_row_at(idx)
+                        if row and row[0] == self.selected_table.name:
+                            tables_table.cursor_row = idx
+                            display_data["cursor_row"] = idx
+                            break
+            except Exception:
+                pass
+
+            # Cache the display data
+            self._set_cached_ui_render(cache_key, display_data)
 
         def column_matches_query(self, col: ColumnInfo, query: str) -> bool:
             """Check if a column matches the search query using pre-computed data and fuzzy matching."""
             if not query:
                 return True
-                
+
             col_key = f"{col.schema}.{col.table}.{col.name}"
             search_text = self._column_search_data.get(col_key, "")
             query_lower = query.lower()
-            
+
             # Fast substring check first using pre-computed data
             if query_lower in search_text:
                 return True
-            
+
             # Fall back to fuzzy matching
             return (
                 self.fuzzy_match(col.name, query)
@@ -1459,11 +2394,8 @@ if TEXTUAL_AVAILABLE:
 
         def fuzzy_match(self, text: str, query: str) -> bool:
             """
-            Optimized fuzzy match with early exits.
-            1. Exact substring match (highest priority)
-            2. Word boundary match (e.g., 'cus' matches 'customer_order')
-            3. Edit distance within threshold for similar words
-            4. Sequential character match (fallback fuzzy)
+            Highly optimized fuzzy match with multiple strategies and early exits.
+            Prioritizes speed over perfect accuracy for better UX.
             """
             if not query:
                 return True
@@ -1472,105 +2404,265 @@ if TEXTUAL_AVAILABLE:
 
             text_lower = text.lower()
             query_lower = query.lower()
+            query_len = len(query_lower)
+            text_len = len(text_lower)
 
-            # Strategy 1: Exact substring match (fast and intuitive) - early exit
+            # Strategy 1: Exact substring match (fastest) - early exit
             if query_lower in text_lower:
                 return True
-            
-            # For very short queries, skip expensive operations
-            if len(query_lower) < 2:
+
+            # For very short queries, only check exact matches
+            if query_len < 2:
                 return False
 
-            # Strategy 2: Check each word in text (split by _ or space)
-            words = text_lower.replace("_", " ").split()
+            # Strategy 2: Word boundary prefix match (fast and intuitive)
+            # Split by common separators and check if query matches start of any word
+            words = text_lower.replace("_", " ").replace("-", " ").split()
             for word in words:
-                # Check if query is prefix of word - early exit
+                word_len = len(word)
+                # Check prefix match
                 if word.startswith(query_lower):
                     return True
+                # For longer queries, check if word contains query as prefix
+                if word_len >= query_len and word[:query_len] == query_lower:
+                    return True
 
-                # Check edit distance only for similar-length words (optimization)
-                if len(query_lower) >= 3 and abs(len(word) - len(query_lower)) <= 2:
-                    # Allow 1 edit per 3 characters
-                    max_distance = max(1, len(query_lower) // 3)
-                    if self.edit_distance(word, query_lower) <= max_distance:
-                        return True
-
-            # Strategy 3: Sequential character match (fallback fuzzy)
-            # Only try this if query is reasonably short
-            if len(query_lower) <= len(text_lower):
+            # Strategy 3: Character-based approximate matching
+            # Only for reasonable length queries to avoid performance issues
+            if query_len <= 20 and text_len >= query_len:
+                # Fast sequential character match (allows skips)
                 text_idx = 0
+                match_count = 0
                 for char in query_lower:
-                    text_idx = text_lower.find(char, text_idx)
-                    if text_idx == -1:
+                    found_idx = text_lower.find(char, text_idx)
+                    if found_idx == -1:
+                        # Allow some character skips for fuzzy matching
+                        if match_count >= max(1, query_len - 2):  # Allow up to 2 misses
+                            return True
                         return False
-                    text_idx += 1
-                return True
-            
+                    text_idx = found_idx + 1
+                    match_count += 1
+
+                # If we matched most characters, consider it a match
+                if match_count >= max(1, query_len - 1):
+                    return True
+
+            # Strategy 4: Edit distance for similar short words (most expensive, used sparingly)
+            if query_len >= 3 and query_len <= 10:
+                # Only check edit distance for words of similar length
+                words = text_lower.replace("_", " ").split()
+                for word in words:
+                    word_len = len(word)
+                    if abs(word_len - query_len) <= 2 and word_len >= 3:
+                        # Use optimized edit distance with early exit
+                        distance = self._fast_edit_distance(word, query_lower)
+                        max_allowed = max(1, query_len // 4)  # More lenient for longer queries
+                        if distance <= max_allowed:
+                            return True
+
             return False
 
+        def _fast_edit_distance(self, s1: str, s2: str) -> int:
+            """
+            Fast edit distance calculation with optimizations for fuzzy search.
+            Returns early if distance exceeds reasonable threshold.
+            """
+            len1, len2 = len(s1), len(s2)
+
+            # Ensure s1 is the shorter string
+            if len1 > len2:
+                s1, s2 = s2, s1
+                len1, len2 = len2, len1
+
+            # Early exit for very different lengths
+            if len2 - len1 > 2:
+                return len2 - len1
+
+            # Use a simple approach for short strings
+            if len1 <= 3:
+                return sum(c1 != c2 for c1, c2 in zip(s1, s2)) + abs(len1 - len2)
+
+            # Dynamic programming with space optimization
+            prev_row = list(range(len1 + 1))
+            for i, c2 in enumerate(s2):
+                curr_row = [i + 1]
+                min_val = i + 1
+
+                for j, c1 in enumerate(s1):
+                    cost = 0 if c1 == c2 else 1
+                    curr_row.append(
+                        min(
+                            prev_row[j + 1] + 1,  # deletion
+                            curr_row[j] + 1,  # insertion
+                            prev_row[j] + cost,  # substitution
+                        )
+                    )
+                    min_val = min(min_val, curr_row[-1])
+
+                # Early exit if minimum possible distance is too high
+                if min_val > 2:
+                    return min_val
+
+                prev_row = curr_row
+
+            return prev_row[-1]
+
         def filter_tables(self, tables: List[TableInfo], query: str) -> List[TableInfo]:
-            """Filter tables based on fuzzy search query using pre-computed data."""
+            """Filter tables using fast trie-based search with progressive enhancement."""
             if not query:
                 return tables
-            
+
+            query = query.strip()
+            if not query:
+                return tables
+
+            results = []
+
+            # Phase 1: Fast trie-based exact/prefix matches
+            try:
+                trie_matches = self.search_index.search_tables(query)
+                # Filter to only include tables that are in our current tables list
+                table_keys = {f"{t.schema}.{t.name}" for t in tables}
+                results.extend([t for t in trie_matches if f"{t.schema}.{t.name}" in table_keys])
+            except Exception:
+                pass  # Continue to fallback
+
+            # Phase 2: Add fuzzy matches for better coverage (only if query is substantial)
+            if len(query) >= 2:
+                try:
+                    fuzzy_matches = self._filter_tables_fallback(tables, query)
+                    # Add fuzzy matches that aren't already in results
+                    existing_keys = {f"{t.schema}.{t.name}" for t in results}
+                    for table in fuzzy_matches:
+                        table_key = f"{table.schema}.{table.name}"
+                        if table_key not in existing_keys:
+                            results.append(table)
+                            existing_keys.add(table_key)
+                except Exception:
+                    pass
+
+            return results
+
+        def _filter_tables_fallback(self, tables: List[TableInfo], query: str) -> List[TableInfo]:
+            """Fallback table filtering using fuzzy search."""
+            if not query:
+                return tables
+
             query_lower = query.lower()
             filtered = []
-            
+
             # Use pre-computed search data for faster matching
             for table in tables:
                 table_key = f"{table.schema}.{table.name}"
                 search_text = self._table_search_data.get(table_key, "")
-                
+
                 # Fast substring check first (most common case)
                 if query_lower in search_text:
                     filtered.append(table)
                 # Fall back to fuzzy match if needed
                 elif self.fuzzy_match(table.name, query) or self.fuzzy_match(table.remarks or "", query):
                     filtered.append(table)
-            
+
             return filtered
 
         def filter_columns(self, columns: List[ColumnInfo], query: str) -> List[ColumnInfo]:
-            """Filter columns based on fuzzy search query using pre-computed data."""
+            """Filter columns using fast trie-based search with progressive enhancement."""
             if not query:
                 return columns
-            
+
+            query = query.strip()
+            if not query:
+                return columns
+
+            results = []
+
+            # Phase 1: Fast trie-based exact/prefix matches
+            try:
+                trie_matches = self.search_index.search_columns(query)
+                # Filter to only include columns that are in our current columns list
+                column_keys = {f"{c.schema}.{c.table}.{c.name}" for c in columns}
+                results.extend([c for c in trie_matches if f"{c.schema}.{c.table}.{c.name}" in column_keys])
+            except Exception:
+                pass  # Continue to fallback
+
+            # Phase 2: Add fuzzy matches for better coverage (only if query is substantial)
+            if len(query) >= 2:
+                try:
+                    fuzzy_matches = self._filter_columns_fallback(columns, query)
+                    # Add fuzzy matches that aren't already in results
+                    existing_keys = {f"{c.schema}.{c.table}.{c.name}" for c in results}
+                    for col in fuzzy_matches:
+                        col_key = f"{col.schema}.{col.table}.{col.name}"
+                        if col_key not in existing_keys:
+                            results.append(col)
+                            existing_keys.add(col_key)
+                except Exception:
+                    pass
+
+            return results
+
+        def _filter_columns_fallback(self, columns: List[ColumnInfo], query: str) -> List[ColumnInfo]:
+            """Fallback column filtering using fuzzy search."""
+            if not query:
+                return columns
+
             query_lower = query.lower()
             filtered = []
-            
+
             # Use pre-computed search data for faster matching
             for col in columns:
                 col_key = f"{col.schema}.{col.table}.{col.name}"
                 search_text = self._column_search_data.get(col_key, "")
-                
+
                 # Fast substring check first (most common case)
                 if query_lower in search_text:
                     filtered.append(col)
                 # Fall back to fuzzy match if needed
                 elif self.fuzzy_match(col.name, query) or self.fuzzy_match(col.typename, query):
                     filtered.append(col)
-            
+
             return filtered
 
         @on(Input.Changed, "#search-input")
         def on_search_changed(self, event: Input.Changed) -> None:
-            """Handle search input changes with debounce and caching."""
+            """Handle search input changes with progressive rendering."""
             self.search_query = event.value
-            expected_query = self.search_query
-            expected_mode = self.search_mode
-            # Debounce recompute to reduce per-keystroke cost
+            # Cancel any pending progressive search
+            if hasattr(self, "_progressive_search_task") and self._progressive_search_task:
+                try:
+                    self._progressive_search_task.cancel()
+                except Exception:
+                    pass
+
+            # Start progressive search
+            self._progressive_search_task = asyncio.create_task(self._progressive_search(event.value))
+
+        async def _progressive_search(self, query: str) -> None:
+            """Perform progressive search: fast results first, then slower fuzzy matches."""
             try:
-                if self._debounce_timer and not self._debounce_timer.done():
-                    self._debounce_timer.cancel()
-            except Exception:
+                # Phase 1: Immediate trie-based results (fast)
+                if query.strip():
+                    # Update display with fast trie results immediately
+                    self._apply_search_update()
+                    await asyncio.sleep(
+                        min(0.05, self.search_debounce_delay / 4)
+                    )  # Brief pause to show initial results
+
+                    # Phase 2: Add fuzzy matches progressively if needed
+                    if len(query.strip()) >= 2:  # Only for longer queries
+                        # Trigger a more thorough search update
+                        await asyncio.sleep(min(0.1, self.search_debounce_delay / 2))  # Small delay before fuzzy search
+                        self._apply_search_update()  # This will include fuzzy matches
+                else:
+                    # No query - immediate update
+                    self._apply_search_update()
+
+            except asyncio.CancelledError:
+                # Search was cancelled, exit gracefully
                 pass
-            try:
-                self._debounce_timer = asyncio.create_task(
-                    self._debounced_apply(expected_query, expected_mode)
-                )
-            except Exception:
-                # Fallback to immediate update if scheduling fails
-                self._apply_search_update()
+            except Exception as e:
+                # Log error but don't crash
+                self.notify(f"Search error: {e}", severity="error", timeout=3)
 
         @on(DataTable.RowSelected, "#tables-table")
         def on_table_selected(self, event: DataTable.RowSelected) -> None:
@@ -1649,7 +2741,7 @@ if TEXTUAL_AVAILABLE:
                         current_table_key = list(tables_table.rows.keys())[tables_table.cursor_row]
             except Exception:
                 pass
-            
+
             if self.search_mode == "tables":
                 self.search_mode = "columns"
                 mode_button = self.query_one("#search-mode-label", Button)
@@ -1669,7 +2761,7 @@ if TEXTUAL_AVAILABLE:
 
             # Re-run search with new mode
             self.update_tables_display()
-            
+
             # Restore table selection and update columns display
             if current_table_key:
                 try:
@@ -1754,14 +2846,14 @@ if TEXTUAL_AVAILABLE:
                     # Pre-compute lowercase searchable text for each table
                     search_text = f"{table.name} {table.schema} {table.remarks or ''}".lower()
                     self._table_search_data[table_key] = search_text
-                
+
                 for col in self.columns:
                     if col.schema and col.table:
                         table_key = f"{col.schema}.{col.table}"
                         if table_key not in self.table_columns:
                             self.table_columns[table_key] = []
                         self.table_columns[table_key].append(col)
-                        
+
                         # Pre-compute lowercase searchable text for each column
                         col_key = f"{col.schema}.{col.table}.{col.name}"
                         search_text = f"{col.name} {col.typename} {col.remarks or ''}".lower()
@@ -1797,19 +2889,61 @@ if TEXTUAL_AVAILABLE:
 
         def action_help(self) -> None:
             """Show help information."""
-            self.notify(
-                "Navigation: ↑↓/mouse | Search: type | Tab: toggle mode | S: settings | Y: copy path | /: focus | Esc: clear | Q: quit",
-                timeout=5,
+            help_text = (
+                "Navigation: ↑↓/mouse | Search: type | Tab: toggle mode | S: settings | /: focus | Esc: clear | Q: quit"
             )
+            if not self.all_tables_loaded:
+                help_text += " | L: load more tables"
+            help_text += " | Ctrl+L: show all results"
+            self.notify(help_text, timeout=5)
 
         def action_copy_table_path(self) -> None:
             """Copy the currently highlighted table's IBM i path to clipboard."""
             # Path copying was removed; show help about keybindings instead
             self.notify("Copy Table Path is not available in this build", severity="warning", timeout=3)
 
+        def _show_load_more_binding(self) -> bool:
+            """Show the load more binding only when there are more tables to load."""
+            return not self.all_tables_loaded
+
+        def action_load_more(self) -> None:
+            """Load more tables from the database."""
+            if self.all_tables_loaded:
+                self.notify("All tables already loaded", timeout=2)
+                return
+
+            self.notify("Loading more tables...", timeout=1)
+            self.run_worker(self.load_more_tables, exclusive=True)
+
+        def action_load_all_results(self) -> None:
+            """Temporarily increase the display limit to show all current results."""
+            old_limit = self.max_displayed_results
+            self.max_displayed_results = max(len(self.tables), len(self.columns)) + 100  # Show all current results
+            self._invalidate_all_caches()  # Force UI refresh
+            self.update_tables_display()
+            self.notify(f"Showing all {len(self.tables)} tables and {len(self.columns)} columns", timeout=3)
+
+            # Reset limit after a delay
+            async def reset_limit():
+                await asyncio.sleep(30)  # Reset after 30 seconds
+                self.max_displayed_results = old_limit
+                self._invalidate_all_caches()
+                self.update_tables_display()
+
+            asyncio.create_task(reset_limit())
+
+        def get_bindings(self) -> list[Binding]:
+            """Override to dynamically show/hide the load more binding."""
+            bindings = super().get_bindings()
+            # Filter out the load_more binding if all tables are loaded
+            if self.all_tables_loaded:
+                bindings = [b for b in bindings if b.key != "l"]
+            return bindings
+
 
 def search_and_output(query, schema_filter=None, limit=10, output_format="table", use_mock=False):
     """Perform a search and output results directly without TUI."""
+    # For one-shot search, load all data (no lazy loading)
     tables, columns = get_all_tables_and_columns(schema_filter, use_mock)
 
     # Simple filtering for demo
@@ -1871,6 +3005,15 @@ def main():
     parser.add_argument("--install-deps", action="store_true", help="Show required dependencies")
     parser.add_argument("--basic", action="store_true", help="Use basic mode (no Textual TUI)")
     parser.add_argument("--no-cache", action="store_true", help="Disable caching of database schema")
+    parser.add_argument(
+        "--initial-load-limit", type=int, default=100, help="Initial number of tables to load (default: 100)"
+    )
+    parser.add_argument(
+        "--max-display-results", type=int, default=200, help="Maximum results to display in UI (default: 200)"
+    )
+    parser.add_argument(
+        "--search-debounce", type=float, default=0.2, help="Search debounce delay in seconds (default: 0.2)"
+    )
 
     args = parser.parse_args()
 
@@ -1891,13 +3034,23 @@ def main():
     else:
         # Interactive mode - prefer Textual if available
         if TEXTUAL_AVAILABLE and not args.basic:
-            app = DBBrowserApp(schema_filter=args.schema, use_mock=args.mock, use_cache=not args.no_cache)
+            app = DBBrowserApp(
+                schema_filter=args.schema,
+                use_mock=args.mock,
+                use_cache=not args.no_cache,
+                initial_load_limit=args.initial_load_limit,
+            )
+            # Configure performance settings
+            app.max_displayed_results = args.max_display_results
+            app.search_debounce_delay = args.search_debounce
             app.run()
         elif RICH_AVAILABLE:
             if not TEXTUAL_AVAILABLE:
                 print("[Note: For full keyboard/mouse support, install Textual: pip install textual]")
                 print()
-            browser = DBBrowserTUI(schema_filter=args.schema, use_mock=args.mock)
+            browser = DBBrowserTUI(
+                schema_filter=args.schema, use_mock=args.mock, initial_load_limit=args.initial_load_limit
+            )
             browser.run()
         else:
             print("Error: This tool requires either 'rich' or 'textual' library.")
