@@ -2124,17 +2124,43 @@ if TEXTUAL_AVAILABLE:
                 for table in displayed_tables:
                     tables_table.add_row(table.name, table.remarks or "", key=f"{table.schema}.{table.name}")
 
-                # Add indicator for more results if needed
-                if has_more_results:
+                # Automatically load more data in background if we have search results approaching the limit
+                search_result_count = len(filtered_tables)
+                if (
+                    search_result_count >= self.max_displayed_results * 0.8  # 80% of limit reached
+                    and not self.all_tables_loaded  # More data available to load
+                    and self.search_query  # We have an active search
+                    and not hasattr(self, "_background_load_task")  # No background load in progress
+                    or (
+                        hasattr(self, "_background_load_task")
+                        and (self._background_load_task is None or self._background_load_task.done())
+                    )
+                ):
+                    # Start background loading
+                    self._background_load_task = asyncio.create_task(
+                        self._load_more_for_search(self.search_query, search_result_count)
+                    )
+
+                # Show loading indicator if background load is in progress
+                if (
+                    hasattr(self, "_background_load_task")
+                    and self._background_load_task
+                    and not self._background_load_task.done()
+                ):
+                    tables_table.add_row(
+                        "🔄 Loading more results...",
+                        f"Searching {len(self.tables)} tables loaded so far",
+                        key="loading_indicator",
+                    )
+                    display_data["tables_info"] = f"Tables ({len(displayed_tables)} matching, searching more data...)"
+                elif has_more_results:
+                    # Fallback to manual load option if background loading not available
                     remaining = len(filtered_tables) - self.max_displayed_results
                     tables_table.add_row(
                         f"... and {remaining} more tables",
                         "Press Ctrl+L to load all results",
                         key=f"load_more_tables_{self.search_mode}",
                     )
-
-                # Update info text
-                if has_more_results:
                     display_data["tables_info"] = (
                         f"Tables ({len(displayed_tables)}+ matching, {remaining} more available)"
                     )
@@ -2196,8 +2222,40 @@ if TEXTUAL_AVAILABLE:
                             tables_table.add_row(*row_data["args"], key=row_data["key"])
                             tables_with_matches.append(table)
 
-                    # Update info text
-                    display_data["tables_info"] = f"Tables with matching columns ({len(tables_with_matches)} found)"
+                    # Automatically load more data in background for column search
+                    total_column_matches = len(matching_columns)
+                    if (
+                        total_column_matches >= self.max_displayed_results * 0.8  # 80% of limit reached
+                        and not self.all_tables_loaded  # More data available to load
+                        and self.search_query  # We have an active search
+                        and not hasattr(self, "_background_load_task")  # No background load in progress
+                        or (
+                            hasattr(self, "_background_load_task")
+                            and (self._background_load_task is None or self._background_load_task.done())
+                        )
+                    ):
+                        # Start background loading
+                        self._background_load_task = asyncio.create_task(
+                            self._load_more_for_search(self.search_query, total_column_matches)
+                        )
+
+                    # Show loading indicator if background load is in progress
+                    if (
+                        hasattr(self, "_background_load_task")
+                        and self._background_load_task
+                        and not self._background_load_task.done()
+                    ):
+                        # Add loading indicator to table display
+                        tables_table.add_row(
+                            "🔄 Loading more results...",
+                            f"Searching {len(self.tables)} tables loaded so far",
+                            key="loading_indicator",
+                        )
+                        display_data["tables_info"] = (
+                            f"Tables with matching columns ({len(tables_with_matches)} found, searching more data...)"
+                        )
+                    else:
+                        display_data["tables_info"] = f"Tables with matching columns ({len(tables_with_matches)} found)"
                     info = self.query_one("#tables-container .info-text", Static)
                     info.update(display_data["tables_info"])
 
@@ -2632,6 +2690,14 @@ if TEXTUAL_AVAILABLE:
                 except Exception:
                     pass
 
+            # Cancel any background loading for previous search
+            if hasattr(self, "_background_load_task") and self._background_load_task:
+                try:
+                    self._background_load_task.cancel()
+                    self._background_load_task = None
+                except Exception:
+                    pass
+
             # Debounce the search update
             self._search_update_task = asyncio.create_task(self._debounced_search_update())
 
@@ -2646,6 +2712,74 @@ if TEXTUAL_AVAILABLE:
             except Exception as e:
                 # Log error but don't crash
                 self.notify(f"Search error: {e}", severity="error", timeout=3)
+
+        async def _load_more_for_search(self, search_query: str, current_result_count: int) -> None:
+            """Load additional data in background to find more search results."""
+            try:
+                # Load more tables in chunks
+                load_chunk_size = 200  # Load 200 more tables at a time
+                tables_loaded = 0
+
+                while (
+                    not self.all_tables_loaded
+                    and tables_loaded < 1000  # Don't load too much at once
+                    and search_query == self.search_query
+                ):  # Search query hasn't changed
+                    # Load more data
+                    loaded = await self.load_more_tables(load_chunk_size)
+                    if not loaded:
+                        break  # No more data to load
+
+                    tables_loaded += load_chunk_size
+
+                    # Re-run search with the new data
+                    if self.search_mode == "tables":
+                        filtered_tables = self.filter_tables(self.tables, search_query)
+                        new_result_count = len(filtered_tables)
+
+                        # If we found significantly more results, update the display
+                        if new_result_count > current_result_count + 10:  # Found at least 10 more results
+                            # Update the cache with new results
+                            self._set_cached("tables", search_query, {"filtered_tables": filtered_tables})
+                            # Update display
+                            self._apply_search_update()
+                            break  # Stop loading for now
+
+                    elif self.search_mode == "columns":
+                        # For column search, we need to rebuild the column matches
+                        matching_table_counts = {}
+                        matching_columns = []
+                        q = search_query
+                        for col in self.columns:
+                            if self.column_matches_query(col, q):
+                                t_key = f"{col.schema}.{col.table}"
+                                matching_table_counts[t_key] = matching_table_counts.get(t_key, 0) + 1
+                                matching_columns.append(col)
+
+                        # Cache the updated results
+                        self._set_cached(
+                            "columns",
+                            search_query,
+                            {
+                                "matching_table_counts": matching_table_counts,
+                                "matching_columns": matching_columns,
+                            },
+                        )
+
+                        # Update display if we found more results
+                        if len(matching_columns) > current_result_count + 10:
+                            self._apply_search_update()
+                            break
+
+                    # Small delay to prevent overwhelming the system
+                    await asyncio.sleep(0.1)
+
+            except Exception as e:
+                # Log error but don't crash the background task
+                print(f"Background search loading error: {e}")
+            finally:
+                # Clear the background task reference
+                self._background_load_task = None
 
         @on(DataTable.RowSelected, "#tables-table")
         def on_table_selected(self, event: DataTable.RowSelected) -> None:
@@ -2889,7 +3023,7 @@ if TEXTUAL_AVAILABLE:
             )
             if not self.all_tables_loaded:
                 help_text += " | L: load more tables"
-            help_text += " | Ctrl+L: show all results"
+            help_text += " | Ctrl+L: show all current results"
             self.notify(help_text, timeout=5)
 
         def action_copy_table_path(self) -> None:
@@ -2912,6 +3046,14 @@ if TEXTUAL_AVAILABLE:
 
         def action_load_all_results(self) -> None:
             """Temporarily increase the display limit to show all current results."""
+            if (
+                hasattr(self, "_background_load_task")
+                and self._background_load_task
+                and not self._background_load_task.done()
+            ):
+                self.notify("Background loading already in progress", timeout=2)
+                return
+
             old_limit = self.max_displayed_results
             self.max_displayed_results = max(len(self.tables), len(self.columns)) + 100  # Show all current results
             self._invalidate_all_caches()  # Force UI refresh
