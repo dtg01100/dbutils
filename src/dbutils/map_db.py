@@ -1,10 +1,11 @@
 import argparse
+import asyncio
 import json
 import logging
-from typing import Dict, List
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict, List
 
 from dbutils import catalog
-from dbutils.utils import query_runner
 
 
 def mock_get_tables() -> List[Dict[str, str]]:
@@ -91,42 +92,6 @@ def mock_get_primary_keys() -> List[Dict[str, str]]:
     ]
 
 
-def get_tables() -> List[Dict[str, object]]:
-    """Get tables using IBM i catalog."""
-    return catalog.get_tables()
-
-
-def get_columns() -> List[Dict[str, object]]:
-    """Get columns using IBM i catalog."""
-    result = catalog.get_columns()
-    # Normalize TYPENAME field name for compatibility
-    for col in result:
-        if "DATA_TYPE" in col and "TYPENAME" not in col:
-            col["TYPENAME"] = col["DATA_TYPE"]
-    return result
-
-
-def get_primary_keys() -> List[Dict[str, object]]:
-    """Get primary keys using IBM i catalog."""
-    result = catalog.get_primary_keys()
-    # Add TYPENAME field by looking up column data type
-    if result:
-        cols = catalog.get_columns()
-        col_types = {
-            (c["TABSCHEMA"], c["TABNAME"], c["COLNAME"]): c.get("DATA_TYPE", "")
-            for c in cols
-        }
-        for pk in result:
-            key = (pk["TABSCHEMA"], pk["TABNAME"], pk["COLNAME"])
-            pk["TYPENAME"] = col_types.get(key, "")
-    return result
-
-
-def get_foreign_keys() -> List[Dict[str, object]]:
-    """Get foreign keys using IBM i catalog."""
-    return catalog.get_foreign_keys()
-
-
 def mock_get_foreign_keys() -> List[Dict[str, str]]:
     return [
         {
@@ -148,109 +113,146 @@ def mock_get_foreign_keys() -> List[Dict[str, str]]:
     ]
 
 
+def get_tables() -> List[Dict[str, Any]]:
+    """Get tables using IBM i catalog."""
+    return catalog.get_tables()
+
+
+def get_columns() -> List[Dict[str, Any]]:
+    """Get columns using IBM i catalog and normalize."""
+    result = catalog.get_columns()
+    for col in result:
+        if "DATA_TYPE" in col and "TYPENAME" not in col:
+            col["TYPENAME"] = col["DATA_TYPE"]
+    return result
+
+
+def get_primary_keys(all_columns: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Get primary keys and enrich with type info from all_columns."""
+    pks = catalog.get_primary_keys()
+    if not pks:
+        return []
+
+    col_types = {(c["TABSCHEMA"], c["TABNAME"], c["COLNAME"]): c.get("DATA_TYPE", "") for c in all_columns}
+    for pk in pks:
+        key = (pk["TABSCHEMA"], pk["TABNAME"], pk["COLNAME"])
+        pk["TYPENAME"] = col_types.get(key, "")
+    return pks
+
+
+def get_foreign_keys() -> List[Dict[str, Any]]:
+    """Get foreign keys using IBM i catalog."""
+    return catalog.get_foreign_keys()
+
+
 def infer_relationships(
-    tables: List[Dict[str, object]],
-    columns: List[Dict[str, object]],
-    pks: List[Dict[str, object]],
-    use_mock: bool = False,
+    tables: List[Dict[str, Any]],
+    columns: List[Dict[str, Any]],
+    pks: List[Dict[str, Any]],
+    fks: List[Dict[str, Any]],
 ) -> List[Dict[str, str]]:
-    """Infer foreign-key-like relationships using actual constraints, remarks, and naming heuristics.
+    """Infer relationships using actual constraints, remarks, and naming heuristics."""
+    relationships: Dict[tuple, Dict[str, str]] = {}
 
-    Returns list of relationships with keys: TABSCHEMA, TABNAME, COLNAME, REFTABSCHEMA, REFTABNAME, REFCOLNAME
-    """
-    relationships: List[Dict[str, str]] = []
+    # 1. Use actual foreign key constraints
+    for fk in fks:
+        rel_key = (
+            fk["TABSCHEMA"],
+            fk["TABNAME"],
+            fk["COLNAME"],
+            fk["REFTABSCHEMA"],
+            fk["REFTABNAME"],
+            fk["REFCOLNAME"],
+        )
+        relationships[rel_key] = {
+            "TABSCHEMA": fk["TABSCHEMA"],
+            "TABNAME": fk["TABNAME"],
+            "COLNAME": fk["COLNAME"],
+            "REFTABSCHEMA": fk["REFTABSCHEMA"],
+            "REFTABNAME": fk["REFTABNAME"],
+            "REFCOLNAME": fk["REFCOLNAME"],
+        }
 
-    # First, try to get actual foreign key constraints from the database
-    try:
-        fks = get_foreign_keys() if not use_mock else mock_get_foreign_keys()
-        for fk in fks:
-            relationships.append(
-                {
-                    "TABSCHEMA": fk["TABSCHEMA"],
-                    "TABNAME": fk["TABNAME"],
-                    "COLNAME": fk["COLNAME"],
-                    "REFTABSCHEMA": fk["REFTABSCHEMA"],
-                    "REFTABNAME": fk["REFTABNAME"],
-                    "REFCOLNAME": fk["REFCOLNAME"],
-                }
-            )
-    except Exception:
-        # If we can't get actual foreign keys, fall back to inference methods
-        pass
-
-    # If no actual foreign keys were found, use inference methods
+    # 2. Fallback to inference if no FKs were found
     if not relationships:
+        # Pre-build lookups for efficiency
         table_dict = {f"{t['TABSCHEMA']}.{t['TABNAME']}": t for t in tables}
+        pk_lookup = {(pk.get("TABSCHEMA"), pk.get("TABNAME")): [] for pk in pks}
+        for pk in pks:
+            pk_lookup[(pk.get("TABSCHEMA"), pk.get("TABNAME"))].append(pk)
 
-        for table in tables:
-            table_key = f"{table['TABSCHEMA']}.{table['TABNAME']}"
-            table_cols = [c for c in columns if f"{c.get('TABSCHEMA')}.{c.get('TABNAME')}" == table_key]
-            for col in table_cols:
-                col_name = col["COLNAME"]
-                col_type = col.get("TYPENAME")
-                col_desc = str(col.get("REMARKS", "")).lower()
+        for col in columns:
+            col_table_key = f"{col.get('TABSCHEMA')}.{col.get('TABNAME')}"
+            col_name_lower = col["COLNAME"].lower()
+            col_type = col.get("TYPENAME")
+            col_desc = str(col.get("REMARKS", "")).lower()
 
-                # Check description for explicit references
+            # Heuristic 1: Check description for explicit references
+            if any(k in col_desc for k in ("ref", "foreign", "key", "references")):
                 for other_key, other_table in table_dict.items():
-                    if other_key == table_key:
+                    if other_key == col_table_key:
                         continue
-                    other_table_name = other_table["TABNAME"].lower()
-                    if other_table_name in col_desc and any(
-                        k in col_desc for k in ("ref", "foreign", "key", "references")
-                    ):
-                        matching_pks = [
-                            pk
-                            for pk in pks
-                            if f"{pk.get('TABSCHEMA')}.{pk.get('TABNAME')}" == other_key
-                            and pk.get("TYPENAME") == col_type
-                        ]
+                    if other_table["TABNAME"].lower() in col_desc:
+                        matching_pks = pk_lookup.get((other_table["TABSCHEMA"], other_table["TABNAME"]), [])
                         for pk in matching_pks:
-                            relationships.append(
-                                {
-                                    "TABSCHEMA": table["TABSCHEMA"],
-                                    "TABNAME": table["TABNAME"],
-                                    "COLNAME": col_name,
-                                    "REFTABSCHEMA": pk.get("TABSCHEMA") or table["TABSCHEMA"],
-                                    "REFTABNAME": pk.get("TABNAME"),
-                                    "REFCOLNAME": pk.get("COLNAME"),
+                            if pk.get("TYPENAME") == col_type:
+                                rel_key = (
+                                    col["TABSCHEMA"],
+                                    col["TABNAME"],
+                                    col["COLNAME"],
+                                    pk["TABSCHEMA"],
+                                    pk["TABNAME"],
+                                    pk["COLNAME"],
+                                )
+                                relationships[rel_key] = {
+                                    "TABSCHEMA": col["TABSCHEMA"],
+                                    "TABNAME": col["TABNAME"],
+                                    "COLNAME": col["COLNAME"],
+                                    "REFTABSCHEMA": pk["TABSCHEMA"],
+                                    "REFTABNAME": pk["TABNAME"],
+                                    "REFCOLNAME": pk["COLNAME"],
                                 }
-                            )
-                            break
 
-                # Heuristic fallback: name-based
-                for pk in pks:
-                    pk_table_key = f"{pk.get('TABSCHEMA')}.{pk.get('TABNAME')}"
-                    if pk_table_key == table_key:
-                        continue
-                    pk_col = pk.get("COLNAME")
-                    pk_type = pk.get("TYPENAME")
-                    if pk_type and col_type and str(pk_type) == str(col_type):
-                        if (
-                            col_name.lower() == (pk_col or "").lower()
-                            or col_name.lower() == f"{pk.get('TABNAME', '').lower()}_id"
-                            or (
-                                col_name.lower().endswith("_id")
-                                and col_name[:-3].lower() == pk.get("TABNAME", "").lower()
-                            )
-                        ):
-                            relationships.append(
-                                {
-                                    "TABSCHEMA": table["TABSCHEMA"],
-                                    "TABNAME": table["TABNAME"],
-                                    "COLNAME": col_name,
-                                    "REFTABSCHEMA": pk.get("TABSCHEMA") or table["TABSCHEMA"],
-                                    "REFTABNAME": pk.get("TABNAME"),
-                                    "REFCOLNAME": pk_col,
-                                }
-                            )
-    return relationships
+            # Heuristic 2: Name-based matching
+            for pk in pks:
+                pk_table_key = f"{pk.get('TABSCHEMA')}.{pk.get('TABNAME')}"
+                if pk_table_key == col_table_key:
+                    continue
+
+                pk_col_lower = (pk.get("COLNAME") or "").lower()
+                pk_table_lower = (pk.get("TABNAME") or "").lower()
+
+                if str(pk.get("TYPENAME")) == str(col_type):
+                    is_match = (
+                        col_name_lower == pk_col_lower
+                        or col_name_lower == f"{pk_table_lower}_id"
+                        or (col_name_lower.endswith("_id") and col_name_lower[:-3] == pk_table_lower)
+                    )
+                    if is_match:
+                        rel_key = (
+                            col["TABSCHEMA"],
+                            col["TABNAME"],
+                            col["COLNAME"],
+                            pk["TABSCHEMA"],
+                            pk["TABNAME"],
+                            pk["COLNAME"],
+                        )
+                        relationships[rel_key] = {
+                            "TABSCHEMA": col["TABSCHEMA"],
+                            "TABNAME": col["TABNAME"],
+                            "COLNAME": col["COLNAME"],
+                            "REFTABSCHEMA": pk["TABSCHEMA"],
+                            "REFTABNAME": pk["TABNAME"],
+                            "REFCOLNAME": pk["COLNAME"],
+                        }
+    return list(relationships.values())
 
 
 def build_schema_map(
-    tables: List[Dict[str, object]], columns: List[Dict[str, object]], relationships: List[Dict[str, str]]
-) -> Dict[str, object]:
-    """Build a schema mapping keyed by 'SCHEMA.TABLE' containing columns and relationships."""
-    schema: Dict[str, object] = {}
+    tables: List[Dict[str, Any]], columns: List[Dict[str, Any]], relationships: List[Dict[str, str]]
+) -> Dict[str, Any]:
+    """Build a schema mapping keyed by 'SCHEMA.TABLE'."""
+    schema: Dict[str, Any] = {}
     for table in tables:
         key = f"{table['TABSCHEMA']}.{table['TABNAME']}"
         schema[key] = {"type": table.get("TYPE"), "columns": {}, "relationships": []}
@@ -279,8 +281,27 @@ def build_schema_map(
     return schema
 
 
-def main():
-    # Set up logging
+async def get_schema_details(executor: ThreadPoolExecutor, use_mock: bool) -> tuple:
+    """Fetch schema details concurrently."""
+    if use_mock:
+        return mock_get_tables(), mock_get_columns(), mock_get_primary_keys(), mock_get_foreign_keys()
+
+    loop = asyncio.get_running_loop()
+
+    # Fetch columns first, as they are needed by primary keys
+    columns = await loop.run_in_executor(executor, get_columns)
+
+    # Now fetch tables, pks, and fks concurrently
+    tables_task = loop.run_in_executor(executor, get_tables)
+    pks_task = loop.run_in_executor(executor, get_primary_keys, columns)
+    fks_task = loop.run_in_executor(executor, get_foreign_keys)
+
+    tables, pks, fks = await asyncio.gather(tables_task, pks_task, fks_task)
+
+    return tables, columns, pks, fks
+
+
+async def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
     parser = argparse.ArgumentParser(description="Map DB2 database schema")
@@ -291,55 +312,40 @@ def main():
 
     logging.info("Starting schema mapping")
     logging.info(f"Using mock data: {args.mock}")
-    if args.table:
-        logging.info(f"Mapping specific table: {args.table}")
-    if args.output:
-        logging.info(f"Output will be written to: {args.output}")
 
     try:
-        if args.mock:
-            logging.info("Using mock data")
-            tables = mock_get_tables()
-            columns = mock_get_columns()
-            pks = mock_get_primary_keys()
-        else:
-            logging.info("Fetching schema information from database")
-            tables = get_tables()
-            columns = get_columns()
-            pks = get_primary_keys()
+        with ThreadPoolExecutor() as executor:
+            tables, columns, pks, fks = await get_schema_details(executor, args.mock)
 
-        logging.info(f"Found {len(tables)} tables, {len(columns)} columns, {len(pks)} primary keys")
+        logging.info(
+            f"Found {len(tables)} tables, {len(columns)} columns, {len(pks)} primary keys, {len(fks)} foreign keys"
+        )
 
-        relationships = infer_relationships(tables, columns, pks, use_mock=args.mock)
+        relationships = infer_relationships(tables, columns, pks, fks)
         logging.info(f"Identified {len(relationships)} relationships")
 
         schema = build_schema_map(tables, columns, relationships)
         logging.info(f"Built schema map for {len(schema)} tables")
 
         if args.table:
-            if args.table in schema:
-                result = {args.table: schema[args.table]}
-                logging.info(f"Successfully mapped table {args.table}")
-            else:
-                result = {"error": f"Table {args.table} not found"}
-                logging.warning(f"Requested table {args.table} not found in schema")
+            result = (
+                {args.table: schema[args.table]} if args.table in schema else {"error": f"Table {args.table} not found"}
+            )
             output = json.dumps(result, indent=2)
         else:
             output = json.dumps(schema, indent=2)
-            logging.info("Successfully mapped complete schema")
 
         if args.output:
-            logging.info(f"Writing output to {args.output}")
             with open(args.output, "w") as f:
                 f.write(output)
-            logging.info("Output written successfully")
+            logging.info(f"Output written to {args.output}")
         else:
             print(output)
 
     except Exception as e:
-        logging.error(f"An error occurred during schema mapping: {str(e)}")
+        logging.error(f"An error occurred: {e}", exc_info=True)
         raise
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
