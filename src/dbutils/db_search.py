@@ -24,21 +24,30 @@ def get_tables(schema: Optional[str] = None) -> List[Dict]:
 def get_columns(table_name: str, schema: str) -> List[Dict]:
     """Get columns for a specific table."""
     columns = catalog.get_columns(schema=schema, table=table_name)
-    
+
     # Filter for searchable types
-    searchable_types = ['VARCHAR', 'CHAR', 'CLOB', 'INTEGER', 'BIGINT', 'DECIMAL', 
-                        'NUMERIC', 'DOUBLE', 'REAL', 'DATE', 'TIME', 'TIMESTAMP']
-    
+    searchable_types = [
+        "VARCHAR",
+        "CHAR",
+        "CLOB",
+        "INTEGER",
+        "BIGINT",
+        "DECIMAL",
+        "NUMERIC",
+        "DOUBLE",
+        "REAL",
+        "DATE",
+        "TIME",
+        "TIMESTAMP",
+    ]
+
     filtered = [c for c in columns if c.get("DATA_TYPE") in searchable_types]
-    
+
     # Normalize to expected format
     normalized = []
     for col in filtered:
-        normalized.append({
-            "COLNAME": col.get("COLNAME"),
-            "TYPENAME": col.get("DATA_TYPE")
-        })
-    
+        normalized.append({"COLNAME": col.get("COLNAME"), "TYPENAME": col.get("DATA_TYPE")})
+
     return normalized
 
 

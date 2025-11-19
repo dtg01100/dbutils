@@ -1,7 +1,7 @@
 import argparse
 import json
 import logging
-from typing import List, Dict
+from typing import Dict, List
 
 from . import catalog
 
@@ -20,7 +20,7 @@ def format_table(rows: List[Dict]) -> str:
     if not rows:
         return "(no indexes)"
     headers = ["INDEX_SCHEMA", "INDEX_NAME", "TABSCHEMA", "TABNAME", "COLUMN_NAME", "IS_UNIQUE", "ORDINAL_POSITION"]
-    widths = {h: max(len(h), *(len(str(r.get(h, ''))) for r in rows)) for h in headers}
+    widths = {h: max(len(h), *(len(str(r.get(h, ""))) for r in rows)) for h in headers}
     sep = " ".join(h.ljust(widths[h]) for h in headers)
     lines = [sep]
     for r in rows:

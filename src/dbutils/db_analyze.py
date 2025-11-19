@@ -10,10 +10,9 @@ Uses dbutils.utils.query_runner for consistent SQL execution and parsing.
 
 import argparse
 import json
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from dbutils import catalog
-from dbutils.utils import query_runner
 
 
 def analyze_table(table_name: str, schema: Optional[str] = None) -> Dict:
@@ -50,29 +49,33 @@ def analyze_table(table_name: str, schema: Optional[str] = None) -> Dict:
 
     # Get constraints (primary keys and foreign keys)
     constraints = []
-    
+
     # Primary keys
     pks = catalog.get_primary_keys(schema=schema)
     table_pks = [pk for pk in pks if pk.get("TABNAME") == table_name.upper()]
     for pk in table_pks:
-        constraints.append({
-            "CONSTNAME": pk.get("CONSTRAINT_NAME"),
-            "TYPE": "PRIMARY KEY",
-            "COLNAME": pk.get("COLNAME"),
-        })
-    
+        constraints.append(
+            {
+                "CONSTNAME": pk.get("CONSTRAINT_NAME"),
+                "TYPE": "PRIMARY KEY",
+                "COLNAME": pk.get("COLNAME"),
+            }
+        )
+
     # Foreign keys
     fks = catalog.get_foreign_keys(schema=schema)
     table_fks = [fk for fk in fks if fk.get("TABNAME") == table_name.upper()]
     for fk in table_fks:
-        constraints.append({
-            "CONSTNAME": fk.get("FK_NAME"),
-            "TYPE": "FOREIGN KEY",
-            "COLNAME": fk.get("FKCOLUMN_NAME"),
-            "REFTABNAME": fk.get("PKTABLE_NAME"),
-            "REFCOLNAME": fk.get("PKCOLUMN_NAME"),
-        })
-    
+        constraints.append(
+            {
+                "CONSTNAME": fk.get("FK_NAME"),
+                "TYPE": "FOREIGN KEY",
+                "COLNAME": fk.get("FKCOLUMN_NAME"),
+                "REFTABNAME": fk.get("PKTABLE_NAME"),
+                "REFCOLNAME": fk.get("PKCOLUMN_NAME"),
+            }
+        )
+
     analysis["constraints"] = constraints
 
     # Recommendations
@@ -88,6 +91,8 @@ def analyze_table(table_name: str, schema: Optional[str] = None) -> Dict:
             analysis["recommendations"].append(f"Column {col['COLNAME']} is NOT NULL but has no default")
 
     return analysis
+
+
 def main():
     parser = argparse.ArgumentParser(description="Analyze DB2 table statistics and performance metrics")
     parser.add_argument("table", help="Table name (schema.table or just table)")

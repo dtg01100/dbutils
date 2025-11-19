@@ -12,7 +12,6 @@ import json
 from typing import Dict, List, Optional
 
 from dbutils import catalog
-from dbutils.utils import query_runner
 
 
 def get_table_schema(table_name: str, schema: str) -> List[Dict]:
@@ -37,7 +36,7 @@ def compare_columns(col1: Dict, col2: Dict) -> Dict:
         ("NUMERIC_SCALE", "SCALE"),
         ("IS_NULLABLE", "NULLS"),
         ("COLUMN_DEFAULT", "DEFAULT"),
-        ("COLUMN_TEXT", "REMARKS")
+        ("COLUMN_TEXT", "REMARKS"),
     ]
 
     for catalog_field, display_name in fields_to_compare:

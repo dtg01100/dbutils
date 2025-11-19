@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Test DACDATA schema queries to see what works."""
 
-import subprocess
-import tempfile
-import json
 import csv
 import io
+import json
 import os
+import subprocess
+import tempfile
 
 
 def query_runner(sql: str):
@@ -100,7 +100,7 @@ AND TABLE_SCHEMA = 'DACDATA'
 """
 result3 = query_runner(sql3)
 if result3:
-    print(f"\nTable count result:")
+    print("\nTable count result:")
     for row in result3:
         print(f"  - {row}")
 else:

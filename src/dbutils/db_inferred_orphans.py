@@ -1,16 +1,16 @@
 import argparse
-import logging
 import json
-from typing import List, Dict
+import logging
+from typing import Dict
 
 from dbutils.db_relate import (
-    mock_get_tables,
-    mock_get_columns,
-    mock_get_primary_keys,
-    get_tables,
     get_columns,
     get_primary_keys,
+    get_tables,
     infer_relationships,
+    mock_get_columns,
+    mock_get_primary_keys,
+    mock_get_tables,
     score_relationships,
 )
 
@@ -34,9 +34,7 @@ def build_orphan_sql(rel: Dict) -> str:
 
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-    parser = argparse.ArgumentParser(
-        description="Generate orphan detection SQL for inferred relationships"
-    )
+    parser = argparse.ArgumentParser(description="Generate orphan detection SQL for inferred relationships")
     parser.add_argument("--mock", action="store_true", help="Use mock catalog data")
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of table output")
     parser.add_argument("--min-score", type=float, default=0.0, help="Minimum score threshold")

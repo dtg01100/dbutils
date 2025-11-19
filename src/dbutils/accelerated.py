@@ -7,7 +7,7 @@ back to pure Python implementations.
 """
 
 import logging
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +16,7 @@ try:
     from .fast_ops import (
         FastSearchIndex as _FastSearchIndex,
     )
+
     HAS_CYTHON = True
     logger.info("Using Cython-accelerated fast operations")
 
@@ -27,7 +28,7 @@ try:
         """Fast string normalization using Cython."""
         if not text:
             return ""
-        return text.lower().replace('_', ' ')
+        return text.lower().replace("_", " ")
 
     def fast_split_words(text: str) -> list:
         """Fast word splitting using Cython."""
@@ -52,7 +53,7 @@ except ImportError:
         """Pure Python string normalization fallback."""
         if not text:
             return ""
-        return text.lower().replace('_', ' ')
+        return text.lower().replace("_", " ")
 
     def fast_split_words(text: str) -> list:
         """Pure Python word splitting fallback."""
@@ -76,6 +77,7 @@ class AcceleratedSearchIndex:
             self._index = create_fast_search_index()
         else:
             from .db_browser import SearchIndex
+
             self._index = SearchIndex()
 
     def build_index(self, tables: List, columns: List) -> None:
@@ -96,13 +98,14 @@ def create_accelerated_search_index():
     """Create an accelerated search index."""
     return AcceleratedSearchIndex()
 
+
 def get_acceleration_status() -> Dict[str, Any]:
     """Get the status of acceleration features."""
     return {
         "cython_available": HAS_CYTHON,
         "accelerated_search": HAS_CYTHON,
         "accelerated_strings": False,  # Not implemented yet
-        "performance_level": "high" if HAS_CYTHON else "standard"
+        "performance_level": "high" if HAS_CYTHON else "standard",
     }
 
 

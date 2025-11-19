@@ -1,7 +1,8 @@
 """Test enhanced scoring JSON output of db_relate."""
 
-from dbutils import db_relate
 import sys
+
+from dbutils import db_relate
 
 
 def test_relationships_json_enhanced(capsys):

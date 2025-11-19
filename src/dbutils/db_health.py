@@ -54,21 +54,17 @@ def check_database_health() -> Dict:
         # Note: IBM i doesn't have STATS_TIME like LUW, using basic table info
         tables = catalog.get_tables()
         table_sizes = catalog.get_table_sizes()
-        
+
         # Build dict for quick lookup
         size_dict = {f"{t.get('TABSCHEMA')}.{t.get('TABNAME')}": t for t in table_sizes}
-        
+
         stale_stats = []
         for table in tables:
             key = f"{table.get('TABSCHEMA')}.{table.get('TABNAME')}"
             size_info = size_dict.get(key)
             if size_info is None:
-                stale_stats.append({
-                    "TABSCHEMA": table.get("TABSCHEMA"),
-                    "TABNAME": table.get("TABNAME"),
-                    "CARD": 0
-                })
-        
+                stale_stats.append({"TABSCHEMA": table.get("TABSCHEMA"), "TABNAME": table.get("TABNAME"), "CARD": 0})
+
         health_report["tables"] = stale_stats
 
         if len(stale_stats) > 10:  # If more than 10 tables with stale stats
@@ -82,7 +78,7 @@ def check_database_health() -> Dict:
         # Note: IBM i indexes don't have NLEAF/NLEVELS like LUW
         # Using basic index info instead
         all_indexes = catalog.get_indexes()
-        
+
         # For IBM i, we can't easily detect fragmentation, so skip this check
         fragmented_indexes = []
         health_report["indexes"] = fragmented_indexes
@@ -107,10 +103,10 @@ def check_database_health() -> Dict:
     # Check database size and utilization
     try:
         table_sizes = catalog.get_table_sizes()
-        
+
         total_size_kb = sum(int(t.get("DATA_SIZE", 0)) for t in table_sizes)
         avg_card = sum(int(t.get("ROWCOUNT", 0)) for t in table_sizes) / len(table_sizes) if table_sizes else 0
-        
+
         health_report["performance_metrics"]["total_db_size_kb"] = total_size_kb
         health_report["performance_metrics"]["avg_table_cardinality"] = avg_card
     except Exception:
@@ -150,7 +146,7 @@ def check_schema_health(schema_name: str) -> Dict:
             # Get table size info
             table_sizes = catalog.get_table_sizes(schema=schema_name.upper())
             size_info = next((t for t in table_sizes if t["TABNAME"] == table_name.upper()), None)
-            
+
             if size_info:
                 table_data["row_count"] = int(size_info.get("ROWCOUNT", 0))
 

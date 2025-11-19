@@ -42,8 +42,7 @@ except ImportError:
     TEXTUAL_AVAILABLE = False
 
 from dataclasses import dataclass
-from typing import Dict, Set, Optional as Opt
-import sys
+from typing import Set
 
 # String interning for memory optimization
 _string_cache: Dict[str, str] = {}

@@ -1,25 +1,21 @@
 #!/usr/bin/env python3
 """Test performance optimizations with real database connections."""
 
-import sys
-import time
-import tempfile
-import subprocess
-import json
 import csv
 import io
+import json
 import os
-from typing import List, Dict, Any
+import subprocess
+import sys
+import tempfile
+import time
+from typing import Dict, List
 
 sys.path.insert(0, "src")
 
 from dbutils.db_browser import (
-    get_all_tables_and_columns,
-    DBBrowserTUI,
-    DBBrowserApp,
     SearchIndex,
-    TableInfo,
-    ColumnInfo,
+    get_all_tables_and_columns,
 )
 
 

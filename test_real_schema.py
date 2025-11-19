@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Test with actual schemas that exist."""
 
-import subprocess
-import tempfile
-import json
 import csv
 import io
+import json
 import os
+import subprocess
+import tempfile
 
 
 def query_runner(sql: str):

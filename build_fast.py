@@ -7,7 +7,6 @@ This script compiles the performance-critical Cython modules for better performa
 
 import subprocess
 import sys
-import os
 from pathlib import Path
 
 

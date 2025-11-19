@@ -11,4 +11,4 @@ def test_ohhst_in_mock_tables():
             assert t.schema.upper() == "DACDATA"
             break
     else:
-            raise AssertionError('OHHST table not found')
+        raise AssertionError("OHHST table not found")

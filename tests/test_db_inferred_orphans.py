@@ -1,7 +1,8 @@
 """Tests for inferred orphan SQL utility."""
 
-from dbutils import db_inferred_orphans
 import sys
+
+from dbutils import db_inferred_orphans
 
 
 def test_orphans_table_output(capsys):
@@ -30,4 +31,3 @@ def test_orphans_json_output(capsys):
     assert out.strip().startswith("[")
     assert "sql" in out
     assert "score" in out
-

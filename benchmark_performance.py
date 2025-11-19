@@ -3,15 +3,14 @@
 Performance comparison between pure Python and Cython-accelerated implementations.
 """
 
-import time
 import sys
-from typing import List
+import time
 
 # Add src to path
 sys.path.insert(0, "src")
 
-from dbutils.db_browser import TableInfo, ColumnInfo
-from dbutils.accelerated import get_acceleration_status, create_accelerated_search_index
+from dbutils.accelerated import create_accelerated_search_index, get_acceleration_status
+from dbutils.db_browser import ColumnInfo, TableInfo
 
 
 def create_test_data(num_tables=1000, num_columns_per_table=20):

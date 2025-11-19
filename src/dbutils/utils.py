@@ -5,6 +5,7 @@ Shared utilities for dbutils modules.
 - query_runner: Execute SQL using external `query_runner` tool, parse JSON or delimited text
 - edit_distance, fuzzy_match: Optimized fuzzy matching helpers inspired by db_browser
 """
+
 from __future__ import annotations
 
 import csv
@@ -55,7 +56,7 @@ def query_runner(sql: str) -> List[Dict]:
                 if r is None:
                     continue
                 # Normalize keys (strip whitespace)
-                normalized = { (k.strip() if isinstance(k, str) else k): v for k, v in r.items() }
+                normalized = {(k.strip() if isinstance(k, str) else k): v for k, v in r.items()}
                 rows.append(normalized)
             return rows
     finally:

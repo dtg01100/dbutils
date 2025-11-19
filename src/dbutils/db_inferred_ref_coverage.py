@@ -1,16 +1,15 @@
 import argparse
 import json
 import logging
-from typing import List, Dict
 
 from dbutils.db_relate import (
-    mock_get_tables,
-    mock_get_columns,
-    mock_get_primary_keys,
-    get_tables,
     get_columns,
     get_primary_keys,
+    get_tables,
     infer_relationships,
+    mock_get_columns,
+    mock_get_primary_keys,
+    mock_get_tables,
     score_relationships,
 )
 
@@ -66,9 +65,7 @@ def main():
         widths["TABSCHEMA"] = max(widths["TABSCHEMA"], len(str(r.get("TABSCHEMA", ""))))
         widths["TABNAME"] = max(widths["TABNAME"], len(str(r.get("TABNAME", ""))))
         widths["COLNAME"] = max(widths["COLNAME"], len(str(r.get("COLNAME", ""))))
-        widths["REFTABSCHEMA"] = max(
-            widths["REFTABSCHEMA"], len(str(r.get("REFTABSCHEMA", "")))
-        )
+        widths["REFTABSCHEMA"] = max(widths["REFTABSCHEMA"], len(str(r.get("REFTABSCHEMA", ""))))
         widths["REFTABNAME"] = max(widths["REFTABNAME"], len(str(r.get("REFTABNAME", ""))))
         widths["REFCOLNAME"] = max(widths["REFCOLNAME"], len(str(r.get("REFCOLNAME", ""))))
         widths["SCORE"] = max(widths["SCORE"], len(str(r.get("score", ""))))

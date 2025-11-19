@@ -1,7 +1,8 @@
 """Tests for inferred ref coverage utility."""
 
-from dbutils import db_inferred_ref_coverage
 import sys
+
+from dbutils import db_inferred_ref_coverage
 
 
 def test_ref_coverage_table_output(capsys):
@@ -30,4 +31,3 @@ def test_ref_coverage_json_output(capsys):
     out = capsys.readouterr().out
     assert out.strip().startswith("[")
     assert "score" in out
-

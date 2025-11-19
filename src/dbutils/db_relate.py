@@ -24,9 +24,7 @@ def query_runner(sql):
     logging.debug("Executing SQL query (first 100 chars): %s", sql[:100])
 
     try:
-        result = subprocess.run(
-            ["query_runner", "-t", "db2", temp_file], capture_output=True, text=True, check=False
-        )
+        result = subprocess.run(["query_runner", "-t", "db2", temp_file], capture_output=True, text=True, check=False)
         if result.returncode != 0:
             error_msg = f"query_runner failed: {result.stderr.strip()}"
             logging.error(error_msg)
@@ -178,10 +176,7 @@ def get_primary_keys():
     # Add TYPENAME field by looking up column data type
     if result:
         cols = catalog.get_columns()
-        col_types = {
-            (c["TABSCHEMA"], c["TABNAME"], c["COLNAME"]): c.get("DATA_TYPE", "")
-            for c in cols
-        }
+        col_types = {(c["TABSCHEMA"], c["TABNAME"], c["COLNAME"]): c.get("DATA_TYPE", "") for c in cols}
         for pk in result:
             key = (pk["TABSCHEMA"], pk["TABNAME"], pk["COLNAME"])
             pk["TYPENAME"] = col_types.get(key, "")
@@ -306,9 +301,7 @@ def score_relationships(relationships, columns, pks):
     Score weights chosen for simplicity. Returns list of enriched relationship dicts.
     """
     # Build quick lookup maps
-    pk_types = {
-        (pk["TABSCHEMA"], pk["TABNAME"], pk["COLNAME"]): pk.get("TYPENAME") for pk in pks
-    }
+    pk_types = {(pk["TABSCHEMA"], pk["TABNAME"], pk["COLNAME"]): pk.get("TYPENAME") for pk in pks}
     col_map = {}
     for c in columns:
         col_map[(c["TABSCHEMA"], c["TABNAME"], c["COLNAME"])] = c
@@ -327,8 +320,10 @@ def score_relationships(relationships, columns, pks):
         cc_lower = rel["COLNAME"].lower()
         parent_pk_lower = rel["REFCOLNAME"].lower()
         parent_table_lower = rel["REFTABNAME"].lower()
-        if cc_lower == parent_pk_lower or cc_lower == f"{parent_table_lower}_id" or (
-            cc_lower.endswith("_id") and cc_lower[:-3] == parent_table_lower
+        if (
+            cc_lower == parent_pk_lower
+            or cc_lower == f"{parent_table_lower}_id"
+            or (cc_lower.endswith("_id") and cc_lower[:-3] == parent_table_lower)
         ):
             name_match = 1
 
@@ -477,7 +472,6 @@ def main():
     if args.max_hops is not None:
         logging.info("Max hops limit: %s", args.max_hops)
 
-
     # Validate input format
     start_parts = args.start.split(".")
     end_parts = args.end.split(".")
@@ -516,9 +510,7 @@ def main():
             columns = get_columns()
             pks = get_primary_keys()
 
-        logging.info(
-            "Found %s tables, %s columns, %s primary keys", len(tables), len(columns), len(pks)
-        )
+        logging.info("Found %s tables, %s columns, %s primary keys", len(tables), len(columns), len(pks))
 
         relationships = infer_relationships(tables, columns, pks, use_mock=args.mock)
         logging.info("Identified %s relationships", len(relationships))
@@ -526,9 +518,7 @@ def main():
         graph = build_graph(relationships)
         logging.info("Built graph with %s nodes", len(graph))
 
-        logging.info(
-            "Searching for path from %s.%s to %s.%s", start_table, start_col, end_table, end_col
-        )
+        logging.info("Searching for path from %s.%s to %s.%s", start_table, start_col, end_table, end_col)
         path, _cols = find_path(graph, start_table, start_col, end_table, end_col, args.max_hops)
 
         if args.format == "relationships-json":
