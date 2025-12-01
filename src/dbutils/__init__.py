@@ -16,6 +16,7 @@ from .db_search import main as db_search_main
 from .db_table_sizes import main as db_table_sizes_main
 from .map_db import main as map_db_main
 from .main_launcher import main as smart_launcher_main
+from .gui.qt_app import main as qt_gui_main
 
 __all__ = [
     "db_browser_main",
@@ -30,4 +31,5 @@ __all__ = [
     "db_table_sizes_main",
     "map_db_main",
     "smart_launcher_main",
+    "qt_gui_main",
 ]
