@@ -42,7 +42,10 @@ dependencies = [
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-packages = ["dbutils"]
+packages = {find = {where = ["src"], include = ["dbutils*"]}}
+
+[tool.uv]
+package = true
 
 [tool.ruff]
 line-length = 120

@@ -429,23 +429,41 @@ class DataLoaderWorker(QObject):
     data_loaded = Signal(object, object, object)  # (tables, columns, all_schemas)
     error_occurred = Signal(str)
     progress_updated = Signal(str)
+    progress_value = Signal(int, int)  # (current, total)
 
     def __init__(self):
         super().__init__()
 
     def load_data(self, schema_filter: Optional[str], use_mock: bool):
-        """Load database data in background thread."""
+        """Load database data in background thread with granular progress updates."""
         try:
-            self.progress_updated.emit("Loading tables and columns...")
+            # Step 1: Load tables and columns
+            self.progress_updated.emit("Connecting to database...")
+            QApplication.processEvents()  # Allow UI to update
+
             from ..catalog import get_all_tables_and_columns
             from ..catalog import get_tables  # Use this to get a list of all schemas
+
+            self.progress_updated.emit("Loading tables and columns...")
+            QApplication.processEvents()  # Allow UI to update
 
             # Get the actual tables and columns based on the schema filter
             tables, columns = get_all_tables_and_columns(schema_filter, use_mock)
 
+            # Send intermediate progress update
+            self.progress_updated.emit(f"Loaded {len(tables)} tables and {len(columns)} columns, now loading schemas...")
+            self.progress_value.emit(1, 2)  # 1 of 2 steps complete
+            QApplication.processEvents()  # Allow UI to update
+
             # Also get all possible schemas (without filter) to populate the dropdown completely
+            self.progress_updated.emit("Loading available schemas...")
+            QApplication.processEvents()  # Allow UI to update
+
             all_tables = get_tables(mock=use_mock)
             all_schemas = sorted(set(table['TABSCHEMA'] for table in all_tables))
+
+            self.progress_value.emit(2, 2)  # 2 of 2 steps complete
+            QApplication.processEvents()  # Allow UI to update
 
             self.data_loaded.emit(tables, columns, all_schemas)
         except Exception as e:
@@ -493,7 +511,8 @@ class QtDBBrowser(QMainWindow):
 
         # Show window immediately, then load data in background
         self.show()
-        QTimer.singleShot(0, self.load_data)  # Load data after window is shown
+        # Use a slight delay to ensure the UI is fully rendered before starting data loading
+        QTimer.singleShot(50, self.load_data)  # Load data after window is shown with a small delay
 
     def setup_ui(self):
         """Setup the main user interface."""
@@ -775,7 +794,8 @@ class QtDBBrowser(QMainWindow):
         """Load database data in background thread."""
         self.status_label.setText("Loading data...")
         self.progress_bar.setVisible(True)
-        self.progress_bar.setRange(0, 0)  # Indeterminate progress
+        self.progress_bar.setRange(0, 100)  # Determinate progress
+        self.progress_bar.setValue(0)
 
         # Cancel any existing data loader thread
         if self.data_loader_worker:
@@ -797,12 +817,18 @@ class QtDBBrowser(QMainWindow):
         self.data_loader_worker.data_loaded.connect(self.on_data_loaded)
         self.data_loader_worker.error_occurred.connect(self.on_data_load_error)
         self.data_loader_worker.progress_updated.connect(self.status_label.setText)
+        self.data_loader_worker.progress_value.connect(self.on_data_progress)
 
         # Start thread and initiate data loading
         self.data_loader_thread.started.connect(
             lambda: self.data_loader_worker.load_data(self.schema_filter, self.use_mock)
         )
         self.data_loader_thread.start()
+
+    def on_data_progress(self, current: int, total: int):
+        """Handle data loading progress updates."""
+        progress_percent = int((current / total) * 100) if total > 0 else 0
+        self.progress_bar.setValue(progress_percent)
 
     def on_data_loaded(self, tables, columns, all_schemas=None):
         """Handle data loaded from background thread."""
@@ -824,7 +850,9 @@ class QtDBBrowser(QMainWindow):
             self.update_schema_combo()
 
             self.status_label.setText(f"Loaded {len(self.tables)} tables, {len(self.columns)} columns")
-            self.progress_bar.setVisible(False)
+            self.progress_bar.setValue(100)  # Set to 100% before hiding
+            # Keep progress bar visible briefly to show completion
+            QTimer.singleShot(500, lambda: self.progress_bar.setVisible(False))
 
             # Clean up thread
             if self.data_loader_thread:
@@ -836,6 +864,13 @@ class QtDBBrowser(QMainWindow):
         except Exception as e:
             self.status_label.setText(f"Error processing data: {e}")
             self.progress_bar.setVisible(False)
+
+            # Clean up thread
+            if self.data_loader_thread:
+                self.data_loader_thread.quit()
+                self.data_loader_thread.wait()
+                self.data_loader_thread = None
+                self.data_loader_worker = None
 
     def on_data_load_error(self, error: str):
         """Handle data loading errors."""
