@@ -57,6 +57,34 @@ def get_tables(schema: Optional[str] = None, mock: bool = False) -> List[Dict[st
     return result
 
 
+def get_all_tables_and_columns(
+    schema_filter: Optional[str] = None,
+    use_mock: bool = False,
+    use_cache: bool = True,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """
+    Get both tables and columns in a single call.
+
+    This is a convenience function that combines get_tables() and get_columns()
+    to avoid multiple database queries.
+
+    Args:
+        schema_filter: Optional schema filter
+        use_mock: Return mock data if True
+        use_cache: Use cached results if True
+        limit: Optional limit for number of results
+        offset: Optional offset for pagination
+
+    Returns:
+        Tuple of (tables, columns)
+    """
+    from .db_browser import get_all_tables_and_columns as browser_func
+
+    return browser_func(schema_filter, use_mock, use_cache, limit, offset)
+
+
 def get_columns(schema: Optional[str] = None, table: Optional[str] = None, mock: bool = False) -> List[Dict[str, Any]]:
     """
     Get column metadata from QSYS2.SYSCOLUMNS for IBM i.

@@ -1,0 +1,15 @@
+# Qt Dependencies for DB Browser GUI
+# Install with: pip install -r requirements-qt.txt
+
+# Core Qt Framework (choose one)
+PySide6>=6.5.0  # Official Qt6 bindings (recommended)
+# PyQt6>=6.5.0    # Alternative Qt6 bindings
+
+# Optional: Enhanced widgets
+qtawesome>=1.2.0      # Icon library
+qt-material>=2.14        # Material design theme
+
+# Development dependencies (optional)
+pytest-qt>=4.2.0      # Qt testing framework
+black>=23.0.0             # Code formatting
+mypy>=1.8.0               # Type checking

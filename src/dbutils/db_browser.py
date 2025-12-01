@@ -1673,6 +1673,8 @@ if TEXTUAL_AVAILABLE:
             Binding("s", "open_settings", "Settings"),
             Binding("l", "load_more", "Load More Tables"),
             Binding("ctrl+l", "load_all_results", "Load All Results"),
+            Binding("h", "toggle_non_matching", "Show/Hide Non-Matching"),
+            Binding("x", "toggle_stream_search", "Toggle Streaming Search"),
         ]
 
         def __init__(
@@ -1715,6 +1717,12 @@ if TEXTUAL_AVAILABLE:
             # Pre-computed lowercase fields for faster searching (fallback)
             self._table_search_data: Dict[str, str] = {}  # table_key -> lowercase searchable text
             self._column_search_data: Dict[str, str] = {}  # column_key -> lowercase searchable text
+            # Column search display options
+            self.show_non_matching_tables = True  # Toggle to show/hide tables without matching columns
+            # Streaming search results
+            self._stream_search_enabled = True  # Enable streaming search results
+            self._current_stream_task: Optional[asyncio.Task] = None  # Current streaming task
+            self._streamed_results: List = []  # Results found so far in current search
 
         # -----------------------------
         # Search caching & debounce utils
@@ -2121,7 +2129,6 @@ if TEXTUAL_AVAILABLE:
 
                 # Determine how many results to display
                 total_available_results = len(filtered_tables)
-                search_result_count = total_available_results
 
                 # If we have a small result set that fits comfortably on screen, load everything
                 small_result_threshold = 50  # If <= 50 results, load all available
@@ -2194,14 +2201,36 @@ if TEXTUAL_AVAILABLE:
                         matching_table_counts = cached["matching_table_counts"]
                         matching_columns = cached["matching_columns"]
                     else:
+                        # Optimized column search with table-level aggregation
                         matching_table_counts: Dict[str, int] = {}
                         matching_columns = []
                         q = self.search_query
+
+                        # Pre-compute query lower for performance
+                        q_lower = q.lower()
+
                         for col in self.columns:
-                            if self.column_matches_query(col, q):
+                            # Fast pre-computed data check first
+                            col_key = f"{col.schema}.{col.table}.{col.name}"
+                            search_text = self._column_search_data.get(col_key, "")
+
+                            # Quick substring check
+                            matches = False
+                            if q_lower in search_text:
+                                matches = True
+                            else:
+                                # Fall back to fuzzy matching only if needed
+                                matches = (
+                                    self.fuzzy_match(col.name, q)
+                                    or self.fuzzy_match(col.typename, q)
+                                    or self.fuzzy_match(col.remarks or "", q)
+                                )
+
+                            if matches:
                                 t_key = f"{col.schema}.{col.table}"
                                 matching_table_counts[t_key] = matching_table_counts.get(t_key, 0) + 1
                                 matching_columns.append(col)
+
                         self._set_cached(
                             "columns",
                             self.search_query,
@@ -2211,14 +2240,17 @@ if TEXTUAL_AVAILABLE:
                             },
                         )
 
-                    # Display tables that have matching columns
+                    # Display ALL tables with their matching column counts
                     tables_with_matches = []
+                    tables_without_matches = []
                     columns_data = {"rows": [], "info": ""}
 
                     for table in self.tables:
                         table_key = f"{table.schema}.{table.name}"
-                        if table_key in matching_table_counts:
-                            match_count = matching_table_counts[table_key]
+                        match_count = matching_table_counts.get(table_key, 0)
+
+                        if match_count > 0:
+                            # Tables with matching columns - always show
                             info_text = table.remarks or ""
                             if info_text:
                                 info_text = f"{info_text} — {match_count} matching column(s)"
@@ -2228,9 +2260,20 @@ if TEXTUAL_AVAILABLE:
                             display_data["table_rows"].append(row_data)
                             tables_table.add_row(*row_data["args"], key=row_data["key"])
                             tables_with_matches.append(table)
+                        elif self.show_non_matching_tables:
+                            # Tables without matching columns - only show if option is enabled
+                            info_text = table.remarks or "No matching columns"
+                            if info_text and info_text != "No matching columns":
+                                info_text = f"{info_text} — no matching columns"
+                            else:
+                                info_text = "no matching columns"
+                            row_data = {"args": (f"· {table.name}", info_text), "key": table_key}
+                            display_data["table_rows"].append(row_data)
+                            tables_table.add_row(*row_data["args"], key=row_data["key"])
+                            tables_without_matches.append(table)
 
                     # Store information for scroll-based loading
-                    self._current_displayed_count = len(displayed_columns)
+                    self._current_displayed_count = len(matching_columns)
                     self._total_available_results = len(matching_columns)
 
                     # Show loading indicator if background load is in progress
@@ -2245,11 +2288,29 @@ if TEXTUAL_AVAILABLE:
                             f"Searching {len(self.tables)} tables loaded so far",
                             key="loading_indicator",
                         )
-                        display_data["tables_info"] = (
-                            f"Tables with matching columns ({len(tables_with_matches)} found, searching more data...)"
-                        )
+                        total_tables = len(tables_with_matches) + len(tables_without_matches)
+                        total_matching_columns = len(matching_columns)
+
+                        if self.show_non_matching_tables:
+                            display_data["tables_info"] = (
+                                f"Tables ({total_tables} total, {len(tables_with_matches)} with matches, {total_matching_columns} matching columns, searching more data...)"
+                            )
+                        else:
+                            display_data["tables_info"] = (
+                                f"Tables ({len(tables_with_matches)} with matches, {total_matching_columns} matching columns, searching more data... [H: toggle non-matching]"
+                            )
                     else:
-                        display_data["tables_info"] = f"Tables with matching columns ({len(tables_with_matches)} found)"
+                        total_tables = len(tables_with_matches) + len(tables_without_matches)
+                        total_matching_columns = len(matching_columns)
+
+                        if self.show_non_matching_tables:
+                            display_data["tables_info"] = (
+                                f"Tables ({total_tables} total, {len(tables_with_matches)} with matches, {total_matching_columns} matching columns total)"
+                            )
+                        else:
+                            display_data["tables_info"] = (
+                                f"Tables ({len(tables_with_matches)} with matches, {total_matching_columns} matching columns) [H: toggle non-matching]"
+                            )
                     info = self.query_one("#tables-container .info-text", Static)
                     info.update(display_data["tables_info"])
 
@@ -2675,8 +2736,9 @@ if TEXTUAL_AVAILABLE:
 
         @on(Input.Changed, "#search-input")
         def on_search_changed(self, event: Input.Changed) -> None:
-            """Handle search input changes with debouncing."""
+            """Handle search input changes with streaming results."""
             self.search_query = event.value
+
             # Cancel any pending search update
             if hasattr(self, "_search_update_task") and self._search_update_task:
                 try:
@@ -2692,13 +2754,25 @@ if TEXTUAL_AVAILABLE:
                 except Exception:
                     pass
 
+            # Cancel current streaming task
+            if hasattr(self, "_current_stream_task") and self._current_stream_task:
+                try:
+                    self._current_stream_task.cancel()
+                    self._current_stream_task = None
+                except Exception:
+                    pass
+
             # Reset scroll loading state
             if not hasattr(self, "_scroll_load_triggered"):
                 self._scroll_load_triggered = False
             self._scroll_load_triggered = False
 
-            # Debounce the search update
-            self._search_update_task = asyncio.create_task(self._debounced_search_update())
+            # Start streaming search immediately (no debounce for streaming)
+            if self._stream_search_enabled and self.search_query:
+                self._current_stream_task = asyncio.create_task(self._stream_search_results())
+            else:
+                # Fall back to debounced search for non-streaming mode
+                self._search_update_task = asyncio.create_task(self._debounced_search_update())
 
         def _check_scroll_loading(self) -> None:
             """Check if we should trigger scroll-based loading."""
@@ -2990,7 +3064,9 @@ if TEXTUAL_AVAILABLE:
                 search_input = self.query_one("#search-input", Input)
                 search_input.placeholder = "Type to search columns by name, type, or description..."
                 self.notify(
-                    "🔍 COLUMN SEARCH MODE: Find tables with matching columns", severity="information", timeout=4
+                    "🔍 COLUMN SEARCH MODE: Find tables with matching columns (H: show/hide non-matching)",
+                    severity="information",
+                    timeout=4,
                 )
             else:
                 self.search_mode = "tables"
@@ -3149,6 +3225,10 @@ if TEXTUAL_AVAILABLE:
             if not self.all_tables_loaded:
                 help_text += " | L: load more tables"
             help_text += " | Ctrl+L: show all current results"
+            if self.search_mode == "columns":
+                help_text += " | H: show/hide non-matching tables"
+            if self._stream_search_enabled:
+                help_text += " | X: toggle streaming search"
             self.notify(help_text, timeout=5)
 
         def action_copy_table_path(self) -> None:
@@ -3193,6 +3273,34 @@ if TEXTUAL_AVAILABLE:
                 self.update_tables_display()
 
             asyncio.create_task(reset_limit())
+
+        def action_toggle_stream_search(self) -> None:
+            """Toggle streaming search results on/off."""
+            self._stream_search_enabled = not self._stream_search_enabled
+
+            # Cancel current streaming task if active
+            if hasattr(self, "_current_stream_task") and self._current_stream_task:
+                try:
+                    self._current_stream_task.cancel()
+                    self._current_stream_task = None
+                except Exception:
+                    pass
+
+            # Clear streamed results
+            self._streamed_results = []
+
+            # Show notification
+            if self._stream_search_enabled:
+                self.notify("🔄 Streaming search ENABLED - Results appear as found", severity="information", timeout=3)
+            else:
+                self.notify("⏸️ Streaming search DISABLED - Using batch search", severity="information", timeout=3)
+
+            # Re-run search with new mode if there's a query
+            if self.search_query:
+                if self._stream_search_enabled:
+                    self._current_stream_task = asyncio.create_task(self._stream_search_results())
+                else:
+                    self._search_update_task = asyncio.create_task(self._debounced_search_update())
 
         def get_bindings(self) -> list[Binding]:
             """Override to dynamically show/hide the load more binding."""
@@ -3276,6 +3384,10 @@ def main():
     parser.add_argument(
         "--search-debounce", type=float, default=0.2, help="Search debounce delay in seconds (default: 0.2)"
     )
+    parser.add_argument(
+        "--stream-search", action="store_true", default=True, help="Enable streaming search results (default: enabled)"
+    )
+    parser.add_argument("--no-stream-search", action="store_true", help="Disable streaming search results")
 
     args = parser.parse_args()
 
@@ -3296,6 +3408,9 @@ def main():
     else:
         # Interactive mode - prefer Textual if available
         if TEXTUAL_AVAILABLE and not args.basic:
+            # Configure streaming search
+            stream_enabled = args.stream_search and not args.no_stream_search
+
             app = DBBrowserApp(
                 schema_filter=args.schema,
                 use_mock=args.mock,
@@ -3305,6 +3420,7 @@ def main():
             # Configure performance settings
             app.max_displayed_results = args.max_display_results
             app.search_debounce_delay = args.search_debounce
+            app._stream_search_enabled = stream_enabled
             app.run()
         elif RICH_AVAILABLE:
             if not TEXTUAL_AVAILABLE:
@@ -3321,4 +3437,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Check if we should use smart launcher
+    if len(sys.argv) == 1 or (len(sys.argv) > 1 and not sys.argv[1].startswith("-")):
+        # Use smart launcher for default behavior
+        from .main_launcher import main as smart_launcher
+
+        smart_launcher()
+    else:
+        # Use direct main for specific arguments or legacy behavior
+        main()
