@@ -1383,6 +1383,15 @@ class QtDBBrowser(QMainWindow):
                 except Exception:
                     pass
 
+            # If there's an active search query, re-run the search to include new data
+            if hasattr(self, 'search_query') and self.search_query and self.search_query.strip():
+                # Clear cache for current query so it re-searches with new data
+                cache_key = f"{self.search_mode}:{self.search_query.lower()}"
+                if cache_key in self.search_results_cache:
+                    del self.search_results_cache[cache_key]
+                # Trigger search update with new data
+                self._trigger_incremental_search()
+
             # Update progress bar more meaningfully if total estimate provided
             if total_est and total_est > 0:
                 pct = max(1, min(100, int((loaded / total_est) * 100)))
@@ -1511,6 +1520,37 @@ class QtDBBrowser(QMainWindow):
         )
         self.search_thread.start()
 
+    def _trigger_incremental_search(self):
+        """Trigger search immediately without debounce - used for incremental updates during data loading."""
+        if not self.search_query or not self.search_query.strip():
+            return
+        
+        # Cancel any existing search
+        if self.search_worker:
+            self.search_worker.cancel_search()
+
+        if self.search_thread and self.search_thread.isRunning():
+            self.search_thread.quit()
+            self.search_thread.wait(1000)
+
+        # Create worker and thread
+        self.search_worker = SearchWorker()
+        self.search_thread = QThread()
+
+        # Move worker to thread
+        self.search_worker.moveToThread(self.search_thread)
+
+        # Connect signals
+        self.search_worker.results_ready.connect(self.on_search_results)
+        self.search_worker.search_complete.connect(self.on_incremental_search_complete)
+        self.search_worker.error_occurred.connect(self.on_search_error)
+
+        # Start thread
+        self.search_thread.started.connect(
+            lambda: self.search_worker.perform_search(self.tables, self.columns, self.search_query, self.search_mode)
+        )
+        self.search_thread.start()
+
     def on_search_results(self, results: List[SearchResult]):
         """Handle streaming search results."""
         self.tables_model.set_search_results(results)
@@ -1539,6 +1579,16 @@ class QtDBBrowser(QMainWindow):
                 self.tables_overlay.hide()
         except Exception:
             pass
+
+    def on_incremental_search_complete(self):
+        """Handle incremental search completion during data loading - quieter than normal search complete."""
+        results_count = self.tables_model.rowCount()
+        
+        # Update status to show search is updating with new data
+        self.status_label.setText(f"Found {results_count} results (loading more data...)")
+        
+        # Don't cache incremental results - they're incomplete
+        # Don't hide progress or overlay - data is still loading
 
     def on_search_error(self, error: str):
         """Handle search errors."""
