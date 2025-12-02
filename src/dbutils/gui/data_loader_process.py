@@ -32,6 +32,11 @@ CACHE_EXPIRATION_SECONDS = 24 * 60 * 60
 # Use gzip compression for cache files
 USE_COMPRESSION = True
 
+# Dynamic chunk sizing configuration
+MIN_BATCH_SIZE = 100
+MAX_BATCH_SIZE = 2000
+TARGET_CHUNK_TIME_MS = 500  # Target 500ms per chunk for responsive UI
+
 
 def jprint(obj: Dict[str, Any]) -> None:
     sys.stdout.write(json.dumps(obj) + "\n")
@@ -355,17 +360,25 @@ def main():
         sys.stderr.flush()
         jprint({"type": "progress", "message": f"Loaded {loaded_total} tables…", "current": 1, "total": 3})
 
-        # Stream remaining pages
+        # Stream remaining pages with dynamic batch sizing
         offset = initial_limit
+        current_batch_size = batch_size
+        chunk_times = []  # Track recent chunk load times for adaptive sizing
+        
         while True:
-            cached = db_browser.load_from_cache(schema_filter, limit=batch_size, offset=offset)
+            chunk_start = time.time()
+            
+            cached = db_browser.load_from_cache(schema_filter, limit=current_batch_size, offset=offset)
             if cached:
                 t_chunk, c_chunk = cached
             else:
                 t_chunk, c_chunk = db_browser.get_all_tables_and_columns(
-                    schema_filter, use_mock, use_cache=True, limit=batch_size, offset=offset
+                    schema_filter, use_mock, use_cache=True, limit=current_batch_size, offset=offset
                 )
 
+            chunk_time_ms = (time.time() - chunk_start) * 1000
+            chunk_times.append(chunk_time_ms)
+            
             if not t_chunk:
                 break
 
@@ -383,8 +396,27 @@ def main():
             )
             jprint({"type": "progress", "message": f"Loaded {loaded_total} tables…", "current": 2, "total": 3})
 
+            # Adaptive batch sizing: adjust based on recent performance
+            if len(chunk_times) >= 3:
+                avg_time = sum(chunk_times[-3:]) / 3
+                
+                if avg_time < TARGET_CHUNK_TIME_MS * 0.5:
+                    # Too fast, increase batch size for efficiency
+                    new_size = min(int(current_batch_size * 1.5), MAX_BATCH_SIZE)
+                    if new_size != current_batch_size:
+                        sys.stderr.write(f"Increasing batch size: {current_batch_size} -> {new_size} (avg {avg_time:.0f}ms)\n")
+                        sys.stderr.flush()
+                        current_batch_size = new_size
+                elif avg_time > TARGET_CHUNK_TIME_MS * 1.5:
+                    # Too slow, decrease batch size for responsiveness
+                    new_size = max(int(current_batch_size * 0.7), MIN_BATCH_SIZE)
+                    if new_size != current_batch_size:
+                        sys.stderr.write(f"Decreasing batch size: {current_batch_size} -> {new_size} (avg {avg_time:.0f}ms)\n")
+                        sys.stderr.flush()
+                        current_batch_size = new_size
+
             offset += len(t_chunk)
-            if len(t_chunk) < batch_size:
+            if len(t_chunk) < current_batch_size:
                 break
 
         # Save loaded data to cache for next time (with 24 hour expiration)
