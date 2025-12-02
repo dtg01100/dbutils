@@ -558,6 +558,18 @@ def get_available_schemas(use_mock: bool = False) -> List[SchemaInfo]:
     return schemas
 
 
+def humanize_schema_name(raw: str) -> str:
+    """Return a human-friendly schema label for use in UI displays.
+
+    This is purely cosmetic and must not change the underlying schema
+    identifier used for filtering/selection.
+    """
+    if not raw:
+        return ""
+    # Replace multiple underscores with a single space and split/join to remove empties
+    return " ".join(part for part in raw.replace("__", "_").split("_") if part)
+
+
 async def get_available_schemas_async(use_mock: bool = False) -> List[SchemaInfo]:
     """Async version of get_available_schemas that doesn't block the UI."""
     if use_mock:
@@ -1593,7 +1605,11 @@ if TEXTUAL_AVAILABLE:
 
                 # Add individual schemas
                 for schema in self.schemas:
-                    item_label = f"{schema.name} ({schema.table_count} tables)"
+                    # Humanize display label: show readable name and table count
+                    display_name = humanize_schema_name(schema.name)
+                    item_label = (
+                        f"{display_name} ({schema.table_count} table{'s' if schema.table_count != 1 else ''})"
+                    )
                     item = ListItem(Label(item_label))
                     if schema.name == self.current_schema:
                         schema_list.index = len(schema_list) - 1 + 1  # Will select after append

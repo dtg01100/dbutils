@@ -434,14 +434,20 @@ def main():
             # Build schema list from loaded tables if cache miss
             sys.stderr.write("Cache miss, building schema list from loaded tables\n")
             sys.stderr.flush()
-            schemas = set()
+            # Build mapping of schema -> table count so the UI can show counts
+            schema_counts = {}
             for t in all_loaded_tables:
                 if hasattr(t, "schema"):
-                    schemas.add(t.schema)
+                    key = t.schema
                 else:
-                    schemas.add(t.get("schema") or t.get("TABSCHEMA", ""))
-            
-            schemas_list = sorted(schemas)
+                    key = t.get("schema") or t.get("TABSCHEMA", "")
+                schema_counts.setdefault(key, 0)
+                schema_counts[key] += 1
+
+            # Create list of dicts with name and count for richer payloads
+            schemas_list = [
+                {"name": name, "count": schema_counts.get(name, 0)} for name in sorted(schema_counts.keys())
+            ]
             # Save to cache for next time
             save_schemas_to_cache(schemas_list)
         

@@ -815,6 +815,16 @@ class DataLoaderProcess(QObject):
 
 
 
+def humanize_schema_name(raw: str) -> str:
+    """Return a human-friendly label for a schema name.
+
+    Cosmetic only - does not change the real schema identifier.
+    """
+    if not raw:
+        return ""
+    return " ".join(part for part in raw.replace("__", "_").split("_") if part)
+
+
 class QtDBBrowser(QMainWindow):
     """Main Qt Database Browser application."""
 
@@ -1048,6 +1058,8 @@ class QtDBBrowser(QMainWindow):
         panel.setMaximumHeight(120)
 
         return panel
+
+    pass
 
     def create_tables_panel(self) -> QWidget:
         """Create the tables panel."""
@@ -1533,9 +1545,18 @@ class QtDBBrowser(QMainWindow):
             self.status_label.setText(f"Chunk processing error: {e}")
 
     def update_schema_combo(self):
-        """Update schema combo box with all available schemas."""
+        """Update schema combo box with all available schemas.
+
+        The combo will show a friendly label containing both the schema
+        name and a hint of how many tables are present in that schema,
+        while storing the actual schema name as user data. This avoids
+        ambiguity and ensures the selected schema_filter remains the
+        proper schema name when users pick a human readable label.
+        """
         # Use all available schemas instead of just those in current data
-        schemas = self.all_schemas if hasattr(self, 'all_schemas') and self.all_schemas else sorted(set(table.schema for table in self.tables))
+        schemas = self.all_schemas if hasattr(self, 'all_schemas') and self.all_schemas else sorted(
+            set(table.schema for table in self.tables)
+        )
 
         # Preserve the currently selected schema filter during update
         current_filter = self.schema_filter
@@ -1544,13 +1565,45 @@ class QtDBBrowser(QMainWindow):
         self.schema_combo.blockSignals(True)
         try:
             self.schema_combo.clear()
-            self.schema_combo.addItem("All Schemas")
-            for schema in schemas:
-                self.schema_combo.addItem(schema)
+            # Add 'All Schemas' with explicit userData=None so we can detect it later
+            self.schema_combo.addItem("All Schemas", None)
 
-            # Restore the selection based on the current filter
+            # Add a friendly display string for each schema, but attach the
+            # real schema name as the QComboBox itemData so we don't need to
+            # parse the shown label when the selection changes.
+            for schema_entry in schemas:
+                # Support both string schemas and richer dict entries produced by the data loader
+                if isinstance(schema_entry, dict):
+                    name = schema_entry.get("name")
+                    raw_count = schema_entry.get("count")
+                    # Only display count if it's a positive integer - avoid showing 0 tables
+                    try:
+                        rc = int(raw_count) if raw_count is not None else None
+                    except Exception:
+                        rc = None
+                    count = rc if rc and rc > 0 else None
+                else:
+                    name = schema_entry
+                    # Only compute local counts if we have tables loaded; otherwise avoid showing '0 tables'
+                    count = None
+                    if self.tables:
+                        computed = sum(1 for t in self.tables if getattr(t, 'schema', None) == name)
+                        count = computed if computed > 0 else None
+
+                # For Qt dropdown we want to show the exact schema name coming
+                # from the database so users can match the DB value exactly.
+                display_name = name
+                if count is None:
+                    label = f"{display_name}"
+                else:
+                    label = f"{display_name} ({count} table{'s' if count != 1 else ''})"
+
+                # store the actual schema name as userData
+                self.schema_combo.addItem(label, name)
+
+            # Restore the selection based on the current filter using stored userData
             if current_filter:
-                index = self.schema_combo.findText(current_filter)
+                index = self.schema_combo.findData(current_filter)
                 if index >= 0:
                     self.schema_combo.setCurrentIndex(index)
                 else:
@@ -2115,11 +2168,26 @@ class QtDBBrowser(QMainWindow):
 
 
     def on_schema_changed(self, schema: str):
-        """Handle schema filter change."""
-        if schema == "All Schemas":
+        """Handle schema filter change.
+
+        The QComboBox stores human-friendly labels but the real schema name
+        is stored as the item's userData so we should prefer that when
+        updating the active filter.
+        """
+        try:
+            idx = self.schema_combo.currentIndex()
+            # itemData will be the real schema name (or None for All Schemas)
+            selected = self.schema_combo.itemData(idx)
+        except Exception:
+            # Fall back to the supplied text for environments without Qt
+            selected = None if schema == "All Schemas" else schema
+
+        if selected is None:
             self.schema_filter = None
         else:
-            self.schema_filter = schema
+            # Ensure string type
+            self.schema_filter = str(selected)
+
         self.load_data()
 
     def on_show_non_matching_changed(self, checked: bool):
