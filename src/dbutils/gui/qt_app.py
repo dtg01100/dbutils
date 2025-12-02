@@ -861,6 +861,9 @@ class QtDBBrowser(QMainWindow):
         self.setWindowTitle("DB Browser - Qt (Experimental)")
         self.setGeometry(100, 100, 1200, 800)
 
+        # Enable nested and tabbed docks for flexible layout
+        self.setDockNestingEnabled(True)
+
         # Set central widget to empty - we'll use all docks
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -919,7 +922,9 @@ class QtDBBrowser(QMainWindow):
         self.tables_dock = QDockWidget("Tables", self)
         self.tables_dock.setAllowedAreas(
             Qt.DockWidgetArea.LeftDockWidgetArea | 
-            Qt.DockWidgetArea.RightDockWidgetArea
+            Qt.DockWidgetArea.RightDockWidgetArea |
+            Qt.DockWidgetArea.TopDockWidgetArea |
+            Qt.DockWidgetArea.BottomDockWidgetArea
         )
         
         # Create tables panel content
@@ -934,15 +939,17 @@ class QtDBBrowser(QMainWindow):
         self.columns_dock = QDockWidget("Columns", self)
         self.columns_dock.setAllowedAreas(
             Qt.DockWidgetArea.LeftDockWidgetArea | 
-            Qt.DockWidgetArea.RightDockWidgetArea
+            Qt.DockWidgetArea.RightDockWidgetArea |
+            Qt.DockWidgetArea.TopDockWidgetArea |
+            Qt.DockWidgetArea.BottomDockWidgetArea
         )
         
         # Create columns panel content
         columns_widget = self.create_columns_panel()
         self.columns_dock.setWidget(columns_widget)
         
-        # Add to main window on right
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.columns_dock)
+        # Split with tables dock to create side-by-side layout
+        self.splitDockWidget(self.tables_dock, self.columns_dock, Qt.Orientation.Horizontal)
 
     def create_search_panel(self) -> QWidget:
         """Create the search input panel."""
@@ -1136,6 +1143,7 @@ class QtDBBrowser(QMainWindow):
         self.column_details_dock.setAllowedAreas(
             Qt.DockWidgetArea.LeftDockWidgetArea | 
             Qt.DockWidgetArea.RightDockWidgetArea | 
+            Qt.DockWidgetArea.TopDockWidgetArea |
             Qt.DockWidgetArea.BottomDockWidgetArea
         )
         
