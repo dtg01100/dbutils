@@ -20,8 +20,13 @@ from __future__ import annotations
 import sys
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+
+# Cache expiration time in seconds (24 hours)
+CACHE_EXPIRATION_SECONDS = 24 * 60 * 60
 
 
 def jprint(obj: Dict[str, Any]) -> None:
@@ -29,11 +34,89 @@ def jprint(obj: Dict[str, Any]) -> None:
     sys.stdout.flush()
 
 
-def get_schema_cache_path() -> Path:
-    """Get the path to the schema cache file."""
+def get_cache_dir() -> Path:
+    """Get the cache directory."""
     cache_dir = Path.home() / ".cache" / "dbutils"
     cache_dir.mkdir(parents=True, exist_ok=True)
-    return cache_dir / "schemas.json"
+    return cache_dir
+
+
+def get_schema_cache_path() -> Path:
+    """Get the path to the schema cache file."""
+    return get_cache_dir() / "schemas.json"
+
+
+def get_data_cache_path(schema_filter: Optional[str]) -> Path:
+    """Get the path to the data cache file for a specific schema filter."""
+    cache_dir = get_cache_dir()
+    if schema_filter:
+        # Sanitize schema name for filename
+        safe_name = "".join(c if c.isalnum() else "_" for c in schema_filter)
+        return cache_dir / f"data_{safe_name}.json"
+    else:
+        return cache_dir / "data_all.json"
+
+
+def is_cache_valid(cache_path: Path, max_age_seconds: int = CACHE_EXPIRATION_SECONDS) -> bool:
+    """Check if a cache file exists and is not expired."""
+    if not cache_path.exists():
+        return False
+    
+    # Check file age
+    file_mtime = cache_path.stat().st_mtime
+    age_seconds = time.time() - file_mtime
+    
+    return age_seconds < max_age_seconds
+
+
+def load_cached_data(schema_filter: Optional[str]) -> Optional[Tuple[List[Dict], List[Dict]]]:
+    """Load cached table and column data if valid."""
+    try:
+        cache_path = get_data_cache_path(schema_filter)
+        
+        if not is_cache_valid(cache_path):
+            sys.stderr.write(f"Data cache miss or expired for schema_filter={schema_filter}\n")
+            sys.stderr.flush()
+            return None
+        
+        with open(cache_path, 'r') as f:
+            data = json.load(f)
+            tables = data.get('tables', [])
+            columns = data.get('columns', [])
+            cached_at = data.get('cached_at', 0)
+            
+            age_hours = (time.time() - cached_at) / 3600
+            sys.stderr.write(f"Data cache hit for schema_filter={schema_filter} (age: {age_hours:.1f}h, {len(tables)} tables)\n")
+            sys.stderr.flush()
+            
+            return tables, columns
+    except Exception as e:
+        sys.stderr.write(f"Failed to load data cache: {e}\n")
+        sys.stderr.flush()
+    
+    return None
+
+
+def save_data_to_cache(schema_filter: Optional[str], tables: List[Dict], columns: List[Dict]) -> None:
+    """Save table and column data to cache."""
+    try:
+        cache_path = get_data_cache_path(schema_filter)
+        
+        data = {
+            'tables': tables,
+            'columns': columns,
+            'cached_at': time.time(),
+            'schema_filter': schema_filter
+        }
+        
+        with open(cache_path, 'w') as f:
+            json.dump(data, f)
+        
+        sys.stderr.write(f"Saved {len(tables)} tables and {len(columns)} columns to data cache\n")
+        sys.stderr.flush()
+    except Exception as e:
+        sys.stderr.write(f"Failed to save data cache: {e}\n")
+        sys.stderr.flush()
 
 
 def load_cached_schemas() -> Optional[List[str]]:
@@ -146,11 +229,51 @@ def main():
         sys.stderr.write(f"Starting data loader: schema_filter={schema_filter}, use_mock={use_mock}, initial_limit={initial_limit}, batch_size={batch_size}\n")
         sys.stderr.flush()
 
+        # Try to load from processed data cache first (24 hour expiration)
+        cached_data = load_cached_data(schema_filter)
+        
+        if cached_data:
+            all_tables_dicts, all_columns_dicts = cached_data
+            
+            # Stream the cached data in chunks
+            sys.stderr.write(f"Streaming {len(all_tables_dicts)} tables from cache...\n")
+            sys.stderr.flush()
+            jprint({"type": "progress", "message": "Loading from cache…", "current": 0, "total": 3})
+            
+            # Send all data as initial chunk (already processed)
+            jprint({
+                "type": "chunk",
+                "tables": all_tables_dicts,
+                "columns": all_columns_dicts,
+                "loaded": len(all_tables_dicts),
+                "estimated": len(all_tables_dicts),
+            })
+            jprint({"type": "progress", "message": f"Loaded {len(all_tables_dicts)} tables from cache", "current": 2, "total": 3})
+            
+            # Load schemas from cache
+            schemas_list = load_cached_schemas()
+            if not schemas_list:
+                # Fallback: build from cached tables
+                schemas_list = sorted({t['schema'] for t in all_tables_dicts})
+                save_schemas_to_cache(schemas_list)
+            
+            jprint({"type": "schemas", "schemas": schemas_list})
+            jprint({"type": "progress", "message": "Done", "current": 3, "total": 3})
+            jprint({"type": "done"})
+            sys.stderr.write("Loaded from cache, exiting normally\n")
+            sys.stderr.flush()
+            return 0
+
+        # Cache miss - load from database
+        sys.stderr.write("Data cache miss, loading from database...\n")
+        sys.stderr.flush()
+
         # Import from absolute paths since this runs as __main__
         import dbutils.db_browser as db_browser
 
-        # Track all loaded tables to build schema list
+        # Track all loaded tables to build schema list and save to cache
         all_loaded_tables = []
+        all_loaded_columns = []
         
         # Initial chunk
         sys.stderr.write("Loading initial chunk...\n")
@@ -158,7 +281,7 @@ def main():
         jprint({"type": "progress", "message": "Connecting…", "current": 0, "total": 3})
 
         cached = db_browser.load_from_cache(schema_filter, limit=initial_limit, offset=0)
-        sys.stderr.write(f"Cache result: {'hit' if cached else 'miss'}\n")
+        sys.stderr.write(f"DB cache result: {'hit' if cached else 'miss'}\n")
         sys.stderr.flush()
         if cached:
             tables, columns = cached
@@ -168,6 +291,7 @@ def main():
             )
 
         all_loaded_tables.extend(tables)
+        all_loaded_columns.extend(columns)
         loaded_total = len(tables)
         # Estimate if we likely have more
         if loaded_total < initial_limit:
@@ -205,6 +329,7 @@ def main():
                 break
 
             all_loaded_tables.extend(t_chunk)
+            all_loaded_columns.extend(c_chunk)
             loaded_total += len(t_chunk)
             jprint(
                 {
@@ -220,6 +345,11 @@ def main():
             offset += len(t_chunk)
             if len(t_chunk) < batch_size:
                 break
+
+        # Save loaded data to cache for next time (with 24 hour expiration)
+        all_tables_dicts = to_table_dicts(all_loaded_tables)
+        all_columns_dicts = to_column_dicts(all_loaded_columns)
+        save_data_to_cache(schema_filter, all_tables_dicts, all_columns_dicts)
 
         # Try to load schemas from cache first
         schemas_list = load_cached_schemas()

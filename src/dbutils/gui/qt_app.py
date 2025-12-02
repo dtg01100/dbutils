@@ -1107,6 +1107,11 @@ class QtDBBrowser(QMainWindow):
         refresh_schemas_action.triggered.connect(self.rebuild_schema_cache)
         file_menu.addAction(refresh_schemas_action)
 
+        clear_cache_action = QAction("Clear All Caches", self)
+        clear_cache_action.setShortcut("Ctrl+Shift+C")
+        clear_cache_action.triggered.connect(self.clear_all_caches)
+        file_menu.addAction(clear_cache_action)
+
         file_menu.addSeparator()
 
         exit_action = QAction("Exit", self)
@@ -1696,6 +1701,66 @@ class QtDBBrowser(QMainWindow):
                 self,
                 "Error",
                 f"Failed to rebuild schema cache: {e}"
+            )
+
+    def clear_all_caches(self):
+        """Clear all cached data (schemas and table/column data)."""
+        from pathlib import Path
+        import glob
+        
+        try:
+            cache_dir = Path.home() / ".cache" / "dbutils"
+            
+            if not cache_dir.exists():
+                QMessageBox.information(
+                    self,
+                    "Cache Empty",
+                    "No cache files found."
+                )
+                return
+            
+            # Count and delete cache files
+            cache_files = list(cache_dir.glob("*.json"))
+            count = len(cache_files)
+            
+            if count == 0:
+                QMessageBox.information(
+                    self,
+                    "Cache Empty",
+                    "No cache files found."
+                )
+                return
+            
+            # Confirm deletion
+            reply = QMessageBox.question(
+                self,
+                "Clear Caches",
+                f"This will delete {count} cache file(s):\n\n"
+                "• Schema list cache\n"
+                "• Table/column data caches\n\n"
+                "Data will be reloaded from the database on next refresh.\n\n"
+                "Continue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                for cache_file in cache_files:
+                    cache_file.unlink()
+                
+                self.status_label.setText(f"Cleared {count} cache files")
+                
+                QMessageBox.information(
+                    self,
+                    "Caches Cleared",
+                    f"Successfully deleted {count} cache file(s).\n\n"
+                    "Press F5 to reload data from the database."
+                )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to clear caches: {e}"
             )
 
     def show_about(self):
