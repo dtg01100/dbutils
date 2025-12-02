@@ -892,6 +892,12 @@ class QtDBBrowser(QMainWindow):
             Qt.DockWidgetArea.BottomDockWidgetArea
         )
         
+        # Prevent the dock from being resized too large
+        self.search_dock.setFeatures(
+            QDockWidget.DockWidgetFeature.DockWidgetMovable |
+            QDockWidget.DockWidgetFeature.DockWidgetFloatable
+        )
+        
         # Create search panel content
         search_widget = self.create_search_panel()
         
@@ -899,6 +905,9 @@ class QtDBBrowser(QMainWindow):
         search_widget.setMaximumHeight(120)
         
         self.search_dock.setWidget(search_widget)
+        
+        # Set size policy on the dock itself
+        self.search_dock.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         
         # Add to main window at top
         self.addDockWidget(Qt.DockWidgetArea.TopDockWidgetArea, self.search_dock)
@@ -1020,9 +1029,9 @@ class QtDBBrowser(QMainWindow):
         # Store reference to container for potential future use
         self.search_progress_container = progress_container
 
-        # Set a minimum size to ensure the group box label is visible
-        panel.setMinimumHeight(140)  # Increased to ensure group box label is fully visible
-        panel.setMaximumHeight(180)  # Increased maximum to accommodate all content
+        # Set compact size constraints for the search panel
+        panel.setMinimumHeight(80)
+        panel.setMaximumHeight(120)
 
         return panel
 
@@ -2054,9 +2063,6 @@ def main():
     parser.add_argument("--no-streaming", action="store_true", help="Disable streaming search")
 
     args = parser.parse_args()
-
-    # Force X11 platform to avoid Wayland dock sizing issues
-    os.environ['QT_QPA_PLATFORM'] = 'xcb'
 
     # Create Qt application
     app = QApplication(sys.argv)
