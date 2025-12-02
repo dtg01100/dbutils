@@ -882,12 +882,16 @@ class QtDBBrowser(QMainWindow):
         tables_panel = self.create_tables_panel()
         content_splitter.addWidget(tables_panel)
 
-        # Columns panel (right)
+        # Columns panel (middle)
         columns_panel = self.create_columns_panel()
         content_splitter.addWidget(columns_panel)
 
-        # Set splitter proportions
-        content_splitter.setSizes([600, 600])
+        # Column details panel (right)
+        details_panel = self.create_column_details_panel()
+        content_splitter.addWidget(details_panel)
+
+        # Set splitter proportions (40% tables, 35% columns list, 25% details)
+        content_splitter.setSizes([480, 420, 300])
 
         main_layout.addWidget(content_splitter)
         # Make the splitter expand to take up available space
@@ -1088,6 +1092,35 @@ class QtDBBrowser(QMainWindow):
 
         # Keep a reference
         self.columns_panel = panel
+        return panel
+
+    def create_column_details_panel(self) -> QWidget:
+        """Create the column details info panel."""
+        panel = QGroupBox("Column Details")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
+
+        # Create a text edit widget for displaying column details
+        self.column_details_text = QTextEdit()
+        self.column_details_text.setReadOnly(True)
+        self.column_details_text.setPlaceholderText("Select a table to view column details...")
+        
+        # Style the text edit for better readability
+        self.column_details_text.setStyleSheet("""
+            QTextEdit {
+                font-family: 'Courier New', monospace;
+                font-size: 10pt;
+                background-color: #f8f9fa;
+                border: 1px solid #ddd;
+                padding: 8px;
+            }
+        """)
+        
+        layout.addWidget(self.column_details_text)
+        
+        # Keep a reference
+        self.column_details_panel = panel
         return panel
 
     def setup_menu(self):
@@ -1639,8 +1672,44 @@ class QtDBBrowser(QMainWindow):
         if table_key:
             columns = self.table_columns.get(table_key, [])
             self.columns_model.set_columns(columns)
+            self.update_column_details(table_key, columns)
         else:
             self.columns_model.set_columns([])
+            self.update_column_details(None, [])
+
+    def update_column_details(self, table_key: Optional[str], columns: List[ColumnInfo]):
+        """Update the column details panel with formatted information."""
+        if not table_key or not columns:
+            self.column_details_text.setPlainText("No table selected")
+            return
+        
+        # Parse table key
+        parts = table_key.split('.')
+        schema = parts[0] if len(parts) > 0 else ''
+        table = parts[1] if len(parts) > 1 else ''
+        
+        # Format column details
+        details = []
+        details.append(f"Table: {schema}.{table}")
+        details.append(f"Columns: {len(columns)}")
+        details.append("="*60)
+        details.append("")
+        
+        for i, col in enumerate(columns, 1):
+            details.append(f"{i}. {col.name}")
+            details.append(f"   Type:     {col.typename}" + (f"({col.length})" if col.length else ""))
+            if col.scale:
+                details.append(f"   Scale:    {col.scale}")
+            details.append(f"   Nullable: {'Yes' if col.nulls == 'Y' else 'No'}")
+            if col.remarks:
+                # Wrap long remarks
+                remarks_lines = col.remarks.split('\n')
+                details.append(f"   Remarks:  {remarks_lines[0]}")
+                for remark_line in remarks_lines[1:]:
+                    details.append(f"             {remark_line}")
+            details.append("")
+        
+        self.column_details_text.setPlainText("\n".join(details))
 
     def toggle_search_mode(self):
         """Toggle between table and column search modes."""
