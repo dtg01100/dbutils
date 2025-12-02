@@ -11,6 +11,7 @@ import os
 import sys
 import asyncio
 import json
+import csv
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
@@ -39,6 +40,8 @@ try:
         QMessageBox,
         QSizePolicy,
         QDockWidget,
+        QFileDialog,
+        QProgressDialog,
     )
     from PySide6.QtCore import (
         Qt,
@@ -81,6 +84,8 @@ except ImportError:
             QMessageBox,
             QSizePolicy,
             QDockWidget,
+            QFileDialog,
+            QProgressDialog,
         )
         from PyQt6.QtCore import (
             Qt,
@@ -1200,6 +1205,13 @@ class QtDBBrowser(QMainWindow):
 
         file_menu.addSeparator()
 
+        export_action = QAction("Export...", self)
+        export_action.setShortcut("Ctrl+E")
+        export_action.triggered.connect(self.show_export_dialog)
+        file_menu.addAction(export_action)
+
+        file_menu.addSeparator()
+
         exit_action = QAction("Exit", self)
         exit_action.setShortcut("Ctrl+Q")
         exit_action.triggered.connect(self.close)
@@ -1886,6 +1898,221 @@ class QtDBBrowser(QMainWindow):
 
         status = "shown" if self.show_non_matching else "hidden"
         self.status_label.setText(f"Non-matching tables {status}")
+
+    def show_export_dialog(self):
+        """Show export dialog to choose format and file."""
+        # Get current filtered data
+        if hasattr(self, 'tables_proxy') and self.tables_proxy:
+            row_count = self.tables_proxy.rowCount()
+        else:
+            row_count = 0
+        
+        if row_count == 0:
+            QMessageBox.warning(self, "No Data", "No tables to export. Please load data first.")
+            return
+        
+        # Ask user for export format
+        format_dialog = QMessageBox(self)
+        format_dialog.setWindowTitle("Export Format")
+        format_dialog.setText("Choose export format:")
+        csv_btn = format_dialog.addButton("CSV (Table List)", QMessageBox.ButtonRole.ActionRole)
+        json_btn = format_dialog.addButton("JSON (Full Schema)", QMessageBox.ButtonRole.ActionRole)
+        sql_btn = format_dialog.addButton("SQL DDL", QMessageBox.ButtonRole.ActionRole)
+        format_dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+        format_dialog.exec()
+        
+        clicked = format_dialog.clickedButton()
+        if clicked == csv_btn:
+            self.export_csv()
+        elif clicked == json_btn:
+            self.export_json()
+        elif clicked == sql_btn:
+            self.export_sql()
+    
+    def export_csv(self):
+        """Export filtered tables to CSV format."""
+        filename, _ = QFileDialog.getSaveFileName(
+            self, "Export to CSV", "", "CSV Files (*.csv);;All Files (*)"
+        )
+        if not filename:
+            return
+        
+        try:
+            progress = QProgressDialog("Exporting to CSV...", "Cancel", 0, 100, self)
+            progress.setWindowModality(Qt.WindowModality.WindowModal)
+            progress.show()
+            
+            with open(filename, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow(['Schema', 'Table', 'Column Count', 'Description'])
+                
+                # Export visible/filtered tables
+                proxy = self.tables_proxy
+                total = proxy.rowCount()
+                
+                for row in range(total):
+                    if progress.wasCanceled():
+                        break
+                    
+                    schema_idx = proxy.index(row, 0)
+                    table_idx = proxy.index(row, 1)
+                    count_idx = proxy.index(row, 2)
+                    desc_idx = proxy.index(row, 3)
+                    
+                    schema = proxy.data(schema_idx)
+                    table = proxy.data(table_idx)
+                    count = proxy.data(count_idx)
+                    desc = proxy.data(desc_idx) or ''
+                    
+                    writer.writerow([schema, table, count, desc])
+                    
+                    if row % 10 == 0:
+                        progress.setValue(int(row * 100 / total))
+                        QApplication.processEvents()
+            
+            progress.setValue(100)
+            QMessageBox.information(self, "Export Complete", f"Exported {total} tables to {filename}")
+        except Exception as e:
+            QMessageBox.critical(self, "Export Error", f"Failed to export: {e}")
+    
+    def export_json(self):
+        """Export full schema structure to JSON format."""
+        filename, _ = QFileDialog.getSaveFileName(
+            self, "Export to JSON", "", "JSON Files (*.json);;All Files (*)"
+        )
+        if not filename:
+            return
+        
+        try:
+            progress = QProgressDialog("Exporting to JSON...", "Cancel", 0, 100, self)
+            progress.setWindowModality(Qt.WindowModality.WindowModal)
+            progress.show()
+            
+            # Build complete schema structure
+            schema_data = {}
+            proxy = self.tables_proxy
+            total = proxy.rowCount()
+            
+            for row in range(total):
+                if progress.wasCanceled():
+                    break
+                
+                schema_idx = proxy.index(row, 0)
+                table_idx = proxy.index(row, 1)
+                desc_idx = proxy.index(row, 3)
+                
+                schema = proxy.data(schema_idx)
+                table = proxy.data(table_idx)
+                desc = proxy.data(desc_idx) or ''
+                
+                if schema not in schema_data:
+                    schema_data[schema] = {}
+                
+                # Get columns for this table
+                columns = []
+                for col in self.all_columns:
+                    if col.table_schema == schema and col.table_name == table:
+                        columns.append({
+                            'name': col.column_name,
+                            'type': col.data_type,
+                            'length': col.length,
+                            'scale': col.scale,
+                            'nullable': col.nullable,
+                            'remarks': col.remarks or ''
+                        })
+                
+                schema_data[schema][table] = {
+                    'description': desc,
+                    'columns': columns
+                }
+                
+                if row % 10 == 0:
+                    progress.setValue(int(row * 100 / total))
+                    QApplication.processEvents()
+            
+            # Write JSON file
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(schema_data, f, indent=2, ensure_ascii=False)
+            
+            progress.setValue(100)
+            QMessageBox.information(self, "Export Complete", f"Exported schema to {filename}")
+        except Exception as e:
+            QMessageBox.critical(self, "Export Error", f"Failed to export: {e}")
+    
+    def export_sql(self):
+        """Export CREATE TABLE DDL statements."""
+        filename, _ = QFileDialog.getSaveFileName(
+            self, "Export to SQL", "", "SQL Files (*.sql);;All Files (*)"
+        )
+        if not filename:
+            return
+        
+        try:
+            progress = QProgressDialog("Generating SQL DDL...", "Cancel", 0, 100, self)
+            progress.setWindowModality(Qt.WindowModality.WindowModal)
+            progress.show()
+            
+            with open(filename, 'w', encoding='utf-8') as f:
+                proxy = self.tables_proxy
+                total = proxy.rowCount()
+                
+                for row in range(total):
+                    if progress.wasCanceled():
+                        break
+                    
+                    schema_idx = proxy.index(row, 0)
+                    table_idx = proxy.index(row, 1)
+                    desc_idx = proxy.index(row, 3)
+                    
+                    schema = proxy.data(schema_idx)
+                    table = proxy.data(table_idx)
+                    desc = proxy.data(desc_idx)
+                    
+                    # Write table comment if available
+                    if desc:
+                        f.write(f"-- {desc}\\n")
+                    
+                    f.write(f"CREATE TABLE {schema}.{table} (\\n")
+                    
+                    # Get columns for this table
+                    columns = []
+                    for col in self.all_columns:
+                        if col.table_schema == schema and col.table_name == table:
+                            columns.append(col)
+                    
+                    # Write column definitions
+                    col_lines = []
+                    for col in columns:
+                        col_def = f"    {col.column_name} {col.data_type}"
+                        if col.length:
+                            if col.scale:
+                                col_def += f"({col.length},{col.scale})"
+                            else:
+                                col_def += f"({col.length})"
+                        if not col.nullable:
+                            col_def += " NOT NULL"
+                        col_lines.append(col_def)
+                    
+                    f.write(",\\n".join(col_lines))
+                    f.write("\\n);\\n\\n")
+                    
+                    # Add column comments if available
+                    for col in columns:
+                        if col.remarks:
+                            f.write(f"COMMENT ON COLUMN {schema}.{table}.{col.column_name} IS '{col.remarks}';\\n")
+                    
+                    if any(col.remarks for col in columns):
+                        f.write("\\n")
+                    
+                    if row % 10 == 0:
+                        progress.setValue(int(row * 100 / total))
+                        QApplication.processEvents()
+            
+            progress.setValue(100)
+            QMessageBox.information(self, "Export Complete", f"Generated DDL for {total} tables")
+        except Exception as e:
+            QMessageBox.critical(self, "Export Error", f"Failed to export: {e}")
+
 
     def on_schema_changed(self, schema: str):
         """Handle schema filter change."""
