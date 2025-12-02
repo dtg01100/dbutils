@@ -932,6 +932,7 @@ class QtDBBrowser(QMainWindow):
     def create_search_panel(self) -> QWidget:
         """Create the search input panel."""
         panel = QWidget()
+        panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         layout = QVBoxLayout(panel)
         layout.setSpacing(4)
         layout.setContentsMargins(8, 8, 8, 6)
@@ -1183,6 +1184,30 @@ class QtDBBrowser(QMainWindow):
 
         # View menu
         view_menu = menubar.addMenu("View")
+
+        toggle_search_action = QAction("Show Search Panel", self)
+        toggle_search_action.setShortcut("Ctrl+Shift+S")
+        toggle_search_action.setCheckable(True)
+        toggle_search_action.setChecked(True)
+        toggle_search_action.triggered.connect(self.toggle_search_dock)
+        view_menu.addAction(toggle_search_action)
+        self.toggle_search_action = toggle_search_action
+
+        toggle_tables_action = QAction("Show Tables Panel", self)
+        toggle_tables_action.setShortcut("Ctrl+Shift+T")
+        toggle_tables_action.setCheckable(True)
+        toggle_tables_action.setChecked(True)
+        toggle_tables_action.triggered.connect(self.toggle_tables_dock)
+        view_menu.addAction(toggle_tables_action)
+        self.toggle_tables_action = toggle_tables_action
+
+        toggle_columns_action = QAction("Show Columns Panel", self)
+        toggle_columns_action.setShortcut("Ctrl+Shift+C")
+        toggle_columns_action.setCheckable(True)
+        toggle_columns_action.setChecked(True)
+        toggle_columns_action.triggered.connect(self.toggle_columns_dock)
+        view_menu.addAction(toggle_columns_action)
+        self.toggle_columns_action = toggle_columns_action
 
         toggle_details_action = QAction("Show Column Details", self)
         toggle_details_action.setShortcut("Ctrl+D")
@@ -1790,6 +1815,39 @@ class QtDBBrowser(QMainWindow):
             self.column_details_dock.show()
             self.toggle_details_action.setChecked(True)
             self.toggle_details_action.setText("Hide Column Details")
+
+    def toggle_search_dock(self):
+        """Toggle the search dock widget visibility."""
+        if self.search_dock.isVisible():
+            self.search_dock.hide()
+            self.toggle_search_action.setChecked(False)
+            self.toggle_search_action.setText("Show Search Panel")
+        else:
+            self.search_dock.show()
+            self.toggle_search_action.setChecked(True)
+            self.toggle_search_action.setText("Hide Search Panel")
+
+    def toggle_tables_dock(self):
+        """Toggle the tables dock widget visibility."""
+        if self.tables_dock.isVisible():
+            self.tables_dock.hide()
+            self.toggle_tables_action.setChecked(False)
+            self.toggle_tables_action.setText("Show Tables Panel")
+        else:
+            self.tables_dock.show()
+            self.toggle_tables_action.setChecked(True)
+            self.toggle_tables_action.setText("Hide Tables Panel")
+
+    def toggle_columns_dock(self):
+        """Toggle the columns dock widget visibility."""
+        if self.columns_dock.isVisible():
+            self.columns_dock.hide()
+            self.toggle_columns_action.setChecked(False)
+            self.toggle_columns_action.setText("Show Columns Panel")
+        else:
+            self.columns_dock.show()
+            self.toggle_columns_action.setChecked(True)
+            self.toggle_columns_action.setText("Hide Columns Panel")
 
     def toggle_streaming(self):
         """Toggle streaming search - now always enabled."""
