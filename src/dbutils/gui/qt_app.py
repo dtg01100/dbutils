@@ -872,6 +872,11 @@ class QtDBBrowser(QMainWindow):
         self.setup_columns_dock()
         self.setup_column_details_dock()
 
+        # Force search dock to compact height after layout is complete
+        QTimer.singleShot(0, lambda: self.resizeDocks(
+            [self.search_dock], [120], Qt.Orientation.Vertical
+        ))
+
         # Busy overlays for panels
         try:
             self.tables_overlay = BusyOverlay(self.tables_table)
@@ -880,9 +885,6 @@ class QtDBBrowser(QMainWindow):
             # If overlays cannot be created (e.g., tests without Qt), ignore gracefully
             self.tables_overlay = None
             self.columns_overlay = None
-
-        # Create column details as dockable widget
-        self.setup_column_details_dock()
 
     def setup_search_dock(self):
         """Create search panel as a dockable widget."""
