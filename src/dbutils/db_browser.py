@@ -423,7 +423,7 @@ def mock_get_columns() -> List[ColumnInfo]:
 
 # Cache configuration
 CACHE_DIR = Path.home() / ".cache" / "dbutils"
-CACHE_FILE = CACHE_DIR / "schema_cache.pkl"
+CACHE_FILE = CACHE_DIR / "schema_cache.pkl.gz"
 
 
 def get_cache_key(schema_filter: Optional[str], limit: Optional[int] = None, offset: Optional[int] = None) -> str:
@@ -440,11 +440,24 @@ def load_from_cache(
 ) -> Optional[tuple[List[TableInfo], List[ColumnInfo]]]:
     """Load tables and columns from cache if available and recent."""
     if not CACHE_FILE.exists():
-        return None
+        # Backward compatibility: try old uncompressed cache
+        legacy = CACHE_DIR / "schema_cache.pkl"
+        if not legacy.exists():
+            return None
+        cache_path = legacy
+        is_gzip = False
+    else:
+        cache_path = CACHE_FILE
+        is_gzip = True
 
     try:
-        with open(CACHE_FILE, "rb") as f:
-            cache_data = pickle.load(f)
+        if is_gzip:
+            import gzip
+            with gzip.open(cache_path, "rb") as f:
+                cache_data = pickle.load(f)
+        else:
+            with open(cache_path, "rb") as f:
+                cache_data = pickle.load(f)
 
         cache_key = get_cache_key(schema_filter, limit, offset)
         if cache_key not in cache_data:
@@ -469,7 +482,7 @@ def save_to_cache(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> None:
-    """Save tables and columns to cache."""
+    """Save tables and columns to cache (compressed)."""
     try:
         # Create cache directory if it doesn't exist
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -478,7 +491,8 @@ def save_to_cache(
         cache_data = {}
         if CACHE_FILE.exists():
             try:
-                with open(CACHE_FILE, "rb") as f:
+                import gzip
+                with gzip.open(CACHE_FILE, "rb") as f:
                     cache_data = pickle.load(f)
             except Exception:
                 cache_data = {}
@@ -489,8 +503,9 @@ def save_to_cache(
         cache_key = get_cache_key(schema_filter, limit, offset)
         cache_data[cache_key] = {"timestamp": time.time(), "tables": tables, "columns": columns}
 
-        # Save cache
-        with open(CACHE_FILE, "wb") as f:
+        # Save cache compressed
+        import gzip
+        with gzip.open(CACHE_FILE, "wb", compresslevel=5) as f:
             pickle.dump(cache_data, f)
     except Exception:
         # Silently fail - caching is optional
@@ -539,6 +554,41 @@ def get_available_schemas(use_mock: bool = False) -> List[SchemaInfo]:
     return schemas
 
 
+async def get_available_schemas_async(use_mock: bool = False) -> List[SchemaInfo]:
+    """Async version of get_available_schemas that doesn't block the UI."""
+    if use_mock:
+        return [
+            SchemaInfo(name="DACDATA", table_count=15),
+            SchemaInfo(name="TEST", table_count=8),
+            SchemaInfo(name="QGPL", table_count=23),
+            SchemaInfo(name="PRODUCTION", table_count=42),
+        ]
+
+    # Query for schemas with table counts
+    schemas_sql = """
+        SELECT
+            TABLE_SCHEMA,
+            COUNT(*) AS TABLE_COUNT
+        FROM QSYS2.SYSTABLES
+        WHERE TABLE_TYPE IN ('T', 'P')
+        AND SYSTEM_TABLE = 'N'
+        GROUP BY TABLE_SCHEMA
+        ORDER BY TABLE_COUNT DESC, TABLE_SCHEMA
+    """
+
+    schemas = []
+    try:
+        loop = asyncio.get_event_loop()
+        schema_data = await loop.run_in_executor(None, query_runner, schemas_sql)
+        for row in schema_data:
+            schemas.append(SchemaInfo(name=row.get("TABLE_SCHEMA", ""), table_count=int(row.get("TABLE_COUNT", 0))))
+    except Exception as exc:
+        # If query fails, return empty list
+        print(f"Warning: Could not fetch schemas: {exc}")
+
+    return schemas
+
+
 def schema_exists(schema: str, use_mock: bool = False) -> bool:
     """Check whether a schema (library) exists by detecting at least one table in it.
 
@@ -552,6 +602,24 @@ def schema_exists(schema: str, use_mock: bool = False) -> bool:
     sql = f"SELECT 1 FROM QSYS2.SYSTABLES WHERE TABLE_SCHEMA = '{schema.upper()}' AND TABLE_TYPE IN ('T','P') AND SYSTEM_TABLE='N' FETCH FIRST 1 ROWS ONLY"
     try:
         data = query_runner(sql)
+        if not data:
+            return False
+        # If multiple formats, check for truthy results
+        return len(data) > 0
+    except Exception:
+        return False
+
+
+async def schema_exists_async(schema: str, use_mock: bool = False) -> bool:
+    """Async version of schema_exists that doesn't block the UI."""
+    if use_mock:
+        # Mock datasets include DACDATA
+        return schema.upper() == "DACDATA"
+
+    sql = f"SELECT 1 FROM QSYS2.SYSTABLES WHERE TABLE_SCHEMA = '{schema.upper()}' AND TABLE_TYPE IN ('T','P') AND SYSTEM_TABLE='N' FETCH FIRST 1 ROWS ONLY"
+    try:
+        loop = asyncio.get_event_loop()
+        data = await loop.run_in_executor(None, query_runner, sql)
         if not data:
             return False
         # If multiple formats, check for truthy results
@@ -597,13 +665,14 @@ async def get_all_tables_and_columns_async(
     if schema_filter:
         schema_clause = f"AND TABLE_SCHEMA = '{schema_filter.upper()}'"
 
-    # Build pagination clause
+    # Build pagination clause (DB2 for i syntax)
     pagination_clause = ""
     if limit is not None:
-        pagination_clause = f"FETCH FIRST {limit} ROWS ONLY"
         if offset is not None and offset > 0:
-            # For DB2, we need to use a subquery for offset
-            pagination_clause = f"LIMIT {limit} OFFSET {offset}"
+            # DB2 for i requires OFFSET before FETCH
+            pagination_clause = f"OFFSET {offset} ROWS FETCH FIRST {limit} ROWS ONLY"
+        else:
+            pagination_clause = f"FETCH FIRST {limit} ROWS ONLY"
 
     # Query for tables (DB2 for i uses QSYS2.SYSTABLES instead of SYSCAT.TABLES)
     tables_sql = f"""
@@ -788,13 +857,14 @@ def _get_all_tables_and_columns_sync(
     if schema_filter:
         schema_clause = f"AND TABLE_SCHEMA = '{schema_filter.upper()}'"
 
-    # Build pagination clause
+    # Build pagination clause (DB2 for i syntax)
     pagination_clause = ""
     if limit is not None:
-        pagination_clause = f"FETCH FIRST {limit} ROWS ONLY"
         if offset is not None and offset > 0:
-            # For DB2, we need to use a subquery for offset
-            pagination_clause = f"LIMIT {limit} OFFSET {offset}"
+            # DB2 for i requires OFFSET before FETCH
+            pagination_clause = f"OFFSET {offset} ROWS FETCH FIRST {limit} ROWS ONLY"
+        else:
+            pagination_clause = f"FETCH FIRST {limit} ROWS ONLY"
 
     # Query for tables (DB2 for i uses QSYS2.SYSTABLES instead of SYSCAT.TABLES)
     tables_sql = f"""
@@ -930,13 +1000,14 @@ def _get_all_tables_and_columns_sync(
     if schema_filter:
         schema_clause = f"AND TABLE_SCHEMA = '{schema_filter.upper()}'"
 
-    # Build pagination clause
+    # Build pagination clause (DB2 for i syntax)
     pagination_clause = ""
     if limit is not None:
-        pagination_clause = f"FETCH FIRST {limit} ROWS ONLY"
         if offset is not None and offset > 0:
-            # For DB2, we need to use a subquery for offset
-            pagination_clause = f"LIMIT {limit} OFFSET {offset}"
+            # DB2 for i requires OFFSET before FETCH
+            pagination_clause = f"OFFSET {offset} ROWS FETCH FIRST {limit} ROWS ONLY"
+        else:
+            pagination_clause = f"FETCH FIRST {limit} ROWS ONLY"
 
     # Query for tables (DB2 for i uses QSYS2.SYSTABLES instead of SYSCAT.TABLES)
     tables_sql = f"""
@@ -1497,13 +1568,13 @@ if TEXTUAL_AVAILABLE:
         async def on_mount(self) -> None:
             """Load schemas when mounted."""
             # Load schemas in background
-            self.run_worker(self.load_schemas, exclusive=True)
+            asyncio.create_task(self.load_schemas())
 
         async def load_schemas(self) -> None:
             """Load available schemas."""
             try:
-                # Fetch schemas
-                self.schemas = get_available_schemas(self.use_mock)
+                # Fetch schemas using async version to avoid blocking
+                self.schemas = await get_available_schemas_async(self.use_mock)
 
                 # Update UI
                 loading_label = self.query_one("#loading-text", Label)
@@ -2001,7 +2072,10 @@ if TEXTUAL_AVAILABLE:
                     AND SYSTEM_TABLE = 'N'
                     {"AND TABLE_SCHEMA = '" + self.schema_filter.upper() + "'" if self.schema_filter else ""}
                 """
-                count_result = query_runner(count_sql)
+
+                # Run the query in an executor to avoid blocking
+                loop = asyncio.get_event_loop()
+                count_result = await loop.run_in_executor(None, query_runner, count_sql)
                 if count_result and count_result[0].get("TOTAL_COUNT"):
                     self.total_tables_estimate = int(count_result[0]["TOTAL_COUNT"])
             except Exception:
@@ -3133,7 +3207,7 @@ if TEXTUAL_AVAILABLE:
             try:
                 # Verify schema exists before loading - helpful if DACDATA is missing
                 if self.schema_filter:
-                    if not schema_exists(self.schema_filter, self.use_mock):
+                    if not await schema_exists_async(self.schema_filter, self.use_mock):
                         self.notify(
                             f"Schema '{self.schema_filter}' not found in current database. Try settings (S) to select a different schema.",
                             severity="warning",
@@ -3164,8 +3238,8 @@ if TEXTUAL_AVAILABLE:
                 columns_table = self.query_one("#columns-table", DataTable)
                 columns_table.clear()
 
-                # Reload data
-                self.tables, self.columns = get_all_tables_and_columns(
+                # Reload data using async version to avoid blocking
+                self.tables, self.columns = await get_all_tables_and_columns_async(
                     self.schema_filter, self.use_mock, self.use_cache
                 )
 

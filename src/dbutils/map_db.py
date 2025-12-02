@@ -149,13 +149,13 @@ def infer_relationships(
     tables: List[Dict[str, Any]],
     columns: List[Dict[str, Any]],
     pks: List[Dict[str, Any]],
-    fks: List[Dict[str, Any]],
+    fks: List[Dict[str, Any]] | None = None,
 ) -> List[Dict[str, str]]:
     """Infer relationships using actual constraints, remarks, and naming heuristics."""
     relationships: Dict[tuple, Dict[str, str]] = {}
 
-    # 1. Use actual foreign key constraints
-    for fk in fks:
+    # 1. Use actual foreign key constraints (if provided)
+    for fk in (fks or []):
         rel_key = (
             fk["TABSCHEMA"],
             fk["TABNAME"],

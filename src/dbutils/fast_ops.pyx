@@ -1,10 +1,119 @@
 # cython: language_level=3
 # cython: boundscheck=False
 # cython: wraparound=False
+# cython: cdivision=True
+# cython: nonecheck=False
 
 """
 Fast native implementations for performance-critical dbutils operations.
 """
+
+from libc.string cimport strlen, strstr, strcasecmp
+from cpython.unicode cimport PyUnicode_AsUTF8String
+
+
+def fast_string_match(str text, str query):
+    """Ultra-fast case-insensitive substring matching."""
+    cdef bytes text_bytes = text.encode('utf-8').lower()
+    cdef bytes query_bytes = query.encode('utf-8').lower()
+    return query_bytes in text_bytes
+
+
+def fast_prefix_match(str text, str prefix):
+    """Ultra-fast case-insensitive prefix matching."""
+    cdef str text_lower = text.lower()
+    cdef str prefix_lower = prefix.lower()
+    return text_lower.startswith(prefix_lower)
+
+
+def fast_word_prefix_match(str text, str query):
+    """Check if any word in text starts with query (for underscore-separated names)."""
+    cdef list words = text.lower().replace('_', ' ').split()
+    cdef str query_lower = query.lower()
+    cdef str word
+    
+    for word in words:
+        if word.startswith(query_lower):
+            return True
+    return False
+
+
+def fast_search_tables(list tables, str query):
+    """Optimized table search with scoring."""
+    if not query.strip():
+        return [(t, 1.0) for t in tables]
+    
+    cdef str query_lower = query.lower()
+    cdef list results = []
+    cdef object table
+    cdef double score
+    cdef str name_lower, remarks_lower
+    
+    for table in tables:
+        score = 0.0
+        name_lower = table.name.lower()
+        
+        # Exact name match - highest priority
+        if query_lower == name_lower:
+            score = 2.0
+        # Name contains query
+        elif query_lower in name_lower:
+            score = 1.0
+        # Word in name starts with query
+        elif fast_word_prefix_match(table.name, query):
+            score = 0.6
+        # Check remarks if available
+        elif table.remarks:
+            remarks_lower = table.remarks.lower()
+            if query_lower in remarks_lower:
+                score = 0.8
+        
+        if score > 0:
+            results.append((table, score))
+    
+    # Sort by score descending
+    results.sort(key=lambda x: x[1], reverse=True)
+    return results
+
+
+def fast_search_columns(list columns, str query):
+    """Optimized column search with scoring."""
+    if not query.strip():
+        return [(c, 1.0) for c in columns]
+    
+    cdef str query_lower = query.lower()
+    cdef list results = []
+    cdef object col
+    cdef double score
+    cdef str name_lower, typename_lower, remarks_lower
+    
+    for col in columns:
+        score = 0.0
+        name_lower = col.name.lower()
+        typename_lower = col.typename.lower()
+        
+        # Exact name match
+        if query_lower == name_lower:
+            score = 2.0
+        # Name contains query
+        elif query_lower in name_lower:
+            score = 1.0
+        # Type contains query
+        elif query_lower in typename_lower:
+            score = 0.7
+        # Check remarks if available
+        elif col.remarks:
+            remarks_lower = col.remarks.lower()
+            if query_lower in remarks_lower:
+                score = 0.5
+        
+        if score > 0:
+            results.append((col, score))
+    
+    # Sort by score descending
+    results.sort(key=lambda x: x[1], reverse=True)
+    return results
+
 
 cdef class FastTrieNode:
     """Memory-efficient trie node implementation in Cython."""

@@ -16,7 +16,15 @@ from .db_search import main as db_search_main
 from .db_table_sizes import main as db_table_sizes_main
 from .map_db import main as map_db_main
 from .main_launcher import main as smart_launcher_main
-from .gui.qt_app import main as qt_gui_main
+
+# Import Qt GUI main lazily/optionally so environments without Qt can still use the library/tests
+try:
+    from .gui.qt_app import main as qt_gui_main
+except Exception:  # ImportError or Qt not available
+    def qt_gui_main(*args, **kwargs):  # type: ignore
+        raise ImportError(
+            "Qt GUI is not available. Install PySide6 or PyQt6 to use db-browser GUI (pip install PySide6)."
+        )
 
 __all__ = [
     "db_browser_main",

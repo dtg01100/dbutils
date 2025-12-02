@@ -5,9 +5,12 @@ A modern Qt interface for database schema browsing with advanced features
 including streaming search, visualizations, and enhanced user experience.
 """
 
+from __future__ import annotations
+
 import os
 import sys
 import asyncio
+import json
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
@@ -46,6 +49,7 @@ try:
         QModelIndex,
         QSortFilterProxyModel,
         QSize,
+        QProcess,
     )
     from PySide6.QtGui import QIcon, QFont, QPixmap, QAction
 
@@ -86,6 +90,7 @@ except ImportError:
             QModelIndex,
             QSortFilterProxyModel,
             QSize,
+            QProcess,
         )
         from PyQt6.QtGui import QIcon, QFont, QPixmap, QAction
 
@@ -95,6 +100,57 @@ except ImportError:
 
 from ..catalog import get_all_tables_and_columns
 from ..db_browser import TableInfo, ColumnInfo
+from .widgets.enhanced_widgets import BusyOverlay
+
+# Try to import accelerated C extensions for performance
+try:
+    from ..accelerated import fast_search_tables, fast_search_columns
+    USE_FAST_OPS = True
+except ImportError:
+    USE_FAST_OPS = False
+
+# Provide minimal stubs so this module can be imported in environments without Qt
+if not QT_AVAILABLE:
+    class QObject:  # type: ignore
+        pass
+
+    class Signal:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
+        def connect(self, *args, **kwargs):
+            pass
+        def emit(self, *args, **kwargs):
+            pass
+
+    class QAbstractTableModel:  # type: ignore
+        pass
+
+    class QMainWindow:  # type: ignore
+        pass
+
+    class QModelIndex:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class QSize:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class QProcess:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
+        def start(self, *args, **kwargs):
+            pass
+        def write(self, *args, **kwargs):
+            pass
+        def waitForStarted(self, *args, **kwargs):
+            return False
+        def terminate(self):
+            pass
+        def kill(self):
+            pass
+        def state(self):
+            return 0
 
 
 @dataclass
@@ -145,7 +201,7 @@ class DatabaseModel(QAbstractTableModel):
         """Return number of columns."""
         return len(self._headers)
 
-    def data(self, index: QModelIndex, role=Qt.DisplayRole):
+    def data(self, index: QModelIndex, role=None):
         """Return data for given index and role."""
         if not index.isValid():
             return None
@@ -180,7 +236,8 @@ class DatabaseModel(QAbstractTableModel):
             table = self._tables[row]
 
         # Handle different roles
-        if role == Qt.DisplayRole:
+        # Avoid hard dependency on Qt enums at import time
+        if QT_AVAILABLE and role == Qt.DisplayRole:
             if column is not None:
                 # Column search result - display simplified column information in table format
                 if col == 0:  # Name column
@@ -193,7 +250,7 @@ class DatabaseModel(QAbstractTableModel):
                     return table.name
                 elif col == 1:  # Description
                     return table.remarks or ""
-        elif role == Qt.ToolTipRole:
+        elif QT_AVAILABLE and role == Qt.ToolTipRole:
             # Return detailed info as tooltip for all columns
             if column is not None:
                 # For column search results in table view
@@ -211,19 +268,19 @@ class DatabaseModel(QAbstractTableModel):
                         f"Schema: {table.schema}\n"
                         f"Columns: {len(self._columns.get(f'{table.schema}.{table.name}', []))}\n"
                         f"Description: {table.remarks or 'No description'}")
-        elif role == Qt.DecorationRole and col == 0:
+        elif QT_AVAILABLE and role == Qt.DecorationRole and col == 0:
             # Add an icon for tables - would require actual icon resources
             # For now, return None
             return None
-        elif role == Qt.SizeHintRole:
+        elif QT_AVAILABLE and role == Qt.SizeHintRole:
             # Return size hint for better padding
             return QSize(0, 28)  # Match the row height we set
 
         return None
 
-    def headerData(self, section: int, orientation: Qt.Orientation, role: Qt.DisplayRole):
+    def headerData(self, section: int, orientation: Qt.Orientation, role=None):
         """Return header data."""
-        if orientation == Qt.Horizontal:
+        if QT_AVAILABLE and orientation == Qt.Horizontal:
             if role == Qt.DisplayRole:
                 return self._headers[section]
             elif role == Qt.ToolTipRole:
@@ -257,7 +314,7 @@ class ColumnModel(QAbstractTableModel):
         """Return number of columns."""
         return len(self._headers)
 
-    def data(self, index: QModelIndex, role=Qt.DisplayRole):
+    def data(self, index: QModelIndex, role=None):
         """Return data for given index and role."""
         if not index.isValid():
             return None
@@ -271,12 +328,12 @@ class ColumnModel(QAbstractTableModel):
         column = self._columns[row]
 
         # Handle different roles
-        if role == Qt.DisplayRole:
+        if QT_AVAILABLE and role == Qt.DisplayRole:
             if col == 0:  # Column name
                 return column.name
             elif col == 1:  # Description
                 return column.remarks or ""
-        elif role == Qt.ToolTipRole:
+        elif QT_AVAILABLE and role == Qt.ToolTipRole:
             # Return detailed info as tooltip for all columns
             type_str = column.typename
             if column.length:
@@ -293,18 +350,18 @@ class ColumnModel(QAbstractTableModel):
                     f"Scale: {column.scale or 'N/A'}\n"
                     f"Nullable: {column.nulls}\n"
                     f"Description: {column.remarks or 'No description'}")
-        elif role == Qt.TextAlignmentRole:
+        elif QT_AVAILABLE and role == Qt.TextAlignmentRole:
             # No special alignment needed since we're only showing text columns now
             return Qt.AlignLeft | Qt.AlignVCenter
-        elif role == Qt.SizeHintRole:
+        elif QT_AVAILABLE and role == Qt.SizeHintRole:
             # Return size hint for better padding
             return QSize(0, 28)  # Match the row height we set
 
         return None
 
-    def headerData(self, section: int, orientation: Qt.Orientation, role: Qt.DisplayRole):
+    def headerData(self, section: int, orientation: Qt.Orientation, role=None):
         """Return header data."""
-        if orientation == Qt.Horizontal:
+        if QT_AVAILABLE and orientation == Qt.Horizontal:
             if role == Qt.DisplayRole:
                 return self._headers[section]
             elif role == Qt.ToolTipRole:
@@ -333,6 +390,58 @@ class SearchWorker(QObject):
             self._search_cancelled = False
             results = []
 
+            # Use C-accelerated search if available
+            if USE_FAST_OPS:
+                if search_mode == "tables":
+                    scored_results = fast_search_tables(tables, query)
+                    for table, score in scored_results:
+                        if self._search_cancelled:
+                            return
+                        result = SearchResult(
+                            item=table,
+                            match_type="exact" if score >= 1.0 else "fuzzy",
+                            relevance_score=score,
+                            table_key=f"{table.schema}.{table.name}",
+                        )
+                        results.append(result)
+                        
+                        # Emit results in batches
+                        if len(results) % 10 == 0:
+                            self.results_ready.emit(results.copy())
+                            QApplication.processEvents()
+                
+                elif search_mode == "columns":
+                    scored_results = fast_search_columns(columns, query)
+                    table_matches = {}
+                    
+                    for col, score in scored_results:
+                        if self._search_cancelled:
+                            return
+                        table_key = f"{col.schema}.{col.table}"
+                        if table_key not in table_matches:
+                            table_matches[table_key] = []
+                        table_matches[table_key].append(col)
+                        
+                        if len(table_matches[table_key]) == 1:
+                            result = SearchResult(
+                                item=col,
+                                match_type="exact" if score >= 1.0 else "fuzzy",
+                                relevance_score=score,
+                                table_key=table_key,
+                            )
+                            results.append(result)
+                        
+                        # Emit results in batches
+                        if len(results) % 15 == 0:
+                            self.results_ready.emit(results.copy())
+                            QApplication.processEvents()
+                
+                # Emit final results
+                self.results_ready.emit(results)
+                self.search_complete.emit()
+                return
+
+            # Fallback to Python implementation
             if search_mode == "tables":
                 # Table search with improved async behavior
                 query_lower = query.lower()
@@ -427,6 +536,7 @@ class DataLoaderWorker(QObject):
     """Worker for loading database data in background thread."""
 
     data_loaded = Signal(object, object, object)  # (tables, columns, all_schemas)
+    chunk_loaded = Signal(object, object, int, int)  # (tables_chunk, columns_chunk, loaded, total_est)
     error_occurred = Signal(str)
     progress_updated = Signal(str)
     progress_value = Signal(int, int)  # (current, total)
@@ -435,39 +545,267 @@ class DataLoaderWorker(QObject):
         super().__init__()
 
     def load_data(self, schema_filter: Optional[str], use_mock: bool):
-        """Load database data in background thread with granular progress updates."""
+        """Load database data in background thread with granular progress updates and chunked streaming."""
         try:
-            # Step 1: Load tables and columns
-            self.progress_updated.emit("Connecting to database...")
-            QApplication.processEvents()  # Allow UI to update
+            # Prefer async loader with pagination to avoid huge initial transfer
+            self.progress_updated.emit("Connecting to database…")
+            QApplication.processEvents()
 
-            from ..catalog import get_all_tables_and_columns
-            from ..catalog import get_tables  # Use this to get a list of all schemas
+            # Use async-aware functions from db_browser for better performance and caching
+            from ..db_browser import (
+                get_all_tables_and_columns,
+                get_all_tables_and_columns_async,
+                load_from_cache,
+                save_to_cache,
+            )
+            from ..catalog import get_tables  # For schema list
 
-            self.progress_updated.emit("Loading tables and columns...")
-            QApplication.processEvents()  # Allow UI to update
+            initial_limit = 200
+            batch_size = 500
+            loaded_total = 0
+            estimated_total = 0  # Unknown until we probe
 
-            # Get the actual tables and columns based on the schema filter
-            tables, columns = get_all_tables_and_columns(schema_filter, use_mock)
+            # Try cache first for the initial chunk
+            cached = load_from_cache(schema_filter, limit=initial_limit, offset=0)
+            if cached:
+                tables, columns = cached
+            else:
+                tables, columns = get_all_tables_and_columns(schema_filter, use_mock, use_cache=True, limit=initial_limit, offset=0)
 
-            # Send intermediate progress update
-            self.progress_updated.emit(f"Loaded {len(tables)} tables and {len(columns)} columns, now loading schemas...")
-            self.progress_value.emit(1, 2)  # 1 of 2 steps complete
-            QApplication.processEvents()  # Allow UI to update
+            loaded_total += len(tables)
+            # Emit first chunk immediately so UI becomes usable
+            self.progress_updated.emit(f"Loaded {len(tables)} tables (initial chunk)…")
+            self.progress_value.emit(1, 3)
+            self.chunk_loaded.emit(tables, columns, loaded_total, estimated_total)
+            QApplication.processEvents()
 
-            # Also get all possible schemas (without filter) to populate the dropdown completely
-            self.progress_updated.emit("Loading available schemas...")
-            QApplication.processEvents()  # Allow UI to update
+            # Estimate total tables count (best effort)
+            try:
+                # Quick estimate via count query in a worker would require DB call; skip heavy count
+                # Use heuristic: if fewer than batch_size returned, we likely loaded all
+                if len(tables) < initial_limit:
+                    estimated_total = loaded_total
+                else:
+                    estimated_total = loaded_total + batch_size * 4  # rough placeholder estimate
+            except Exception:
+                estimated_total = loaded_total
 
+            # Stream remaining tables in batches
+            offset = initial_limit
+            more = True
+            while more:
+                # Check cache for this page
+                cached = load_from_cache(schema_filter, limit=batch_size, offset=offset)
+                if cached:
+                    t_chunk, c_chunk = cached
+                else:
+                    t_chunk, c_chunk = get_all_tables_and_columns(
+                        schema_filter, use_mock, use_cache=True, limit=batch_size, offset=offset
+                    )
+
+                if not t_chunk:
+                    more = False
+                    break
+
+                loaded_total += len(t_chunk)
+                self.progress_updated.emit(f"Loaded {loaded_total} tables…")
+                # Emit chunk to UI
+                self.chunk_loaded.emit(t_chunk, c_chunk, loaded_total, estimated_total)
+                QApplication.processEvents()
+
+                # Advance
+                offset += len(t_chunk)
+                # If this was a short page, we might be done
+                if len(t_chunk) < batch_size:
+                    more = False
+
+            # After streaming chunks, fetch schemas list (one light query)
+            self.progress_updated.emit("Loading available schemas…")
+            QApplication.processEvents()
             all_tables = get_tables(mock=use_mock)
             all_schemas = sorted(set(table['TABSCHEMA'] for table in all_tables))
 
-            self.progress_value.emit(2, 2)  # 2 of 2 steps complete
-            QApplication.processEvents()  # Allow UI to update
-
-            self.data_loaded.emit(tables, columns, all_schemas)
+            # Final completion signal (aggregate not required, UI already holds accumulated state)
+            self.progress_value.emit(3, 3)
+            QApplication.processEvents()
+            self.data_loaded.emit([], [], all_schemas)
         except Exception as e:
             self.error_occurred.emit(str(e))
+
+
+class DataLoaderProcess(QObject):
+    """Subprocess-based data loader using QProcess to avoid GIL/UI hitching."""
+
+    data_loaded = Signal(object, object, object)  # (tables, columns, all_schemas)
+    chunk_loaded = Signal(object, object, int, int)  # (tables_chunk, columns_chunk, loaded, total_est)
+    error_occurred = Signal(str)
+    progress_updated = Signal(str)
+    progress_value = Signal(int, int)  # (current, total)
+
+    def __init__(self):
+        super().__init__()
+        self._proc = QProcess()
+        self._stdout_buffer = ""
+        self._schemas = None
+        self._finished_handled = False  # Track if we've already handled the finish event
+
+        # Connect signals if running within Qt
+        if QT_AVAILABLE:
+            try:
+                self._proc.readyReadStandardOutput.connect(self._on_stdout)
+            except Exception:
+                pass
+            try:
+                self._proc.readyReadStandardError.connect(self._on_stderr)
+            except Exception:
+                pass
+            try:
+                # PySide/PyQt both offer finished(int, QProcess.ExitStatus)
+                self._proc.finished.connect(self._on_finished)
+            except Exception:
+                pass
+            try:
+                self._proc.errorOccurred.connect(lambda e: self.error_occurred.emit(f"Process error: {e}"))
+            except Exception:
+                pass
+
+    def start(self, schema_filter: Optional[str], use_mock: bool, initial_limit: int = 200, batch_size: int = 500):
+        """Start the data loader subprocess and send the initial command."""
+        # Launch module as subprocess
+        # Check if we're running under uv (UV_PROJECT_DIR env var is set)
+        # or if sys.executable can import dbutils, otherwise use fallback
+        python_exe = sys.executable
+        use_uv = os.environ.get("VIRTUAL_ENV") or os.environ.get("UV_PROJECT_DIR")
+        
+        if use_uv:
+            # Use uv run to ensure correct environment
+            args = ["uv", "run", "python", "-m", "dbutils.gui.data_loader_process"]
+            self._proc.start("uv", args[1:])
+        else:
+            args = [python_exe, "-m", "dbutils.gui.data_loader_process"]
+            self._proc.start(args[0], args[1:])
+        
+        if hasattr(self._proc, "waitForStarted") and not self._proc.waitForStarted(5000):
+            self.error_occurred.emit("Failed to start data loader process")
+            return
+
+        # Send the start command as JSON line
+        payload = {
+            "cmd": "start",
+            "schema_filter": schema_filter,
+            "use_mock": bool(use_mock),
+            "initial_limit": int(initial_limit),
+            "batch_size": int(batch_size),
+        }
+        data = (json.dumps(payload) + "\n").encode("utf-8")
+        try:
+            self._proc.write(data)
+        except Exception as e:
+            self.error_occurred.emit(f"Failed to communicate with data loader: {e}")
+
+    def _on_stdout(self):
+        try:
+            raw = bytes(self._proc.readAllStandardOutput()).decode("utf-8", errors="ignore")
+            if not raw:
+                return
+            self._stdout_buffer += raw
+            lines = self._stdout_buffer.splitlines(keepends=True)
+            # Keep incomplete last line in buffer
+            if not lines:
+                return
+            if not lines[-1].endswith("\n"):
+                self._stdout_buffer = lines[-1]
+                lines = lines[:-1]
+            else:
+                self._stdout_buffer = ""
+
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    msg = json.loads(line)
+                except Exception:
+                    continue
+                self._handle_message(msg)
+        except Exception as e:
+            self.error_occurred.emit(f"Stdout processing error: {e}")
+
+    def _on_stderr(self):
+        try:
+            raw = bytes(self._proc.readAllStandardError()).decode("utf-8", errors="ignore")
+            if raw:
+                # Log stderr lines - both to console and as error signals
+                for part in raw.strip().splitlines():
+                    print(f"[SUBPROCESS STDERR] {part}", file=sys.stderr)
+                    # Emit as error if it contains "ERROR" or traceback info
+                    if "ERROR" in part.upper() or "Traceback" in part or "File \"" in part:
+                        self.error_occurred.emit(part)
+                    else:
+                        self.progress_updated.emit(part)
+        except Exception as e:
+            print(f"Error reading stderr: {e}", file=sys.stderr)
+
+    def _on_finished(self, code: int, status):  # status type varies
+        # Prevent double-handling of finish event
+        if self._finished_handled:
+            return
+        self._finished_handled = True
+        
+        print(f"[SUBPROCESS] Process finished with exit code {code}, status={status}", file=sys.stderr)
+        # Only emit error if process failed AND we haven't received schemas yet
+        # (schemas indicate successful completion)
+        if code != 0 and self._schemas is None:
+            self.error_occurred.emit(f"Data loader process terminated with exit code {code}")
+        
+        # Schedule cleanup of the QProcess object after a short delay
+        # This prevents destroying it while Qt is still processing signals
+        QTimer.singleShot(100, self._cleanup_process)
+    
+    def _cleanup_process(self):
+        """Clean up the process after it has finished."""
+        try:
+            # Process has finished, safe to clean up now
+            if hasattr(self, '_proc') and self._proc:
+                self._proc.deleteLater()
+        except Exception as e:
+            print(f"Error cleaning up process: {e}", file=sys.stderr)
+
+    def _handle_message(self, msg: Dict[str, Any]):
+        typ = msg.get("type")
+        if typ == "progress":
+            self.progress_updated.emit(msg.get("message", ""))
+            cur = int(msg.get("current", 0))
+            tot = int(msg.get("total", 0))
+            if tot:
+                self.progress_value.emit(cur, tot)
+        elif typ == "chunk":
+            # Convert payload dicts to TableInfo/ColumnInfo
+            t_list = [TableInfo(schema=t.get("schema"), name=t.get("name"), remarks=t.get("remarks", "")) for t in msg.get("tables", [])]
+            c_list = [
+                ColumnInfo(
+                    schema=c.get("schema"),
+                    table=c.get("table"),
+                    name=c.get("name"),
+                    typename=c.get("typename"),
+                    length=c.get("length"),
+                    scale=c.get("scale"),
+                    nulls=c.get("nulls"),
+                    remarks=c.get("remarks", ""),
+                )
+                for c in msg.get("columns", [])
+            ]
+            loaded = int(msg.get("loaded", 0))
+            est = int(msg.get("estimated", 0)) if msg.get("estimated") is not None else 0
+            self.chunk_loaded.emit(t_list, c_list, loaded, est)
+        elif typ == "schemas":
+            self._schemas = list(msg.get("schemas", []))
+        elif typ == "done":
+            # Emit final data_loaded with schemas only (tables/columns streamed via chunks)
+            self.data_loaded.emit([], [], self._schemas or [])
+        elif typ == "error":
+            self.error_occurred.emit(msg.get("message", "Unknown error"))
+
 
 
 class QtDBBrowser(QMainWindow):
@@ -499,11 +837,13 @@ class QtDBBrowser(QMainWindow):
         # Caching for search results to maintain state
         self.search_results_cache: Dict[str, List[SearchResult]] = {}
 
-        # Worker threads
+        # Worker threads / subprocess
         self.search_worker = None
         self.search_thread = None
         self.data_loader_worker = None
         self.data_loader_thread = None
+        self.data_loader_proc = None
+        self.use_subprocess_loader = True
 
         self.setup_ui()
         self.setup_menu()
@@ -552,6 +892,15 @@ class QtDBBrowser(QMainWindow):
         main_layout.addWidget(content_splitter)
         # Make the splitter expand to take up available space
         content_splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
+        # Busy overlays for panels
+        try:
+            self.tables_overlay = BusyOverlay(self.tables_table)
+            self.columns_overlay = BusyOverlay(self.columns_table)
+        except Exception:
+            # If overlays cannot be created (e.g., tests without Qt), ignore gracefully
+            self.tables_overlay = None
+            self.columns_overlay = None
 
     def create_search_panel(self) -> QWidget:
         """Create the search input panel."""
@@ -691,6 +1040,8 @@ class QtDBBrowser(QMainWindow):
 
         layout.addWidget(self.tables_table)
 
+        # Keep a reference to panel if needed in future
+        self.tables_panel = panel
         return panel
 
     def create_columns_panel(self) -> QWidget:
@@ -735,6 +1086,8 @@ class QtDBBrowser(QMainWindow):
 
         layout.addWidget(self.columns_table)
 
+        # Keep a reference
+        self.columns_panel = panel
         return panel
 
     def setup_menu(self):
@@ -791,13 +1144,25 @@ class QtDBBrowser(QMainWindow):
         self.status_bar.addPermanentWidget(self.progress_bar)
 
     def load_data(self):
-        """Load database data in background thread."""
+        """Load database data using a separate process (preferred) or thread fallback."""
         self.status_label.setText("Loading data...")
         self.progress_bar.setVisible(True)
         self.progress_bar.setRange(0, 100)  # Determinate progress
         self.progress_bar.setValue(0)
 
-        # Cancel any existing data loader thread
+        # Show overlays and disable inputs to indicate background work
+        try:
+            if getattr(self, 'tables_overlay', None):
+                self.tables_overlay.show_with_message("Loading tables…")
+            if getattr(self, 'columns_overlay', None):
+                self.columns_overlay.show_with_message("Preparing view…")
+            # Disable primary inputs during load
+            self.search_input.setEnabled(False)
+            self.schema_combo.setEnabled(False)
+        except Exception:
+            pass
+
+        # Cancel any existing data loader thread/process
         if self.data_loader_worker:
             self.data_loader_worker = None
 
@@ -806,24 +1171,39 @@ class QtDBBrowser(QMainWindow):
             self.data_loader_thread.wait()
             self.data_loader_thread = None
 
-        # Create new worker and thread
-        self.data_loader_worker = DataLoaderWorker()
-        self.data_loader_thread = QThread()
+        if self.data_loader_proc and QT_AVAILABLE:
+            try:
+                # Only terminate if actually running
+                if hasattr(self.data_loader_proc._proc, 'state') and self.data_loader_proc._proc.state() != 0:
+                    self.data_loader_proc._proc.terminate()
+                    self.data_loader_proc._proc.waitForFinished(1000)
+            except Exception:
+                pass
+            self.data_loader_proc = None
 
-        # Move worker to thread
-        self.data_loader_worker.moveToThread(self.data_loader_thread)
-
-        # Connect signals
-        self.data_loader_worker.data_loaded.connect(self.on_data_loaded)
-        self.data_loader_worker.error_occurred.connect(self.on_data_load_error)
-        self.data_loader_worker.progress_updated.connect(self.status_label.setText)
-        self.data_loader_worker.progress_value.connect(self.on_data_progress)
-
-        # Start thread and initiate data loading
-        self.data_loader_thread.started.connect(
-            lambda: self.data_loader_worker.load_data(self.schema_filter, self.use_mock)
-        )
-        self.data_loader_thread.start()
+        # Prefer subprocess to avoid GIL/UI contention
+        if self.use_subprocess_loader and QT_AVAILABLE:
+            self.data_loader_proc = DataLoaderProcess()
+            self.data_loader_proc.data_loaded.connect(self.on_data_loaded)
+            self.data_loader_proc.chunk_loaded.connect(self.on_data_chunk)
+            self.data_loader_proc.error_occurred.connect(self.on_data_load_error)
+            self.data_loader_proc.progress_updated.connect(self.status_label.setText)
+            self.data_loader_proc.progress_value.connect(self.on_data_progress)
+            self.data_loader_proc.start(self.schema_filter, self.use_mock, initial_limit=200, batch_size=500)
+        else:
+            # Fallback to thread-based worker
+            self.data_loader_worker = DataLoaderWorker()
+            self.data_loader_thread = QThread()
+            self.data_loader_worker.moveToThread(self.data_loader_thread)
+            self.data_loader_worker.data_loaded.connect(self.on_data_loaded)
+            self.data_loader_worker.chunk_loaded.connect(self.on_data_chunk)
+            self.data_loader_worker.error_occurred.connect(self.on_data_load_error)
+            self.data_loader_worker.progress_updated.connect(self.status_label.setText)
+            self.data_loader_worker.progress_value.connect(self.on_data_progress)
+            self.data_loader_thread.started.connect(
+                lambda: self.data_loader_worker.load_data(self.schema_filter, self.use_mock)
+            )
+            self.data_loader_thread.start()
 
     def on_data_progress(self, current: int, total: int):
         """Handle data loading progress updates."""
@@ -833,49 +1213,112 @@ class QtDBBrowser(QMainWindow):
     def on_data_loaded(self, tables, columns, all_schemas=None):
         """Handle data loaded from background thread."""
         try:
-            self.tables = tables
-            self.columns = columns
-            self.all_schemas = all_schemas or []  # Store all available schemas
+            # Finalization step: only schemas are provided at this point in streaming mode
+            if tables and columns:
+                # Fallback if full data was sent (non-streaming path)
+                self.tables = tables
+                self.columns = columns
+            if all_schemas:
+                self.all_schemas = all_schemas  # Store all available schemas
 
-            # Build table-columns mapping
-            self.table_columns = {}
-            for col in self.columns:
-                table_key = f"{col.schema}.{col.table}"
-                if table_key not in self.table_columns:
-                    self.table_columns[table_key] = []
-                self.table_columns[table_key].append(col)
+            # Ensure table-columns mapping exists
+            if not hasattr(self, 'table_columns') or self.table_columns is None:
+                self.table_columns = {}
+            
+            # Ensure tables and columns lists exist
+            if not hasattr(self, 'tables') or self.tables is None:
+                self.tables = []
+            if not hasattr(self, 'columns') or self.columns is None:
+                self.columns = []
 
             # Update UI
-            self.tables_model.set_data(self.tables, self.table_columns)
-            self.update_schema_combo()
+            # Update UI if we received data (e.g., non-streaming path)
+            if self.tables or self.columns:
+                self.tables_model.set_data(self.tables, self.table_columns)
+            if hasattr(self, 'all_schemas') and self.all_schemas:
+                self.update_schema_combo()
 
             self.status_label.setText(f"Loaded {len(self.tables)} tables, {len(self.columns)} columns")
             self.progress_bar.setValue(100)  # Set to 100% before hiding
             # Keep progress bar visible briefly to show completion
             QTimer.singleShot(500, lambda: self.progress_bar.setVisible(False))
 
+            # Hide overlays and re-enable inputs
+            try:
+                if getattr(self, 'tables_overlay', None):
+                    self.tables_overlay.hide()
+                if getattr(self, 'columns_overlay', None):
+                    self.columns_overlay.hide()
+                self.search_input.setEnabled(True)
+                self.schema_combo.setEnabled(True)
+            except Exception:
+                pass
+
             # Clean up thread
             if self.data_loader_thread:
                 self.data_loader_thread.quit()
                 self.data_loader_thread.wait()
                 self.data_loader_thread = None
                 self.data_loader_worker = None
+            
+            # Clean up subprocess - wait for it to finish properly
+            if self.data_loader_proc and QT_AVAILABLE:
+                try:
+                    # Don't destroy the QProcess here - it will clean up after the process exits
+                    # Destroying it here sends SIGTERM to the still-running process
+                    # Just disconnect signals to prevent further processing
+                    pass
+                except Exception:
+                    pass
 
         except Exception as e:
             self.status_label.setText(f"Error processing data: {e}")
             self.progress_bar.setVisible(False)
 
+            # Hide overlays and re-enable inputs on error
+            try:
+                if getattr(self, 'tables_overlay', None):
+                    self.tables_overlay.hide()
+                if getattr(self, 'columns_overlay', None):
+                    self.columns_overlay.hide()
+                self.search_input.setEnabled(True)
+                self.schema_combo.setEnabled(True)
+            except Exception:
+                pass
+
             # Clean up thread
             if self.data_loader_thread:
                 self.data_loader_thread.quit()
                 self.data_loader_thread.wait()
                 self.data_loader_thread = None
                 self.data_loader_worker = None
+            
+            # Clean up subprocess
+            if self.data_loader_proc and QT_AVAILABLE:
+                try:
+                    # Only terminate if actually running
+                    if hasattr(self.data_loader_proc._proc, 'state') and self.data_loader_proc._proc.state() != 0:
+                        self.data_loader_proc._proc.terminate()
+                        self.data_loader_proc._proc.waitForFinished(1000)
+                except Exception:
+                    pass
+                self.data_loader_proc = None
 
     def on_data_load_error(self, error: str):
         """Handle data loading errors."""
         self.status_label.setText(f"Error loading data: {error}")
         self.progress_bar.setVisible(False)
+
+        # Hide overlays and re-enable inputs
+        try:
+            if getattr(self, 'tables_overlay', None):
+                self.tables_overlay.hide()
+            if getattr(self, 'columns_overlay', None):
+                self.columns_overlay.hide()
+            self.search_input.setEnabled(True)
+            self.schema_combo.setEnabled(True)
+        except Exception:
+            pass
 
         # Clean up thread
         if self.data_loader_thread:
@@ -883,6 +1326,60 @@ class QtDBBrowser(QMainWindow):
             self.data_loader_thread.wait()
             self.data_loader_thread = None
             self.data_loader_worker = None
+        
+        # Clean up subprocess
+        if self.data_loader_proc and QT_AVAILABLE:
+            try:
+                self.data_loader_proc._proc.terminate()
+            except Exception:
+                pass
+            self.data_loader_proc = None
+
+    def on_data_chunk(self, tables_chunk, columns_chunk, loaded: int, total_est: int):
+        """Handle streaming chunk of tables/columns loaded in background."""
+        try:
+            # Initialize data structures if first chunk
+            if not hasattr(self, 'tables') or self.tables is None:
+                self.tables = []
+            if not hasattr(self, 'columns') or self.columns is None:
+                self.columns = []
+            if not hasattr(self, 'table_columns') or self.table_columns is None:
+                self.table_columns = {}
+
+            first_chunk = len(self.tables) == 0 and len(self.columns) == 0
+
+            # Append new data
+            self.tables.extend(tables_chunk or [])
+            self.columns.extend(columns_chunk or [])
+
+            for col in (columns_chunk or []):
+                table_key = f"{col.schema}.{col.table}"
+                if table_key not in self.table_columns:
+                    self.table_columns[table_key] = []
+                self.table_columns[table_key].append(col)
+
+            # Update model (simple reset for correctness)
+            self.tables_model.set_data(self.tables, self.table_columns)
+
+            # After first chunk, hide overlays and enable inputs for immediate interaction
+            if first_chunk:
+                try:
+                    if getattr(self, 'tables_overlay', None):
+                        self.tables_overlay.hide()
+                    if getattr(self, 'columns_overlay', None):
+                        self.columns_overlay.hide()
+                    self.search_input.setEnabled(True)
+                    self.schema_combo.setEnabled(True)
+                except Exception:
+                    pass
+
+            # Update progress bar more meaningfully if total estimate provided
+            if total_est and total_est > 0:
+                pct = max(1, min(100, int((loaded / total_est) * 100)))
+                self.progress_bar.setValue(pct)
+
+        except Exception as e:
+            self.status_label.setText(f"Chunk processing error: {e}")
 
     def update_schema_combo(self):
         """Update schema combo box with all available schemas."""
@@ -892,24 +1389,30 @@ class QtDBBrowser(QMainWindow):
         # Preserve the currently selected schema filter during update
         current_filter = self.schema_filter
 
-        self.schema_combo.clear()
-        self.schema_combo.addItem("All Schemas")
-        for schema in schemas:
-            self.schema_combo.addItem(schema)
+        # Block signals to prevent triggering on_schema_changed during update
+        self.schema_combo.blockSignals(True)
+        try:
+            self.schema_combo.clear()
+            self.schema_combo.addItem("All Schemas")
+            for schema in schemas:
+                self.schema_combo.addItem(schema)
 
-        # Restore the selection based on the current filter
-        if current_filter:
-            index = self.schema_combo.findText(current_filter)
-            if index >= 0:
-                self.schema_combo.setCurrentIndex(index)
+            # Restore the selection based on the current filter
+            if current_filter:
+                index = self.schema_combo.findText(current_filter)
+                if index >= 0:
+                    self.schema_combo.setCurrentIndex(index)
+                else:
+                    # Selected schema is not available in schema list, reset to "All Schemas"
+                    self.schema_combo.setCurrentIndex(0)
+                    # Update filter to reflect change
+                    self.schema_filter = None
             else:
-                # Selected schema is not available in schema list, reset to "All Schemas"
+                # Default to "All Schemas"
                 self.schema_combo.setCurrentIndex(0)
-                # Update filter to reflect change
-                self.schema_filter = None
-        else:
-            # Default to "All Schemas"
-            self.schema_combo.setCurrentIndex(0)
+        finally:
+            # Re-enable signals
+            self.schema_combo.blockSignals(False)
 
     def on_search_changed(self, text: str):
         """Handle search input changes with debouncing to prevent UI locking and implement caching."""
@@ -965,6 +1468,13 @@ class QtDBBrowser(QMainWindow):
         self.search_progress.setVisible(True)
         self.search_progress.setRange(0, 100)
 
+        # Show overlay over the tables while searching
+        try:
+            if getattr(self, 'tables_overlay', None):
+                self.tables_overlay.show_with_message("Searching…")
+        except Exception:
+            pass
+
         # Cancel any existing search first to prevent multiple threads
         if self.search_worker:
             self.search_worker.cancel_search()
@@ -1013,10 +1523,24 @@ class QtDBBrowser(QMainWindow):
 
         self.status_label.setText(f"Search complete - {results_count} results found")
 
+        # Hide table overlay after search completes
+        try:
+            if getattr(self, 'tables_overlay', None):
+                self.tables_overlay.hide()
+        except Exception:
+            pass
+
     def on_search_error(self, error: str):
         """Handle search errors."""
         self.search_progress.setVisible(False)
         self.status_label.setText(f"Search error: {error}")
+
+        # Hide overlay on error
+        try:
+            if getattr(self, 'tables_overlay', None):
+                self.tables_overlay.hide()
+        except Exception:
+            pass
 
     def on_table_selected(self, selected, deselected):
         """Handle table selection."""
@@ -1161,6 +1685,14 @@ class QtDBBrowser(QMainWindow):
             self.data_loader_thread.quit()
             if not self.data_loader_thread.wait(3000):  # Wait up to 3 seconds
                 print("Warning: Data loader thread did not finish in time")
+
+        # Terminate subprocess if used
+        if self.data_loader_proc and QT_AVAILABLE:
+            try:
+                self.data_loader_proc._proc.terminate()
+            except Exception:
+                pass
+            self.data_loader_proc = None
 
         event.accept()
 

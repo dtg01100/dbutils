@@ -13,7 +13,7 @@ try:
         QSizePolicy,
         QGraphicsOpacityEffect,
     )
-    from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect
+    from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect, QObject, QEvent, QPoint
     from PySide6.QtGui import QFont, QColor, QPalette, QPainter, QBrush, QPen
 
     QT_AVAILABLE = True
@@ -29,12 +29,155 @@ except ImportError:
             QSizePolicy,
             QGraphicsOpacityEffect,
         )
-        from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect
+        from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect, QObject, QEvent, QPoint
         from PyQt6.QtGui import QFont, QColor, QPalette, QPainter, QBrush, QPen
 
         QT_AVAILABLE = True
     except ImportError:
         QT_AVAILABLE = False
+
+# Provide minimal stubs when Qt is not available so imports during tests don't fail
+if not QT_AVAILABLE:
+    class _Dummy:
+        def __getattr__(self, name):
+            return 0
+
+    class QWidget:  # type: ignore
+        pass
+
+    class QVBoxLayout:  # type: ignore
+        pass
+
+    class QHBoxLayout:  # type: ignore
+        pass
+
+    class QLabel:  # type: ignore
+        pass
+
+    class QPushButton:  # type: ignore
+        pass
+
+    class QFrame:  # type: ignore
+        pass
+
+    class QSizePolicy:  # type: ignore
+        class Policy:  # type: ignore
+            Expanding = 0
+            Fixed = 0
+
+    class QGraphicsOpacityEffect:  # type: ignore
+        pass
+
+    class QFont:  # type: ignore
+        def setPointSize(self, *args, **kwargs):
+            pass
+        def setBold(self, *args, **kwargs):
+            pass
+
+    class QColor:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
+        def name(self):
+            return "#000000"
+        def lighter(self, *args, **kwargs):
+            return self
+
+    class QPalette:  # type: ignore
+        pass
+
+    class QPainter:  # type: ignore
+        def setRenderHint(self, *args, **kwargs):
+            pass
+        def fillRect(self, *args, **kwargs):
+            pass
+        def setPen(self, *args, **kwargs):
+            pass
+        def setBrush(self, *args, **kwargs):
+            pass
+        def drawArc(self, *args, **kwargs):
+            pass
+        def font(self):
+            return QFont()
+        def setFont(self, *args, **kwargs):
+            pass
+        def drawText(self, *args, **kwargs):
+            pass
+
+    class QBrush:  # type: ignore
+        pass
+
+    class QPen:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
+        def setCapStyle(self, *args, **kwargs):
+            pass
+
+    class QRect:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
+        def moveCenter(self, *args, **kwargs):
+            pass
+
+    class QPoint:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class QTimer:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
+        def setInterval(self, *args, **kwargs):
+            pass
+        def timeout(self):
+            return self
+        def connect(self, *args, **kwargs):
+            pass
+        def start(self, *args, **kwargs):
+            pass
+        def stop(self):
+            pass
+
+    class QPropertyAnimation:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
+        def setDuration(self, *args, **kwargs):
+            pass
+        def setStartValue(self, *args, **kwargs):
+            pass
+        def setEndValue(self, *args, **kwargs):
+            pass
+        def setEasingCurve(self, *args, **kwargs):
+            pass
+        def stop(self):
+            pass
+        def start(self):
+            pass
+
+    class QEasingCurve:  # type: ignore
+        class Type:
+            InOutQuad = 0
+
+    class QObject:  # type: ignore
+        pass
+
+    class QEvent:  # type: ignore
+        class Type:
+            Resize = 0
+            Move = 1
+
+    class Qt:  # type: ignore
+        class AlignmentFlag:
+            AlignCenter = 0
+            AlignLeft = 0
+            AlignVCenter = 0
+        class BrushStyle:
+            NoBrush = 0
+        class PenCapStyle:
+            RoundCap = 0
+        class WidgetAttribute:
+            WA_NoSystemBackground = 0
+            WA_StyledBackground = 0
+            WA_TransparentForMouseEvents = 0
+
 
 
 class StatusIndicator(QWidget):
@@ -417,3 +560,111 @@ class CollapsiblePanel(QWidget):
     def add_layout(self, layout):
         """Add a layout to the content area."""
         self.content_layout.addLayout(layout)
+
+
+class BusyOverlay(QWidget):
+    """A lightweight translucent overlay with a throbber/spinner and message.
+
+    Attach as a child to any widget you want to block during background work.
+    Call show_with_message(...) to display and hide() to remove.
+    The overlay auto-resizes with its parent via an event filter.
+    """
+
+    def __init__(self, parent: QWidget | None = None, message: str = "Loading…"):
+        super().__init__(parent)
+        if parent is not None:
+            # Cover the entire parent
+            self.setGeometry(parent.rect())
+            parent.installEventFilter(self)
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+        # Block interactions while visible
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        self.setVisible(False)
+
+        # Animation state
+        self._angle = 0
+        self._timer = QTimer(self)
+        self._timer.setInterval(16)  # ~60 FPS
+        self._timer.timeout.connect(self._tick)
+
+        # Message
+        self._message = message
+
+        # Optional: slight fade-in when shown
+        self._opacity_effect = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(self._opacity_effect)
+        self._fade = QPropertyAnimation(self._opacity_effect, b"opacity", self)
+        self._fade.setDuration(150)
+        self._fade.setStartValue(0.0)
+        self._fade.setEndValue(1.0)
+        self._fade.setEasingCurve(QEasingCurve.Type.InOutQuad)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        # Keep overlay sized with parent
+        if watched is self.parent() and event.type() in (QEvent.Type.Resize, QEvent.Type.Move):
+            self.setGeometry(self.parent().rect())
+        return False
+
+    def set_message(self, message: str):
+        self._message = message
+        self.update()
+
+    def show_with_message(self, message: str | None = None):
+        if message is not None:
+            self._message = message
+        # Ensure geometry is up to date
+        if self.parent() is not None:
+            self.setGeometry(self.parent().rect())
+        self.setVisible(True)
+        self.raise_()
+        self._timer.start()
+        self._fade.stop()
+        self._opacity_effect.setOpacity(0.0)
+        self._fade.start()
+
+    def hideEvent(self, event):
+        self._timer.stop()
+        return super().hideEvent(event)
+
+    def _tick(self):
+        self._angle = (self._angle + 6) % 360
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Semi-transparent backdrop
+        bg_color = QColor(0, 0, 0, 100)
+        painter.fillRect(self.rect(), bg_color)
+
+        # Center point
+        center = self.rect().center()
+
+        # Draw spinner (arc)
+        radius = int(min(self.width(), self.height()) * 0.05) + 18
+        radius = max(18, min(radius, 48))
+        pen = QPen(QColor(52, 152, 219), 4)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        # Spinner arc parameters
+        span_angle = 120 * 16  # degrees * 16 for Qt
+        start_angle = int(self._angle * 16)
+
+        rect = QRect(0, 0, radius * 2, radius * 2)
+        rect.moveCenter(center - QPoint(0, 10))
+        painter.drawArc(rect, start_angle, span_angle)
+
+        # Draw message text
+        if self._message:
+            painter.setPen(QPen(QColor(240, 240, 240)))
+            font = painter.font()
+            font.setPointSize(11)
+            painter.setFont(font)
+            text_rect = QRect(0, 0, self.width(), 30)
+            text_rect.moveCenter(center + QPoint(0, radius + 10))
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, self._message)
+
