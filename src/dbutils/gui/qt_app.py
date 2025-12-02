@@ -861,39 +861,16 @@ class QtDBBrowser(QMainWindow):
         self.setWindowTitle("DB Browser - Qt (Experimental)")
         self.setGeometry(100, 100, 1200, 800)
 
-        # Central widget
+        # Set central widget to empty - we'll use all docks
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
+        central_widget.hide()  # Hide central widget, using only docks
 
-        # Main layout with reduced spacing
-        main_layout = QVBoxLayout(central_widget)
-        main_layout.setSpacing(6)  # Reduce spacing between elements
-        main_layout.setContentsMargins(8, 6, 8, 6)  # Reduce margins around the layout
-
-        # Search panel - keep it at a fixed size
-        search_panel = self.create_search_panel()
-        main_layout.addWidget(search_panel)
-        # Set the search panel to have a fixed size policy so it doesn't expand
-        search_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-
-        # Content splitter - will take up remaining space
-        content_splitter = QSplitter(Qt.Horizontal)
-        content_splitter.setHandleWidth(3)  # Make splitter handle thinner
-
-        # Tables panel (left)
-        tables_panel = self.create_tables_panel()
-        content_splitter.addWidget(tables_panel)
-
-        # Columns panel (right)
-        columns_panel = self.create_columns_panel()
-        content_splitter.addWidget(columns_panel)
-
-        # Set splitter proportions
-        content_splitter.setSizes([600, 600])
-
-        main_layout.addWidget(content_splitter)
-        # Make the splitter expand to take up available space
-        content_splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        # Create all dock widgets
+        self.setup_search_dock()
+        self.setup_tables_dock()
+        self.setup_columns_dock()
+        self.setup_column_details_dock()
 
         # Busy overlays for panels
         try:
@@ -907,12 +884,57 @@ class QtDBBrowser(QMainWindow):
         # Create column details as dockable widget
         self.setup_column_details_dock()
 
+    def setup_search_dock(self):
+        """Create search panel as a dockable widget."""
+        self.search_dock = QDockWidget("Search", self)
+        self.search_dock.setAllowedAreas(
+            Qt.DockWidgetArea.TopDockWidgetArea | 
+            Qt.DockWidgetArea.BottomDockWidgetArea
+        )
+        
+        # Create search panel content
+        search_widget = self.create_search_panel()
+        self.search_dock.setWidget(search_widget)
+        
+        # Add to main window at top
+        self.addDockWidget(Qt.DockWidgetArea.TopDockWidgetArea, self.search_dock)
+
+    def setup_tables_dock(self):
+        """Create tables panel as a dockable widget."""
+        self.tables_dock = QDockWidget("Tables", self)
+        self.tables_dock.setAllowedAreas(
+            Qt.DockWidgetArea.LeftDockWidgetArea | 
+            Qt.DockWidgetArea.RightDockWidgetArea
+        )
+        
+        # Create tables panel content
+        tables_widget = self.create_tables_panel()
+        self.tables_dock.setWidget(tables_widget)
+        
+        # Add to main window on left
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.tables_dock)
+
+    def setup_columns_dock(self):
+        """Create columns panel as a dockable widget."""
+        self.columns_dock = QDockWidget("Columns", self)
+        self.columns_dock.setAllowedAreas(
+            Qt.DockWidgetArea.LeftDockWidgetArea | 
+            Qt.DockWidgetArea.RightDockWidgetArea
+        )
+        
+        # Create columns panel content
+        columns_widget = self.create_columns_panel()
+        self.columns_dock.setWidget(columns_widget)
+        
+        # Add to main window on right
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.columns_dock)
+
     def create_search_panel(self) -> QWidget:
         """Create the search input panel."""
-        panel = QGroupBox("🔍 Search")
+        panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.setSpacing(4)  # Reduced spacing to keep panel compact
-        layout.setContentsMargins(8, 8, 8, 6)  # Standard margins
+        layout.setSpacing(4)
+        layout.setContentsMargins(8, 8, 8, 6)
 
         # Search input row
         search_row = QHBoxLayout()
@@ -1001,10 +1023,10 @@ class QtDBBrowser(QMainWindow):
 
     def create_tables_panel(self) -> QWidget:
         """Create the tables panel."""
-        panel = QGroupBox("Tables")
+        panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(10, 10, 10, 10)  # Add margins around the layout
-        layout.setSpacing(6)  # Add spacing between elements
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(6)
 
         # Tables table
         self.tables_table = QTableView()
@@ -1045,16 +1067,14 @@ class QtDBBrowser(QMainWindow):
 
         layout.addWidget(self.tables_table)
 
-        # Keep a reference to panel if needed in future
-        self.tables_panel = panel
         return panel
 
     def create_columns_panel(self) -> QWidget:
         """Create the columns panel."""
-        panel = QGroupBox("Columns")
+        panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(10, 10, 10, 10)  # Add margins around the layout
-        layout.setSpacing(6)  # Add spacing between elements
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(6)
 
         # Columns table
         self.columns_table = QTableView()
@@ -1091,8 +1111,6 @@ class QtDBBrowser(QMainWindow):
 
         layout.addWidget(self.columns_table)
 
-        # Keep a reference
-        self.columns_panel = panel
         return panel
 
     def setup_column_details_dock(self):
