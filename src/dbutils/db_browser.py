@@ -14,6 +14,7 @@ import json
 import os
 import pickle
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -453,6 +454,7 @@ def load_from_cache(
     try:
         if is_gzip:
             import gzip
+
             with gzip.open(cache_path, "rb") as f:
                 cache_data = pickle.load(f)
         else:
@@ -492,6 +494,7 @@ def save_to_cache(
         if CACHE_FILE.exists():
             try:
                 import gzip
+
                 with gzip.open(CACHE_FILE, "rb") as f:
                     cache_data = pickle.load(f)
             except Exception:
@@ -505,6 +508,7 @@ def save_to_cache(
 
         # Save cache compressed
         import gzip
+
         with gzip.open(CACHE_FILE, "wb", compresslevel=5) as f:
             pickle.dump(cache_data, f)
     except Exception:
