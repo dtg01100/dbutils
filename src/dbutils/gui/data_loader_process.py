@@ -21,12 +21,16 @@ import sys
 import json
 import os
 import time
+import gzip
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 
 # Cache expiration time in seconds (24 hours)
 CACHE_EXPIRATION_SECONDS = 24 * 60 * 60
+
+# Use gzip compression for cache files
+USE_COMPRESSION = True
 
 
 def jprint(obj: Dict[str, Any]) -> None:
@@ -43,6 +47,8 @@ def get_cache_dir() -> Path:
 
 def get_schema_cache_path() -> Path:
     """Get the path to the schema cache file."""
+    if USE_COMPRESSION:
+        return get_cache_dir() / "schemas.json.gz"
     return get_cache_dir() / "schemas.json"
 
 
@@ -52,9 +58,10 @@ def get_data_cache_path(schema_filter: Optional[str]) -> Path:
     if schema_filter:
         # Sanitize schema name for filename
         safe_name = "".join(c if c.isalnum() else "_" for c in schema_filter)
-        return cache_dir / f"data_{safe_name}.json"
+        filename = f"data_{safe_name}.json.gz" if USE_COMPRESSION else f"data_{safe_name}.json"
     else:
-        return cache_dir / "data_all.json"
+        filename = "data_all.json.gz" if USE_COMPRESSION else "data_all.json"
+    return cache_dir / filename
 
 
 def is_cache_valid(cache_path: Path, max_age_seconds: int = CACHE_EXPIRATION_SECONDS) -> bool:
@@ -79,17 +86,27 @@ def load_cached_data(schema_filter: Optional[str]) -> Optional[Tuple[List[Dict],
             sys.stderr.flush()
             return None
         
-        with open(cache_path, 'r') as f:
-            data = json.load(f)
-            tables = data.get('tables', [])
-            columns = data.get('columns', [])
-            cached_at = data.get('cached_at', 0)
-            
-            age_hours = (time.time() - cached_at) / 3600
-            sys.stderr.write(f"Data cache hit for schema_filter={schema_filter} (age: {age_hours:.1f}h, {len(tables)} tables)\n")
-            sys.stderr.flush()
-            
-            return tables, columns
+        # Read and decompress
+        if USE_COMPRESSION:
+            with gzip.open(cache_path, 'rt', encoding='utf-8') as f:
+                data = json.load(f)
+        else:
+            with open(cache_path, 'r') as f:
+                data = json.load(f)
+        
+        tables = data.get('tables', [])
+        columns = data.get('columns', [])
+        cached_at = data.get('cached_at', 0)
+        
+        age_hours = (time.time() - cached_at) / 3600
+        file_size_mb = cache_path.stat().st_size / (1024 * 1024)
+        sys.stderr.write(
+            f"Data cache hit for schema_filter={schema_filter} "
+            f"(age: {age_hours:.1f}h, {len(tables)} tables, {file_size_mb:.2f}MB)\n"
+        )
+        sys.stderr.flush()
+        
+        return tables, columns
     except Exception as e:
         sys.stderr.write(f"Failed to load data cache: {e}\n")
         sys.stderr.flush()
@@ -98,7 +115,7 @@ def load_cached_data(schema_filter: Optional[str]) -> Optional[Tuple[List[Dict],
 
 
 def save_data_to_cache(schema_filter: Optional[str], tables: List[Dict], columns: List[Dict]) -> None:
-    """Save table and column data to cache."""
+    """Save table and column data to cache with compression."""
     try:
         cache_path = get_data_cache_path(schema_filter)
         
@@ -109,10 +126,19 @@ def save_data_to_cache(schema_filter: Optional[str], tables: List[Dict], columns
             'schema_filter': schema_filter
         }
         
-        with open(cache_path, 'w') as f:
-            json.dump(data, f)
+        # Write with compression
+        if USE_COMPRESSION:
+            with gzip.open(cache_path, 'wt', encoding='utf-8', compresslevel=6) as f:
+                json.dump(data, f, separators=(',', ':'))  # Compact JSON
+        else:
+            with open(cache_path, 'w') as f:
+                json.dump(data, f)
         
-        sys.stderr.write(f"Saved {len(tables)} tables and {len(columns)} columns to data cache\n")
+        file_size_mb = cache_path.stat().st_size / (1024 * 1024)
+        sys.stderr.write(
+            f"Saved {len(tables)} tables and {len(columns)} columns to data cache "
+            f"({file_size_mb:.2f}MB compressed)\n"
+        )
         sys.stderr.flush()
     except Exception as e:
         sys.stderr.write(f"Failed to save data cache: {e}\n")
@@ -120,13 +146,18 @@ def save_data_to_cache(schema_filter: Optional[str], tables: List[Dict], columns
 
 
 def load_cached_schemas() -> Optional[List[str]]:
-    """Load schemas from cache file."""
+    """Load schemas from cache file with compression support."""
     try:
         cache_path = get_schema_cache_path()
         if cache_path.exists():
-            with open(cache_path, 'r') as f:
-                data = json.load(f)
-                return data.get('schemas', [])
+            if USE_COMPRESSION:
+                with gzip.open(cache_path, 'rt', encoding='utf-8') as f:
+                    data = json.load(f)
+                    return data.get('schemas', [])
+            else:
+                with open(cache_path, 'r') as f:
+                    data = json.load(f)
+                    return data.get('schemas', [])
     except Exception as e:
         sys.stderr.write(f"Failed to load schema cache: {e}\n")
         sys.stderr.flush()
@@ -134,12 +165,22 @@ def load_cached_schemas() -> Optional[List[str]]:
 
 
 def save_schemas_to_cache(schemas: List[str]) -> None:
-    """Save schemas to cache file."""
+    """Save schemas to cache file with compression."""
     try:
         cache_path = get_schema_cache_path()
-        with open(cache_path, 'w') as f:
-            json.dump({'schemas': schemas}, f)
-        sys.stderr.write(f"Saved {len(schemas)} schemas to cache\n")
+        
+        if USE_COMPRESSION:
+            with gzip.open(cache_path, 'wt', encoding='utf-8', compresslevel=6) as f:
+                json.dump({'schemas': schemas}, f, separators=(',', ':'))
+        else:
+            with open(cache_path, 'w') as f:
+                json.dump({'schemas': schemas}, f)
+        
+        file_size_mb = cache_path.stat().st_size / (1024 * 1024)
+        sys.stderr.write(
+            f"Saved {len(schemas)} schemas to cache "
+            f"({file_size_mb:.2f}MB{'compressed' if USE_COMPRESSION else ''})\n"
+        )
         sys.stderr.flush()
     except Exception as e:
         sys.stderr.write(f"Failed to save schema cache: {e}\n")

@@ -1719,8 +1719,10 @@ class QtDBBrowser(QMainWindow):
                 )
                 return
             
-            # Count and delete cache files
-            cache_files = list(cache_dir.glob("*.json"))
+            # Count and delete cache files (both .json and .json.gz)
+            json_files = list(cache_dir.glob("*.json"))
+            gz_files = list(cache_dir.glob("*.json.gz"))
+            cache_files = json_files + gz_files
             count = len(cache_files)
             
             if count == 0:
