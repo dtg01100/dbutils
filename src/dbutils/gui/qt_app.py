@@ -38,6 +38,7 @@ try:
         QHeaderView,
         QMessageBox,
         QSizePolicy,
+        QDockWidget,
     )
     from PySide6.QtCore import (
         Qt,
@@ -79,6 +80,7 @@ except ImportError:
             QHeaderView,
             QMessageBox,
             QSizePolicy,
+            QDockWidget,
         )
         from PyQt6.QtCore import (
             Qt,
@@ -882,16 +884,12 @@ class QtDBBrowser(QMainWindow):
         tables_panel = self.create_tables_panel()
         content_splitter.addWidget(tables_panel)
 
-        # Columns panel (middle)
+        # Columns panel (right)
         columns_panel = self.create_columns_panel()
         content_splitter.addWidget(columns_panel)
 
-        # Column details panel (right)
-        details_panel = self.create_column_details_panel()
-        content_splitter.addWidget(details_panel)
-
-        # Set splitter proportions (40% tables, 35% columns list, 25% details)
-        content_splitter.setSizes([480, 420, 300])
+        # Set splitter proportions
+        content_splitter.setSizes([600, 600])
 
         main_layout.addWidget(content_splitter)
         # Make the splitter expand to take up available space
@@ -905,6 +903,9 @@ class QtDBBrowser(QMainWindow):
             # If overlays cannot be created (e.g., tests without Qt), ignore gracefully
             self.tables_overlay = None
             self.columns_overlay = None
+
+        # Create column details as dockable widget
+        self.setup_column_details_dock()
 
     def create_search_panel(self) -> QWidget:
         """Create the search input panel."""
@@ -1094,10 +1095,19 @@ class QtDBBrowser(QMainWindow):
         self.columns_panel = panel
         return panel
 
-    def create_column_details_panel(self) -> QWidget:
-        """Create the column details info panel."""
-        panel = QGroupBox("Column Details")
-        layout = QVBoxLayout(panel)
+    def setup_column_details_dock(self):
+        """Create column details as a dockable widget."""
+        # Create dock widget
+        self.column_details_dock = QDockWidget("Column Details", self)
+        self.column_details_dock.setAllowedAreas(
+            Qt.DockWidgetArea.LeftDockWidgetArea | 
+            Qt.DockWidgetArea.RightDockWidgetArea | 
+            Qt.DockWidgetArea.BottomDockWidgetArea
+        )
+        
+        # Create the content widget
+        dock_widget = QWidget()
+        layout = QVBoxLayout(dock_widget)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(8)
 
@@ -1118,10 +1128,11 @@ class QtDBBrowser(QMainWindow):
         """)
         
         layout.addWidget(self.column_details_text)
+        self.column_details_dock.setWidget(dock_widget)
         
-        # Keep a reference
-        self.column_details_panel = panel
-        return panel
+        # Add to main window on the right side, initially hidden
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.column_details_dock)
+        self.column_details_dock.hide()
 
     def setup_menu(self):
         """Setup the menu bar."""
@@ -1154,6 +1165,16 @@ class QtDBBrowser(QMainWindow):
 
         # View menu
         view_menu = menubar.addMenu("View")
+
+        toggle_details_action = QAction("Show Column Details", self)
+        toggle_details_action.setShortcut("Ctrl+D")
+        toggle_details_action.setCheckable(True)
+        toggle_details_action.setChecked(False)
+        toggle_details_action.triggered.connect(self.toggle_column_details)
+        view_menu.addAction(toggle_details_action)
+        self.toggle_details_action = toggle_details_action
+
+        view_menu.addSeparator()
 
         toggle_streaming = QAction("Toggle Streaming Search", self)
         toggle_streaming.setShortcut("X")
@@ -1740,6 +1761,17 @@ class QtDBBrowser(QMainWindow):
         self.tables_model.set_search_results([])
         self.search_results_cache.clear()  # Clear the cache when search is cleared
         self.status_label.setText("Ready")
+
+    def toggle_column_details(self):
+        """Toggle the column details dock widget visibility."""
+        if self.column_details_dock.isVisible():
+            self.column_details_dock.hide()
+            self.toggle_details_action.setChecked(False)
+            self.toggle_details_action.setText("Show Column Details")
+        else:
+            self.column_details_dock.show()
+            self.toggle_details_action.setChecked(True)
+            self.toggle_details_action.setText("Hide Column Details")
 
     def toggle_streaming(self):
         """Toggle streaming search - now always enabled."""
