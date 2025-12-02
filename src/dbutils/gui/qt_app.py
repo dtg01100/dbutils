@@ -894,6 +894,10 @@ class QtDBBrowser(QMainWindow):
         
         # Create search panel content
         search_widget = self.create_search_panel()
+        
+        # Set explicit maximum height to prevent dock from expanding
+        search_widget.setMaximumHeight(120)
+        
         self.search_dock.setWidget(search_widget)
         
         # Add to main window at top
@@ -2050,6 +2054,9 @@ def main():
     parser.add_argument("--no-streaming", action="store_true", help="Disable streaming search")
 
     args = parser.parse_args()
+
+    # Force X11 platform to avoid Wayland dock sizing issues
+    os.environ['QT_QPA_PLATFORM'] = 'xcb'
 
     # Create Qt application
     app = QApplication(sys.argv)
