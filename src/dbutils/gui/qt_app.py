@@ -1097,10 +1097,15 @@ class QtDBBrowser(QMainWindow):
         # File menu
         file_menu = menubar.addMenu("File")
 
-        refresh_action = QAction("Refresh", self)
+        refresh_action = QAction("Refresh Data", self)
         refresh_action.setShortcut("F5")
         refresh_action.triggered.connect(self.load_data)
         file_menu.addAction(refresh_action)
+
+        refresh_schemas_action = QAction("Rebuild Schema List", self)
+        refresh_schemas_action.setShortcut("Shift+F5")
+        refresh_schemas_action.triggered.connect(self.rebuild_schema_cache)
+        file_menu.addAction(refresh_schemas_action)
 
         file_menu.addSeparator()
 
@@ -1648,6 +1653,50 @@ class QtDBBrowser(QMainWindow):
         # Restart search if active
         if self.search_query.strip():
             self.start_streaming_search()
+
+    def rebuild_schema_cache(self):
+        """Rebuild the schema cache from loaded tables."""
+        from pathlib import Path
+        import json
+        
+        try:
+            # Build schema list from current loaded tables
+            if not self.tables:
+                QMessageBox.warning(
+                    self,
+                    "No Data Loaded",
+                    "Please load data first before rebuilding the schema list."
+                )
+                return
+            
+            schemas = sorted({t.schema for t in self.tables})
+            
+            # Save to cache
+            cache_dir = Path.home() / ".cache" / "dbutils"
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            cache_path = cache_dir / "schemas.json"
+            
+            with open(cache_path, 'w') as f:
+                json.dump({'schemas': schemas}, f)
+            
+            self.status_label.setText(f"Rebuilt schema cache with {len(schemas)} schemas")
+            
+            # Update the combo box with new schemas
+            self.all_schemas = schemas
+            self.update_schema_combo()
+            
+            QMessageBox.information(
+                self,
+                "Schema Cache Rebuilt",
+                f"Successfully rebuilt schema cache with {len(schemas)} schemas.\n\n"
+                "The schema list will now be loaded from cache on future startups."
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to rebuild schema cache: {e}"
+            )
 
     def show_about(self):
         """Show about dialog."""

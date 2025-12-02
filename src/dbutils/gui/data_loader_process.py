@@ -19,12 +19,48 @@ from __future__ import annotations
 
 import sys
 import json
+import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 
 def jprint(obj: Dict[str, Any]) -> None:
     sys.stdout.write(json.dumps(obj) + "\n")
     sys.stdout.flush()
+
+
+def get_schema_cache_path() -> Path:
+    """Get the path to the schema cache file."""
+    cache_dir = Path.home() / ".cache" / "dbutils"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir / "schemas.json"
+
+
+def load_cached_schemas() -> Optional[List[str]]:
+    """Load schemas from cache file."""
+    try:
+        cache_path = get_schema_cache_path()
+        if cache_path.exists():
+            with open(cache_path, 'r') as f:
+                data = json.load(f)
+                return data.get('schemas', [])
+    except Exception as e:
+        sys.stderr.write(f"Failed to load schema cache: {e}\n")
+        sys.stderr.flush()
+    return None
+
+
+def save_schemas_to_cache(schemas: List[str]) -> None:
+    """Save schemas to cache file."""
+    try:
+        cache_path = get_schema_cache_path()
+        with open(cache_path, 'w') as f:
+            json.dump({'schemas': schemas}, f)
+        sys.stderr.write(f"Saved {len(schemas)} schemas to cache\n")
+        sys.stderr.flush()
+    except Exception as e:
+        sys.stderr.write(f"Failed to save schema cache: {e}\n")
+        sys.stderr.flush()
 
 
 def to_table_dicts(tables) -> List[Dict[str, Any]]:
@@ -185,17 +221,30 @@ def main():
             if len(t_chunk) < batch_size:
                 break
 
-        # Build schema list from loaded tables instead of querying database again
-        schemas = set()
-        for t in all_loaded_tables:
-            if hasattr(t, "schema"):
-                schemas.add(t.schema)
-            else:
-                schemas.add(t.get("schema") or t.get("TABSCHEMA", ""))
+        # Try to load schemas from cache first
+        schemas_list = load_cached_schemas()
         
-        sys.stderr.write(f"Sending completion: {len(schemas)} schemas\n")
+        if schemas_list:
+            sys.stderr.write(f"Loaded {len(schemas_list)} schemas from cache\n")
+            sys.stderr.flush()
+        else:
+            # Build schema list from loaded tables if cache miss
+            sys.stderr.write("Cache miss, building schema list from loaded tables\n")
+            sys.stderr.flush()
+            schemas = set()
+            for t in all_loaded_tables:
+                if hasattr(t, "schema"):
+                    schemas.add(t.schema)
+                else:
+                    schemas.add(t.get("schema") or t.get("TABSCHEMA", ""))
+            
+            schemas_list = sorted(schemas)
+            # Save to cache for next time
+            save_schemas_to_cache(schemas_list)
+        
+        sys.stderr.write(f"Sending completion: {len(schemas_list)} schemas\n")
         sys.stderr.flush()
-        jprint({"type": "schemas", "schemas": sorted(schemas)})
+        jprint({"type": "schemas", "schemas": schemas_list})
         jprint({"type": "progress", "message": "Done", "current": 3, "total": 3})
         jprint({"type": "done"})
         sys.stderr.write("All done, exiting normally\n")
