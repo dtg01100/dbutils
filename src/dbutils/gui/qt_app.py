@@ -13,6 +13,7 @@ import asyncio
 import json
 import csv
 from typing import Dict, List, Optional, Any
+import html
 from dataclasses import dataclass
 
 try:
@@ -42,6 +43,8 @@ try:
         QDockWidget,
         QFileDialog,
         QProgressDialog,
+        QStyledItemDelegate,
+        QStyleOptionViewItem,
     )
     from PySide6.QtCore import (
         Qt,
@@ -56,6 +59,8 @@ try:
         QProcess,
     )
     from PySide6.QtGui import QIcon, QFont, QPixmap, QAction
+    # Rich text rendering helpers used by highlight delegate
+    from PySide6.QtGui import QTextDocument, QAbstractTextDocumentLayout, QPalette
 
     QT_AVAILABLE = True
 except ImportError:
@@ -86,6 +91,8 @@ except ImportError:
             QDockWidget,
             QFileDialog,
             QProgressDialog,
+            QStyledItemDelegate,
+            QStyleOptionViewItem,
         )
         from PyQt6.QtCore import (
             Qt,
@@ -100,20 +107,25 @@ except ImportError:
             QProcess,
         )
         from PyQt6.QtGui import QIcon, QFont, QPixmap, QAction
+        # Rich text rendering helpers used by highlight delegate
+        from PyQt6.QtGui import QTextDocument, QAbstractTextDocumentLayout, QPalette
 
         QT_AVAILABLE = True
     except ImportError:
         QT_AVAILABLE = False
 
+# Core helpers & data types from library
 from ..catalog import get_all_tables_and_columns
 from ..db_browser import TableInfo, ColumnInfo
 from .widgets.enhanced_widgets import BusyOverlay
 
-# Try to import accelerated C extensions for performance
+# Try to import accelerated C extensions for performance (optional)
 try:
     from ..accelerated import fast_search_tables, fast_search_columns
     USE_FAST_OPS = True
-except ImportError:
+except Exception:
+    fast_search_tables = None
+    fast_search_columns = None
     USE_FAST_OPS = False
 
 # Provide minimal stubs so this module can be imported in environments without Qt
@@ -124,13 +136,28 @@ if not QT_AVAILABLE:
     class Signal:  # type: ignore
         def __init__(self, *args, **kwargs):
             pass
+
         def connect(self, *args, **kwargs):
             pass
+
         def emit(self, *args, **kwargs):
             pass
 
     class QAbstractTableModel:  # type: ignore
-        pass
+        def beginResetModel(self):
+            return None
+
+        def endResetModel(self):
+            return None
+
+        def rowCount(self, parent=None):
+            return 0
+
+        def columnCount(self, parent=None):
+            return 0
+
+        def data(self, index=None, role=None):
+            return None
 
     class QMainWindow:  # type: ignore
         pass
@@ -146,16 +173,22 @@ if not QT_AVAILABLE:
     class QProcess:  # type: ignore
         def __init__(self, *args, **kwargs):
             pass
+
         def start(self, *args, **kwargs):
             pass
+
         def write(self, *args, **kwargs):
             pass
+
         def waitForStarted(self, *args, **kwargs):
             return False
+
         def terminate(self):
             pass
+
         def kill(self):
             pass
+
         def state(self):
             return 0
 
@@ -186,6 +219,14 @@ class DatabaseModel(QAbstractTableModel):
 
     def set_data(self, tables: List[TableInfo], columns: Dict[str, List[ColumnInfo]]):
         """Set the model data."""
+        # Debug: log when model data is set (helps investigating GUI load issues)
+        try:
+            import sys as _sys
+            _sys.stderr.write(f"[DatabaseModel] set_data called: tables={len(tables)}, columns_keys={len(columns)}\n")
+            _sys.stderr.flush()
+        except Exception:
+            pass
+
         self.beginResetModel()
         self._tables = tables
         self._columns = columns
@@ -194,6 +235,13 @@ class DatabaseModel(QAbstractTableModel):
 
     def set_search_results(self, results: List[SearchResult]):
         """Set search results with relevance scoring."""
+        try:
+            import sys as _sys
+            _sys.stderr.write(f"[DatabaseModel] set_search_results called: {len(results)} results\n")
+            _sys.stderr.flush()
+        except Exception:
+            pass
+
         self.beginResetModel()
         self._search_results = sorted(results, key=lambda x: x.relevance_score, reverse=True)
         self.endResetModel()
@@ -293,6 +341,130 @@ class DatabaseModel(QAbstractTableModel):
             elif role == Qt.ToolTipRole:
                 return self._header_tooltips[section]
         return None
+
+
+def highlight_text_as_html(text: str, query: str) -> str:
+    """Return text converted to HTML with occurrences of query highlighted.
+
+    This function is intentionally independent of Qt so it can be unit-tested
+    in non-GUI environments. Highlighting is case-insensitive and supports
+    multiple whitespace-separated terms in the query.
+    """
+    if not text:
+        return ""
+
+    if not query or not query.strip():
+        return html.escape(text)
+
+    import re
+
+    # Break query into words and build one regex to match any of them
+    words = [w for w in re.split(r"\s+", query) if w]
+    if not words:
+        return html.escape(text)
+
+    # Sort by length to prefer longer matches first so we don't accidentally
+    # highlight sub-parts of larger terms.
+    words = sorted(set(words), key=lambda x: -len(x))
+    pattern = re.compile("(" + "|".join(re.escape(w) for w in words) + ")", re.IGNORECASE)
+
+    parts = pattern.split(text)
+    out_parts: List[str] = []
+    for part in parts:
+        if pattern.fullmatch(part):
+            out_parts.append(f'<span style="background-color:#fffb8f;color:#000;">{html.escape(part)}</span>')
+        else:
+            out_parts.append(html.escape(part))
+
+    return "".join(out_parts)
+
+
+if QT_AVAILABLE:
+    class HighlightDelegate(QStyledItemDelegate):
+        """Item delegate that renders display text as HTML and highlights search matches.
+
+        The delegate calls a provided callable to obtain the active search query so
+        it updates automatically as the query changes in the main window.
+        """
+
+        def __init__(self, parent=None, get_query_callable=None):
+            super().__init__(parent)
+            # Callable that returns current search query (string)
+            self._get_query = get_query_callable or (lambda: "")
+
+        def paint(self, painter, option, index):
+            # Use the model's display string
+            text = index.data(Qt.DisplayRole) or ""
+
+            query = ""
+            try:
+                query = str(self._get_query() or "")
+            except Exception:
+                query = ""
+
+            # Build HTML string with highlighted segments
+            html_text = highlight_text_as_html(text, query) if query else html.escape(text)
+
+            # Prepare QTextDocument for rich text rendering
+            doc = QTextDocument()
+            doc.setDefaultFont(option.font)
+            doc.setHtml(html_text)
+
+            # Draw selection/background using style, then render the document
+            painter.save()
+
+            opt = option
+            # Ensure we use the widget style to draw the background and selection
+            self.initStyleOption(opt, index)
+            style = opt.widget.style() if opt.widget is not None else QApplication.style()
+            try:
+                style.drawControl(style.CE_ItemViewItem, opt, painter, opt.widget)
+            except Exception:
+                # Some Qt bindings may not expose control enums identically; ignore gracefully
+                pass
+
+            # Compute text rectangle and paint document there
+            try:
+                text_rect = style.subElementRect(style.SE_ItemViewItemText, opt, opt.widget)
+            except Exception:
+                text_rect = option.rect
+
+            # Translate painter to the top-left of the text rect to draw document contents
+            painter.translate(text_rect.topLeft())
+            doc.setTextWidth(text_rect.width())
+            ctx = QAbstractTextDocumentLayout.PaintContext()
+            # Set text color to the view's text color for non-highlighted parts
+            default_color = opt.palette.text().color()
+            try:
+                ctx.palette.setColor(QPalette.Text, default_color)
+            except Exception:
+                # In case of missing methods in some environments, ignore
+                pass
+            doc.documentLayout().draw(painter, ctx)
+            painter.restore()
+
+        def sizeHint(self, option, index):
+            text = index.data(Qt.DisplayRole) or ""
+            doc = QTextDocument()
+            doc.setDefaultFont(option.font)
+            doc.setHtml(highlight_text_as_html(text, self._get_query() or ""))
+            # Width may not be set yet; use option.rect fallback
+            w = option.rect.width() if getattr(option, 'rect', None) is not None else 200
+            doc.setTextWidth(w)
+            return QSize(int(doc.idealWidth()) + 4, int(doc.size().height()) + 6)
+else:
+    # Provide a no-op stub so the module can be imported in non-Qt environments
+    class HighlightDelegate:
+        def __init__(self, *args, **kwargs):
+            pass
+        def paint(self, *args, **kwargs):
+            return None
+        def sizeHint(self, *args, **kwargs):
+            # Minimal placeholder that mimics QSize behavior
+            try:
+                return QSize(0, 28)
+            except Exception:
+                return None
 
 
 class ColumnModel(QAbstractTableModel):
@@ -848,6 +1020,8 @@ class QtDBBrowser(QMainWindow):
         # Search state
         self.search_mode = "tables"  # "tables" or "columns"
         self.search_query = ""
+        # Inline highlight enabled state - can be toggled by user
+        self.inline_highlight_enabled = True
         self.show_non_matching = True
         self.streaming_enabled = True  # Always enabled now
 
@@ -1024,6 +1198,11 @@ class QtDBBrowser(QMainWindow):
         self.show_non_matching_check.setChecked(True)
         self.show_non_matching_check.toggled.connect(self.on_show_non_matching_changed)
         options_row.addWidget(self.show_non_matching_check)
+        # Inline highlight toggle
+        self.highlight_check = QCheckBox("Inline Highlight")
+        self.highlight_check.setChecked(True)
+        self.highlight_check.toggled.connect(self.on_highlight_toggled)
+        options_row.addWidget(self.highlight_check)
         options_row.addStretch()  # Add stretch to keep controls left-aligned
 
         layout.addLayout(options_row)
@@ -1074,6 +1253,15 @@ class QtDBBrowser(QMainWindow):
         self.tables_proxy = QSortFilterProxyModel()
         self.tables_proxy.setSourceModel(self.tables_model)
         self.tables_table.setModel(self.tables_proxy)
+        # Delegate to render highlighted search matches (only if enabled)
+        try:
+            self.tables_delegate = None
+            if getattr(self, 'inline_highlight_enabled', True):
+                self.tables_delegate = HighlightDelegate(self.tables_table, lambda: self.search_query)
+                self.tables_table.setItemDelegate(self.tables_delegate)
+        except Exception:
+            # In environments without Qt installed (tests), gracefully continue
+            self.tables_delegate = None
 
         # Configure table with performance and visual enhancements
         self.tables_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -1120,6 +1308,14 @@ class QtDBBrowser(QMainWindow):
         self.columns_table = QTableView()
         self.columns_model = ColumnModel()
         self.columns_table.setModel(self.columns_model)
+        # Delegate to render highlighted search matches (columns view) — only if enabled
+        try:
+            self.columns_delegate = None
+            if getattr(self, 'inline_highlight_enabled', True):
+                self.columns_delegate = HighlightDelegate(self.columns_table, lambda: self.search_query)
+                self.columns_table.setItemDelegate(self.columns_delegate)
+        except Exception:
+            self.columns_delegate = None
 
         # Configure table with performance and visual enhancements
         self.columns_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -1386,9 +1582,20 @@ class QtDBBrowser(QMainWindow):
                 self.columns = []
 
             # Update UI
+            try:
+                import sys as _sys
+                _sys.stderr.write(f"[QtDBBrowser] on_data_loaded called: tables={len(tables) if tables else 0}, columns={len(columns) if columns else 0}, schemas={len(all_schemas) if all_schemas else 0}\n")
+                _sys.stderr.flush()
+            except Exception:
+                pass
             # Update UI if we received data (e.g., non-streaming path)
             if self.tables or self.columns:
                 self.tables_model.set_data(self.tables, self.table_columns)
+                try:
+                    if getattr(self, 'tables_proxy', None):
+                        self.tables_proxy.invalidate()
+                except Exception:
+                    pass
             if hasattr(self, 'all_schemas') and self.all_schemas:
                 self.update_schema_combo()
 
@@ -1493,6 +1700,12 @@ class QtDBBrowser(QMainWindow):
         """Handle streaming chunk of tables/columns loaded in background."""
         try:
             # Initialize data structures if first chunk
+            try:
+                import sys as _sys
+                _sys.stderr.write(f"[QtDBBrowser] on_data_chunk: received chunk: tables_chunk={len(tables_chunk or [])}, columns_chunk={len(columns_chunk or [])}, loaded={loaded}, est={total_est}\n")
+                _sys.stderr.flush()
+            except Exception:
+                pass
             if not hasattr(self, 'tables') or self.tables is None:
                 self.tables = []
             if not hasattr(self, 'columns') or self.columns is None:
@@ -1514,6 +1727,14 @@ class QtDBBrowser(QMainWindow):
 
             # Update model (simple reset for correctness)
             self.tables_model.set_data(self.tables, self.table_columns)
+            # Ensure proxy and view get refreshed
+            try:
+                if getattr(self, 'tables_proxy', None):
+                    self.tables_proxy.invalidate()
+                if getattr(self, 'tables_table', None):
+                    self.tables_table.viewport().update()
+            except Exception:
+                pass
 
             # After first chunk, hide overlays and enable inputs for immediate interaction
             if first_chunk:
@@ -2196,6 +2417,53 @@ class QtDBBrowser(QMainWindow):
         # Restart search if active
         if self.search_query.strip():
             self.start_streaming_search()
+
+    def on_highlight_toggled(self, checked: bool):
+        """Enable or disable inline highlighting delegate on views."""
+        # Update state
+        self.inline_highlight_enabled = bool(checked)
+
+        try:
+            if self.inline_highlight_enabled:
+                # install delegates
+                try:
+                    self.tables_delegate = HighlightDelegate(self.tables_table, lambda: self.search_query)
+                    self.tables_table.setItemDelegate(self.tables_delegate)
+                except Exception:
+                    self.tables_delegate = None
+
+                try:
+                    self.columns_delegate = HighlightDelegate(self.columns_table, lambda: self.search_query)
+                    self.columns_table.setItemDelegate(self.columns_delegate)
+                except Exception:
+                    self.columns_delegate = None
+            else:
+                # remove delegates to use default rendering
+                try:
+                    self.tables_table.setItemDelegate(None)
+                    self.tables_delegate = None
+                except Exception:
+                    pass
+
+                try:
+                    self.columns_table.setItemDelegate(None)
+                    self.columns_delegate = None
+                except Exception:
+                    pass
+
+            # Force view refresh
+            try:
+                if getattr(self, 'tables_proxy', None):
+                    self.tables_proxy.invalidate()
+                if getattr(self, 'tables_table', None):
+                    self.tables_table.viewport().update()
+                if getattr(self, 'columns_table', None):
+                    self.columns_table.viewport().update()
+            except Exception:
+                pass
+        except Exception:
+            # Be resilient; don't crash the whole UI
+            pass
 
     def on_streaming_toggled(self, checked: bool):
         """Handle streaming checkbox change - now always enabled."""
