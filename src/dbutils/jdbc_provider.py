@@ -153,19 +153,22 @@ class JDBCConnection:
             raise RuntimeError("JPype not available")
         if not jpype.isJVMStarted():
             # Try to start JVM with explicit JVM path and classpath including the driver jar
-            # Prefer JAVA_HOME if set; else fall back to JPype default JVM path
+            # Use system Java only (no bundled JDK fallback)
             try:
                 jvm_path = None
-                # Workspace-provided JDK fallback
-                # Prefer system JVM (JPype will locate via environment or system defaults).
-                # Do not fall back to any workspace-bundled JDK to avoid inconsistent JVM versions.
-                try:
-                    jvm_path = jpype.getDefaultJVMPath()
-                except Exception:
-                    jvm_path = None
+                if os.environ.get("JAVA_HOME"):
+                    # Construct libjvm path via JPype helper when JAVA_HOME is set
+                    try:
+                        jvm_path = jpype.getDefaultJVMPath()
+                    except Exception:
+                        jvm_path = None
 
                 if not jvm_path:
-                    raise RuntimeError("Could not locate system JVM. Set JAVA_HOME to a valid Java installation.")
+                    # Last resort: try to find system Java
+                    try:
+                        jvm_path = jpype.getDefaultJVMPath()
+                    except Exception:
+                        raise RuntimeError("No Java runtime found. Set JAVA_HOME or ensure Java is in PATH.")
 
                 # Build classpath: include primary driver JAR and allow additional jars via env
                 cp_entries = [self.provider.jar_path]

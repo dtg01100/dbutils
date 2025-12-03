@@ -45,8 +45,13 @@ def main():
 
         # Create a test table and insert rows
         conn.query("CREATE TABLE IF NOT EXISTS test_table (id INTEGER PRIMARY KEY, name TEXT)")
-        conn.query("INSERT INTO test_table (name) VALUES ('alice'), ('bob'), ('charlie')")
-        print("✓ Created test_table and inserted rows")
+        print("✓ Created test_table")
+        conn.query("INSERT INTO test_table (name) VALUES ('alice')")
+        print("✓ Inserted row 1")
+        conn.query("INSERT INTO test_table (name) VALUES ('bob')")
+        print("✓ Inserted row 2")
+        conn.query("INSERT INTO test_table (name) VALUES ('charlie')")
+        print("✓ Inserted row 3")
 
         # List tables using sqlite_master
         tables = conn.query("SELECT name, type, sql FROM sqlite_master WHERE type='table'")
@@ -71,7 +76,10 @@ def main():
             print(f"  - id={r.get('id')}, name={r.get('name')}")
 
     except Exception as e:
+        import traceback
         print(f"✗ SQLite JDBC smoke test failed: {e}")
+        print("Traceback:")
+        traceback.print_exc()
         return 1
     finally:
         try:
