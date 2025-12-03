@@ -65,7 +65,7 @@ def main():
                 "parent_column": r["REFCOLNAME"],
                 "score": r["score"],
                 "sql": sql,
-            }
+            },
         )
 
     if args.json:
@@ -95,8 +95,8 @@ def main():
                     o["parent_table"].ljust(widths["PARENT_TABLE"]),
                     o["parent_column"].ljust(widths["PARENT_COLUMN"]),
                     str(o["score"]).ljust(widths["SCORE"]),
-                ]
-            )
+                ],
+            ),
         )
     print("\n-- Example orphan detection SQL for first relationship --")
     print(output_rows[0]["sql"])

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Smart launcher for DB Browser - Chooses optimal interface based on environment.
+"""Smart launcher for DB Browser - Chooses optimal interface based on environment.
 
 Automatically selects between Qt GUI, Textual TUI, or CLI based on:
 - Display availability (X11/Wayland)
@@ -9,49 +8,42 @@ Automatically selects between Qt GUI, Textual TUI, or CLI based on:
 - Command line arguments
 """
 
+import argparse
 import os
 import sys
-import argparse
 from typing import Optional
 
 
 def detect_display_environment() -> str:
     """Detect the display environment."""
-
     # Check for explicit display
     if os.environ.get("DISPLAY"):
         return "x11"
-    elif os.environ.get("WAYLAND_DISPLAY"):
+    if os.environ.get("WAYLAND_DISPLAY"):
         return "wayland"
-    elif os.environ.get("SSH_CONNECTION") or os.environ.get("SSH_CLIENT"):
+    if os.environ.get("SSH_CONNECTION") or os.environ.get("SSH_CLIENT"):
         return "ssh"
-    elif sys.platform == "win32":
+    if sys.platform == "win32":
         return "windows"
-    elif sys.platform == "darwin":
+    if sys.platform == "darwin":
         return "macos"
-    else:
-        return "headless"
+    return "headless"
 
 
 def check_gui_availability() -> bool:
     """Check if GUI environment is available."""
-
     # Check for display server
     display_env = detect_display_environment()
 
     if display_env in ["x11", "wayland", "windows", "macos"]:
-        # Try to import Qt libraries
-        try:
-            import PySide6
+        # Prefer using importlib.util.find_spec to test availability without
+        # importing heavy GUI modules into the process. This avoids unused
+        # import linter warnings and reduces startup cost.
+        from importlib import util as _util
 
+        if _util.find_spec("PySide6") or _util.find_spec("PyQt6"):
             return True
-        except ImportError:
-            try:
-                import PyQt6
-
-                return True
-            except ImportError:
-                return False
+        return False
     elif display_env == "ssh":
         # Check if X forwarding is available
         if os.environ.get("DISPLAY"):
@@ -63,17 +55,13 @@ def check_gui_availability() -> bool:
 
 def check_tui_availability() -> bool:
     """Check if TUI environment is available."""
-    try:
-        import textual
+    from importlib import util as _util
 
-        return True
-    except ImportError:
-        return False
+    return bool(_util.find_spec("textual"))
 
 
 def detect_user_preference() -> Optional[str]:
     """Detect user preference from config file."""
-
     config_files = [
         os.path.expanduser("~/.config/dbutils/config.json"),
         os.path.expanduser("~/.dbutils.json"),
@@ -85,7 +73,7 @@ def detect_user_preference() -> Optional[str]:
             try:
                 import json
 
-                with open(config_file, "r") as f:
+                with open(config_file) as f:
                     config = json.load(f)
                     return config.get("preferred_interface")
             except Exception:
@@ -96,7 +84,6 @@ def detect_user_preference() -> Optional[str]:
 
 def save_user_preference(interface: str) -> None:
     """Save user preference to config file."""
-
     config_dir = os.path.expanduser("~/.config/dbutils")
     os.makedirs(config_dir, exist_ok=True)
     config_file = os.path.join(config_dir, "config.json")
@@ -114,13 +101,12 @@ def save_user_preference(interface: str) -> None:
 
 def choose_best_interface(args) -> str:
     """Choose the best interface based on environment and arguments."""
-
     # Command line arguments take priority
     if args.force_gui:
         return "qt"
-    elif args.force_tui:
+    if args.force_tui:
         return "textual"
-    elif args.force_cli:
+    if args.force_cli:
         return "cli"
 
     # User preference
@@ -138,15 +124,13 @@ def choose_best_interface(args) -> str:
         display_env = detect_display_environment()
         if display_env in ["x11", "wayland", "windows", "macos"]:
             return "qt"
-        else:
-            # SSH or headless - prefer TUI
-            return "textual"
-    elif gui_available:
-        return "qt"
-    elif tui_available:
+        # SSH or headless - prefer TUI
         return "textual"
-    else:
-        return "cli"
+    if gui_available:
+        return "qt"
+    if tui_available:
+        return "textual"
+    return "cli"
 
 
 def launch_qt_interface(args) -> None:
@@ -157,7 +141,7 @@ def launch_qt_interface(args) -> None:
         print("🖥️  Launching Qt GUI interface...")
         qt_main()
     except ImportError as e:
-        print(f"❌ Error: Qt libraries not available")
+        print("❌ Error: Qt libraries not available")
         print(f"   {e}")
         print("\n💡 To install Qt support:")
         print("   pip install PySide6")
@@ -174,7 +158,7 @@ def launch_textual_interface(args) -> None:
         print("🖥️  Launching Textual TUI interface...")
         textual_main()
     except ImportError as e:
-        print(f"❌ Error: Textual library not available")
+        print("❌ Error: Textual library not available")
         print(f"   {e}")
         print("\n💡 To install TUI support:")
         print("   pip install textual")

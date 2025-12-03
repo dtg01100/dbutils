@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-dbutils.db_browser - DB2 Schema Browser TUI
+"""dbutils.db_browser - DB2 Schema Browser TUI
 
 Interactive terminal UI for searching and browsing DB2 tables and columns.
 Provides a fzf-like search experience for database schemas.
@@ -103,7 +102,7 @@ class TrieNode:
     __slots__ = ("children", "is_end_of_word", "items")
 
     def __init__(self):
-        self.children: Dict[str, "TrieNode"] = {}
+        self.children: Dict[str, TrieNode] = {}
         self.is_end_of_word = False
         self.items: Set[str] = set()  # Store item keys that end at this node
 
@@ -233,13 +232,46 @@ class SearchIndex:
 
 
 def query_runner(sql: str) -> List[Dict]:
-    """Run an external `query_runner` command and return parsed results."""
+    """Execute SQL and return rows as list[dict].
+
+    Priority:
+    1) If environment variable DBUTILS_JDBC_PROVIDER is set, use JDBC provider via JayDeBeApi.
+       Optionally pass DBUTILS_JDBC_URL_PARAMS (JSON) and DBUTILS_JDBC_USER/PASSWORD.
+    2) Otherwise, fall back to the external `query_runner` command (legacy) and parse output.
+    """
+    # Attempt JDBC path first if configured
+    provider_name = os.environ.get("DBUTILS_JDBC_PROVIDER")
+    if provider_name:
+        try:
+            from dbutils.jdbc_provider import connect as _jdbc_connect
+
+            url_params_raw = os.environ.get("DBUTILS_JDBC_URL_PARAMS", "{}")
+            try:
+                url_params = json.loads(url_params_raw) if url_params_raw else {}
+            except Exception:
+                url_params = {}
+            user = os.environ.get("DBUTILS_JDBC_USER")
+            password = os.environ.get("DBUTILS_JDBC_PASSWORD")
+            conn = _jdbc_connect(provider_name, url_params, user=user, password=password)
+            try:
+                return conn.query(sql)
+            finally:
+                conn.close()
+        except Exception as e:
+            # Fall back to legacy path if JDBC fails, but log the reason
+            try:
+                sys.stderr.write(f"[db_browser] JDBC path failed, falling back to external runner: {e}\n")
+                sys.stderr.flush()
+            except Exception:
+                pass
+
+    # Legacy external runner path
     with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
         f.write(sql)
         temp_file = f.name
 
     try:
-        result = subprocess.run(["query_runner", "-t", "db2", temp_file], capture_output=True, text=True)
+        result = subprocess.run(["query_runner", "-t", "db2", temp_file], check=False, capture_output=True, text=True)
         if result.returncode != 0:
             raise RuntimeError(f"query_runner failed: {result.stderr}")
 
@@ -437,7 +469,9 @@ def get_cache_key(schema_filter: Optional[str], limit: Optional[int] = None, off
 
 
 def load_from_cache(
-    schema_filter: Optional[str], limit: Optional[int] = None, offset: Optional[int] = None
+    schema_filter: Optional[str],
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
 ) -> Optional[tuple[List[TableInfo], List[ColumnInfo]]]:
     """Load tables and columns from cache if available and recent."""
     if not CACHE_FILE.exists():
@@ -724,7 +758,7 @@ async def get_all_tables_and_columns_async(
                     schema=row.get("TABLE_SCHEMA", ""),
                     name=row.get("TABLE_NAME", ""),
                     remarks=row.get("TABLE_TEXT", ""),
-                )
+                ),
             )
 
         # Query for columns based on loaded tables
@@ -798,7 +832,7 @@ async def get_all_tables_and_columns_async(
                     scale=scale,
                     nulls=nulls,
                     remarks=row.get("COLUMN_TEXT", ""),
-                )
+                ),
             )
 
     except Exception as e:
@@ -905,7 +939,7 @@ def _get_all_tables_and_columns_sync(
                     schema=row.get("TABLE_SCHEMA", ""),
                     name=row.get("TABLE_NAME", ""),
                     remarks=row.get("TABLE_TEXT", ""),
-                )
+                ),
             )
 
         # Query for columns based on loaded tables
@@ -977,7 +1011,7 @@ def _get_all_tables_and_columns_sync(
                     scale=scale,
                     nulls=nulls,
                     remarks=row.get("COLUMN_TEXT", ""),
-                )
+                ),
             )
     except Exception as e:
         # If query fails, return empty list (graceful degradation)
@@ -1047,7 +1081,7 @@ def _get_all_tables_and_columns_sync(
                     schema=row.get("TABLE_SCHEMA", ""),
                     name=row.get("TABLE_NAME", ""),
                     remarks=row.get("TABLE_TEXT", ""),
-                )
+                ),
             )
     except Exception as e:
         # If query fails, return empty list (graceful degradation)
@@ -1123,7 +1157,7 @@ def _get_all_tables_and_columns_sync(
                     scale=scale,
                     nulls=nulls,
                     remarks=row.get("COLUMN_TEXT", ""),
-                )
+                ),
             )
     except Exception as e:
         # If query fails, return what we have so far
@@ -1171,7 +1205,10 @@ class DBBrowserTUI:
         """Load the initial batch of tables and their columns."""
         try:
             self.tables, self.columns = get_all_tables_and_columns(
-                self.schema_filter, self.use_mock, limit=self.initial_load_limit, offset=0
+                self.schema_filter,
+                self.use_mock,
+                limit=self.initial_load_limit,
+                offset=0,
             )
             if self.console:
                 self.console.print(f"[green]✓ Loaded {len(self.tables)} tables and {len(self.columns)} columns[/green]")
@@ -1228,7 +1265,10 @@ class DBBrowserTUI:
         try:
             new_offset = self.current_offset + len(self.tables)
             new_tables, new_columns = get_all_tables_and_columns(
-                self.schema_filter, self.use_mock, limit=additional_limit, offset=new_offset
+                self.schema_filter,
+                self.use_mock,
+                limit=additional_limit,
+                offset=new_offset,
             )
 
             if not new_tables:
@@ -1256,7 +1296,7 @@ class DBBrowserTUI:
 
             if self.console:
                 self.console.print(
-                    f"[green]✓ Loaded {len(new_tables)} additional tables ({len(self.tables)} total)[/green]"
+                    f"[green]✓ Loaded {len(new_tables)} additional tables ({len(self.tables)} total)[/green]",
                 )
 
             return True
@@ -1270,7 +1310,8 @@ class DBBrowserTUI:
     def select_column(self, column: ColumnInfo) -> None:
         """Select a column in the basic TUI: sets the table and shows all columns
         for that table, with the clicked column highlighted. This mirrors the
-        behavior in the Textual TUI's column selection."""
+        behavior in the Textual TUI's column selection.
+        """
         if not column or not column.schema or not column.table:
             return
 
@@ -1352,7 +1393,7 @@ class DBBrowserTUI:
                 # Handle different input types
                 if user_input.lower() in ["q", "quit", "exit"]:
                     break
-                elif user_input.lower() in ["s", "search"]:
+                if user_input.lower() in ["s", "search"]:
                     search_term = input("Enter search term: ").strip()
                     self.search_query = search_term
                 elif user_input.isdigit():
@@ -1362,12 +1403,12 @@ class DBBrowserTUI:
                         self.selected_column_name = None
                         if self.console:
                             self.console.print(
-                                f"[green]Selected: {self.selected_table.schema}.{self.selected_table.name}[/green]"
+                                f"[green]Selected: {self.selected_table.schema}.{self.selected_table.name}[/green]",
                             )
                     else:
                         if self.console:
                             self.console.print(
-                                f"[red]Invalid table number. Please select 1-{len(self.filtered_tables)}[/red]"
+                                f"[red]Invalid table number. Please select 1-{len(self.filtered_tables)}[/red]",
                             )
                         continue
                 elif user_input.startswith("> "):
@@ -1607,9 +1648,7 @@ if TEXTUAL_AVAILABLE:
                 for schema in self.schemas:
                     # Humanize display label: show readable name and table count
                     display_name = humanize_schema_name(schema.name)
-                    item_label = (
-                        f"{display_name} ({schema.table_count} table{'s' if schema.table_count != 1 else ''})"
-                    )
+                    item_label = f"{display_name} ({schema.table_count} table{'s' if schema.table_count != 1 else ''})"
                     item = ListItem(Label(item_label))
                     if schema.name == self.current_schema:
                         schema_list.index = len(schema_list) - 1 + 1  # Will select after append
@@ -1881,7 +1920,7 @@ if TEXTUAL_AVAILABLE:
                 compressed["table_rows"] = [(row["args"], row.get("key")) for row in compressed["table_rows"]]
 
             # Compress columns data
-            if "columns_data" in compressed and compressed["columns_data"]:
+            if compressed.get("columns_data"):
                 cols_data = compressed["columns_data"]
                 if "rows" in cols_data:
                     cols_data["rows"] = [(row["args"], row.get("key")) for row in cols_data["rows"]]
@@ -1909,7 +1948,7 @@ if TEXTUAL_AVAILABLE:
                 data["table_rows"] = [{"args": args, "key": key} for args, key in data["table_rows"]]
 
             # Decompress columns data
-            if "columns_data" in data and data["columns_data"]:
+            if data.get("columns_data"):
                 cols_data = data["columns_data"]
                 if "rows" in cols_data:
                     cols_data["rows"] = [{"args": args, "key": key} for args, key in cols_data["rows"]]
@@ -1987,11 +2026,10 @@ if TEXTUAL_AVAILABLE:
             # Show loading notification
             if self.use_mock:
                 self.notify("Loading mock data...", timeout=1)
+            elif self.schema_filter:
+                self.notify(f"Loading schema: {self.schema_filter}... This may take a moment.", timeout=3)
             else:
-                if self.schema_filter:
-                    self.notify(f"Loading schema: {self.schema_filter}... This may take a moment.", timeout=3)
-                else:
-                    self.notify("Loading all database schemas... This may take a moment.", timeout=3)
+                self.notify("Loading all database schemas... This may take a moment.", timeout=3)
 
             # Load data asynchronously to not block UI
             # Run the query in a worker to keep UI responsive
@@ -2002,7 +2040,11 @@ if TEXTUAL_AVAILABLE:
             try:
                 # Load initial batch of tables and columns (using async version for parallel queries)
                 self.tables, self.columns = await get_all_tables_and_columns_async(
-                    self.schema_filter, self.use_mock, self.use_cache, limit=self.initial_load_limit, offset=0
+                    self.schema_filter,
+                    self.use_mock,
+                    self.use_cache,
+                    limit=self.initial_load_limit,
+                    offset=0,
                 )
 
                 # Check if we got fewer results than requested (indicates all data loaded)
@@ -2110,7 +2152,11 @@ if TEXTUAL_AVAILABLE:
             try:
                 new_offset = len(self.tables)
                 new_tables, new_columns = await get_all_tables_and_columns_async(
-                    self.schema_filter, self.use_mock, self.use_cache, limit=additional_limit, offset=new_offset
+                    self.schema_filter,
+                    self.use_mock,
+                    self.use_cache,
+                    limit=additional_limit,
+                    offset=new_offset,
                 )
 
                 if not new_tables:
@@ -2277,180 +2323,179 @@ if TEXTUAL_AVAILABLE:
                 info = self.query_one("#tables-container .info-text", Static)
                 info.update(display_data["tables_info"])
 
-            else:  # search_mode == "columns"
-                # Column-focused search - find tables that contain matching columns
-                if not self.search_query:
-                    # Show all tables when no search
-                    for table in self.tables:
-                        row_data = {"args": (table.name, table.remarks or ""), "key": f"{table.schema}.{table.name}"}
+            # Column-focused search - find tables that contain matching columns
+            elif not self.search_query:
+                # Show all tables when no search
+                for table in self.tables:
+                    row_data = {"args": (table.name, table.remarks or ""), "key": f"{table.schema}.{table.name}"}
+                    display_data["table_rows"].append(row_data)
+                    tables_table.add_row(*row_data["args"], key=row_data["key"])
+                display_data["tables_info"] = f"Tables ({len(self.tables)} total)"
+                info = self.query_one("#tables-container .info-text", Static)
+                info.update(display_data["tables_info"])
+            else:
+                # Try cache first
+                cached = self._get_cached("columns", self.search_query)
+                if cached and "matching_table_counts" in cached and "matching_columns" in cached:
+                    matching_table_counts = cached["matching_table_counts"]
+                    matching_columns = cached["matching_columns"]
+                else:
+                    # Optimized column search with table-level aggregation
+                    matching_table_counts: Dict[str, int] = {}
+                    matching_columns = []
+                    q = self.search_query
+
+                    # Pre-compute query lower for performance
+                    q_lower = q.lower()
+
+                    for col in self.columns:
+                        # Fast pre-computed data check first
+                        col_key = f"{col.schema}.{col.table}.{col.name}"
+                        search_text = self._column_search_data.get(col_key, "")
+
+                        # Quick substring check
+                        matches = False
+                        if q_lower in search_text:
+                            matches = True
+                        else:
+                            # Fall back to fuzzy matching only if needed
+                            matches = (
+                                self.fuzzy_match(col.name, q)
+                                or self.fuzzy_match(col.typename, q)
+                                or self.fuzzy_match(col.remarks or "", q)
+                            )
+
+                        if matches:
+                            t_key = f"{col.schema}.{col.table}"
+                            matching_table_counts[t_key] = matching_table_counts.get(t_key, 0) + 1
+                            matching_columns.append(col)
+
+                    self._set_cached(
+                        "columns",
+                        self.search_query,
+                        {
+                            "matching_table_counts": matching_table_counts,
+                            "matching_columns": matching_columns,
+                        },
+                    )
+
+                # Display ALL tables with their matching column counts
+                tables_with_matches = []
+                tables_without_matches = []
+                columns_data = {"rows": [], "info": ""}
+
+                for table in self.tables:
+                    table_key = f"{table.schema}.{table.name}"
+                    match_count = matching_table_counts.get(table_key, 0)
+
+                    if match_count > 0:
+                        # Tables with matching columns - always show
+                        info_text = table.remarks or ""
+                        if info_text:
+                            info_text = f"{info_text} — {match_count} matching column(s)"
+                        else:
+                            info_text = f"{match_count} matching column(s)"
+                        row_data = {"args": (table.name, info_text), "key": table_key}
                         display_data["table_rows"].append(row_data)
                         tables_table.add_row(*row_data["args"], key=row_data["key"])
-                    display_data["tables_info"] = f"Tables ({len(self.tables)} total)"
-                    info = self.query_one("#tables-container .info-text", Static)
-                    info.update(display_data["tables_info"])
+                        tables_with_matches.append(table)
+                    elif self.show_non_matching_tables:
+                        # Tables without matching columns - only show if option is enabled
+                        info_text = table.remarks or "No matching columns"
+                        if info_text and info_text != "No matching columns":
+                            info_text = f"{info_text} — no matching columns"
+                        else:
+                            info_text = "no matching columns"
+                        row_data = {"args": (f"· {table.name}", info_text), "key": table_key}
+                        display_data["table_rows"].append(row_data)
+                        tables_table.add_row(*row_data["args"], key=row_data["key"])
+                        tables_without_matches.append(table)
+
+                # Store information for scroll-based loading
+                self._current_displayed_count = len(matching_columns)
+                self._total_available_results = len(matching_columns)
+
+                # Show loading indicator if background load is in progress
+                if (
+                    hasattr(self, "_background_load_task")
+                    and self._background_load_task
+                    and not self._background_load_task.done()
+                ):
+                    # Add loading indicator to table display
+                    tables_table.add_row(
+                        "🔄 Loading more results...",
+                        f"Searching {len(self.tables)} tables loaded so far",
+                        key="loading_indicator",
+                    )
+                    total_tables = len(tables_with_matches) + len(tables_without_matches)
+                    total_matching_columns = len(matching_columns)
+
+                    if self.show_non_matching_tables:
+                        display_data["tables_info"] = (
+                            f"Tables ({total_tables} total, {len(tables_with_matches)} with matches, {total_matching_columns} matching columns, searching more data...)"
+                        )
+                    else:
+                        display_data["tables_info"] = (
+                            f"Tables ({len(tables_with_matches)} with matches, {total_matching_columns} matching columns, searching more data... [H: toggle non-matching]"
+                        )
                 else:
-                    # Try cache first
-                    cached = self._get_cached("columns", self.search_query)
-                    if cached and "matching_table_counts" in cached and "matching_columns" in cached:
-                        matching_table_counts = cached["matching_table_counts"]
-                        matching_columns = cached["matching_columns"]
-                    else:
-                        # Optimized column search with table-level aggregation
-                        matching_table_counts: Dict[str, int] = {}
-                        matching_columns = []
-                        q = self.search_query
+                    total_tables = len(tables_with_matches) + len(tables_without_matches)
+                    total_matching_columns = len(matching_columns)
 
-                        # Pre-compute query lower for performance
-                        q_lower = q.lower()
-
-                        for col in self.columns:
-                            # Fast pre-computed data check first
-                            col_key = f"{col.schema}.{col.table}.{col.name}"
-                            search_text = self._column_search_data.get(col_key, "")
-
-                            # Quick substring check
-                            matches = False
-                            if q_lower in search_text:
-                                matches = True
-                            else:
-                                # Fall back to fuzzy matching only if needed
-                                matches = (
-                                    self.fuzzy_match(col.name, q)
-                                    or self.fuzzy_match(col.typename, q)
-                                    or self.fuzzy_match(col.remarks or "", q)
-                                )
-
-                            if matches:
-                                t_key = f"{col.schema}.{col.table}"
-                                matching_table_counts[t_key] = matching_table_counts.get(t_key, 0) + 1
-                                matching_columns.append(col)
-
-                        self._set_cached(
-                            "columns",
-                            self.search_query,
-                            {
-                                "matching_table_counts": matching_table_counts,
-                                "matching_columns": matching_columns,
-                            },
-                        )
-
-                    # Display ALL tables with their matching column counts
-                    tables_with_matches = []
-                    tables_without_matches = []
-                    columns_data = {"rows": [], "info": ""}
-
-                    for table in self.tables:
-                        table_key = f"{table.schema}.{table.name}"
-                        match_count = matching_table_counts.get(table_key, 0)
-
-                        if match_count > 0:
-                            # Tables with matching columns - always show
-                            info_text = table.remarks or ""
-                            if info_text:
-                                info_text = f"{info_text} — {match_count} matching column(s)"
-                            else:
-                                info_text = f"{match_count} matching column(s)"
-                            row_data = {"args": (table.name, info_text), "key": table_key}
-                            display_data["table_rows"].append(row_data)
-                            tables_table.add_row(*row_data["args"], key=row_data["key"])
-                            tables_with_matches.append(table)
-                        elif self.show_non_matching_tables:
-                            # Tables without matching columns - only show if option is enabled
-                            info_text = table.remarks or "No matching columns"
-                            if info_text and info_text != "No matching columns":
-                                info_text = f"{info_text} — no matching columns"
-                            else:
-                                info_text = "no matching columns"
-                            row_data = {"args": (f"· {table.name}", info_text), "key": table_key}
-                            display_data["table_rows"].append(row_data)
-                            tables_table.add_row(*row_data["args"], key=row_data["key"])
-                            tables_without_matches.append(table)
-
-                    # Store information for scroll-based loading
-                    self._current_displayed_count = len(matching_columns)
-                    self._total_available_results = len(matching_columns)
-
-                    # Show loading indicator if background load is in progress
-                    if (
-                        hasattr(self, "_background_load_task")
-                        and self._background_load_task
-                        and not self._background_load_task.done()
-                    ):
-                        # Add loading indicator to table display
-                        tables_table.add_row(
-                            "🔄 Loading more results...",
-                            f"Searching {len(self.tables)} tables loaded so far",
-                            key="loading_indicator",
-                        )
-                        total_tables = len(tables_with_matches) + len(tables_without_matches)
-                        total_matching_columns = len(matching_columns)
-
-                        if self.show_non_matching_tables:
-                            display_data["tables_info"] = (
-                                f"Tables ({total_tables} total, {len(tables_with_matches)} with matches, {total_matching_columns} matching columns, searching more data...)"
-                            )
-                        else:
-                            display_data["tables_info"] = (
-                                f"Tables ({len(tables_with_matches)} with matches, {total_matching_columns} matching columns, searching more data... [H: toggle non-matching]"
-                            )
-                    else:
-                        total_tables = len(tables_with_matches) + len(tables_without_matches)
-                        total_matching_columns = len(matching_columns)
-
-                        if self.show_non_matching_tables:
-                            display_data["tables_info"] = (
-                                f"Tables ({total_tables} total, {len(tables_with_matches)} with matches, {total_matching_columns} matching columns total)"
-                            )
-                        else:
-                            display_data["tables_info"] = (
-                                f"Tables ({len(tables_with_matches)} with matches, {total_matching_columns} matching columns) [H: toggle non-matching]"
-                            )
-                    info = self.query_one("#tables-container .info-text", Static)
-                    info.update(display_data["tables_info"])
-
-                    # Populate the columns panel with limited matches across tables
-                    columns_table = self.query_one("#columns-table", DataTable)
-                    columns_table.clear()
-
-                    # Limit displayed columns for performance
-                    displayed_columns = matching_columns[: self.max_displayed_results]
-                    has_more_columns = len(matching_columns) > self.max_displayed_results
-
-                    for col in displayed_columns:
-                        col_key = f"{col.schema}.{col.table}.{col.name}"
-                        type_str = f"{col.typename}"
-                        if col.length:
-                            type_str += f"({col.length}"
-                            if col.scale:
-                                type_str += f",{col.scale}"
-                            type_str += ")"
-                        row_data = {
-                            "args": (f"{col.schema}.{col.table}.{col.name}", type_str, col.nulls, col.remarks or ""),
-                            "key": col_key,
-                        }
-                        columns_data["rows"].append(row_data)
-                        columns_table.add_row(*row_data["args"], key=row_data["key"])
-
-                    # Add indicator for more results if needed
-                    if has_more_columns:
-                        remaining = len(matching_columns) - self.max_displayed_results
-                        columns_table.add_row(
-                            f"... and {remaining} more columns",
-                            "",
-                            "",
-                            "Press Ctrl+L to load all results",
-                            key=f"load_more_columns_{self.search_mode}",
-                        )
-
-                    if has_more_columns:
-                        columns_data["info"] = (
-                            f"Column matches across tables ({len(displayed_columns)}+ found, {remaining} more available)"
+                    if self.show_non_matching_tables:
+                        display_data["tables_info"] = (
+                            f"Tables ({total_tables} total, {len(tables_with_matches)} with matches, {total_matching_columns} matching columns total)"
                         )
                     else:
-                        columns_data["info"] = f"Column matches across tables ({len(matching_columns)} found)"
-                    info = self.query_one("#columns-container .info-text", Static)
-                    info.update(columns_data["info"])
-                    display_data["columns_data"] = columns_data
+                        display_data["tables_info"] = (
+                            f"Tables ({len(tables_with_matches)} with matches, {total_matching_columns} matching columns) [H: toggle non-matching]"
+                        )
+                info = self.query_one("#tables-container .info-text", Static)
+                info.update(display_data["tables_info"])
+
+                # Populate the columns panel with limited matches across tables
+                columns_table = self.query_one("#columns-table", DataTable)
+                columns_table.clear()
+
+                # Limit displayed columns for performance
+                displayed_columns = matching_columns[: self.max_displayed_results]
+                has_more_columns = len(matching_columns) > self.max_displayed_results
+
+                for col in displayed_columns:
+                    col_key = f"{col.schema}.{col.table}.{col.name}"
+                    type_str = f"{col.typename}"
+                    if col.length:
+                        type_str += f"({col.length}"
+                        if col.scale:
+                            type_str += f",{col.scale}"
+                        type_str += ")"
+                    row_data = {
+                        "args": (f"{col.schema}.{col.table}.{col.name}", type_str, col.nulls, col.remarks or ""),
+                        "key": col_key,
+                    }
+                    columns_data["rows"].append(row_data)
+                    columns_table.add_row(*row_data["args"], key=row_data["key"])
+
+                # Add indicator for more results if needed
+                if has_more_columns:
+                    remaining = len(matching_columns) - self.max_displayed_results
+                    columns_table.add_row(
+                        f"... and {remaining} more columns",
+                        "",
+                        "",
+                        "Press Ctrl+L to load all results",
+                        key=f"load_more_columns_{self.search_mode}",
+                    )
+
+                if has_more_columns:
+                    columns_data["info"] = (
+                        f"Column matches across tables ({len(displayed_columns)}+ found, {remaining} more available)"
+                    )
+                else:
+                    columns_data["info"] = f"Column matches across tables ({len(matching_columns)} found)"
+                info = self.query_one("#columns-container .info-text", Static)
+                info.update(columns_data["info"])
+                display_data["columns_data"] = columns_data
 
             # Set cursor position for selected table
             try:
@@ -2574,8 +2619,7 @@ if TEXTUAL_AVAILABLE:
                     pass
 
         def edit_distance(self, s1: str, s2: str) -> int:
-            """
-            Calculate Levenshtein distance between two strings.
+            """Calculate Levenshtein distance between two strings.
             Returns the minimum number of edits needed to transform s1 into s2.
             """
             if len(s1) < len(s2):
@@ -2598,8 +2642,7 @@ if TEXTUAL_AVAILABLE:
             return previous_row[-1]
 
         def fuzzy_match(self, text: str, query: str) -> bool:
-            """
-            Highly optimized fuzzy match with multiple strategies and early exits.
+            """Highly optimized fuzzy match with multiple strategies and early exits.
             Prioritizes speed over perfect accuracy for better UX.
             """
             if not query:
@@ -2668,8 +2711,7 @@ if TEXTUAL_AVAILABLE:
             return False
 
         def _fast_edit_distance(self, s1: str, s2: str) -> int:
-            """
-            Fast edit distance calculation with optimizations for fuzzy search.
+            """Fast edit distance calculation with optimizations for fuzzy search.
             Returns early if distance exceeds reasonable threshold.
             """
             len1, len2 = len(s1), len(s2)
@@ -2700,7 +2742,7 @@ if TEXTUAL_AVAILABLE:
                             prev_row[j + 1] + 1,  # deletion
                             curr_row[j] + 1,  # insertion
                             prev_row[j] + cost,  # substitution
-                        )
+                        ),
                     )
                     min_val = min(min_val, curr_row[-1])
 
@@ -2762,10 +2804,11 @@ if TEXTUAL_AVAILABLE:
                 search_text = self._table_search_data.get(table_key, "")
 
                 # Fast substring check first (most common case)
-                if query_lower in search_text:
-                    filtered.append(table)
-                # Fall back to fuzzy match if needed
-                elif self.fuzzy_match(table.name, query) or self.fuzzy_match(table.remarks or "", query):
+                if (
+                    query_lower in search_text
+                    or self.fuzzy_match(table.name, query)
+                    or self.fuzzy_match(table.remarks or "", query)
+                ):
                     filtered.append(table)
 
             return filtered
@@ -2820,10 +2863,11 @@ if TEXTUAL_AVAILABLE:
                 search_text = self._column_search_data.get(col_key, "")
 
                 # Fast substring check first (most common case)
-                if query_lower in search_text:
-                    filtered.append(col)
-                # Fall back to fuzzy match if needed
-                elif self.fuzzy_match(col.name, query) or self.fuzzy_match(col.typename, query):
+                if (
+                    query_lower in search_text
+                    or self.fuzzy_match(col.name, query)
+                    or self.fuzzy_match(col.typename, query)
+                ):
                     filtered.append(col)
 
             return filtered
@@ -2894,10 +2938,9 @@ if TEXTUAL_AVAILABLE:
                     and has_more_available
                     and not getattr(self, "_scroll_load_triggered", False)
                     and not hasattr(self, "_background_load_task")
-                    or (
-                        hasattr(self, "_background_load_task")
-                        and (self._background_load_task is None or self._background_load_task.done())
-                    )
+                ) or (
+                    hasattr(self, "_background_load_task")
+                    and (self._background_load_task is None or self._background_load_task.done())
                 ):
                     self._scroll_load_triggered = True
                     self._background_load_task = asyncio.create_task(self._load_more_for_scroll(self.search_query))
@@ -3260,7 +3303,9 @@ if TEXTUAL_AVAILABLE:
 
                 # Reload data using async version to avoid blocking
                 self.tables, self.columns = await get_all_tables_and_columns_async(
-                    self.schema_filter, self.use_mock, self.use_cache
+                    self.schema_filter,
+                    self.use_mock,
+                    self.use_cache,
                 )
 
                 # Rebuild table-columns mapping and pre-computed search data
@@ -3292,23 +3337,26 @@ if TEXTUAL_AVAILABLE:
                 if table_count == 0:
                     if self.schema_filter:
                         self.notify(
-                            f"⚠️ No tables found in schema '{self.schema_filter}'", severity="warning", timeout=5
+                            f"⚠️ No tables found in schema '{self.schema_filter}'",
+                            severity="warning",
+                            timeout=5,
                         )
                     else:
                         self.notify("⚠️ No tables found", severity="warning", timeout=5)
+                elif self.schema_filter:
+                    self.notify(
+                        f"✓ Loaded {table_count} tables from '{self.schema_filter}'",
+                        severity="information",
+                        timeout=2,
+                    )
                 else:
-                    if self.schema_filter:
-                        self.notify(
-                            f"✓ Loaded {table_count} tables from '{self.schema_filter}'",
-                            severity="information",
-                            timeout=2,
-                        )
-                    else:
-                        self.notify(
-                            f"✓ Loaded {table_count} tables from all schemas", severity="information", timeout=2
-                        )
+                    self.notify(
+                        f"✓ Loaded {table_count} tables from all schemas",
+                        severity="information",
+                        timeout=2,
+                    )
             except Exception as e:
-                self.notify(f"Error reloading data: {str(e)}", severity="error", timeout=5)
+                self.notify(f"Error reloading data: {e!s}", severity="error", timeout=5)
 
         def action_help(self) -> None:
             """Show help information."""
@@ -3457,7 +3505,11 @@ def main():
     parser.add_argument("--schema", help="Filter by specific schema (default: DACDATA)", default="DACDATA")
     parser.add_argument("--search", "-s", help="Search query (activates one-shot mode)")
     parser.add_argument(
-        "--limit", "-l", type=int, default=10, help="Limit number of results in one-shot mode (default: 10)"
+        "--limit",
+        "-l",
+        type=int,
+        default=10,
+        help="Limit number of results in one-shot mode (default: 10)",
     )
     parser.add_argument(
         "--format",
@@ -3470,16 +3522,28 @@ def main():
     parser.add_argument("--basic", action="store_true", help="Use basic mode (no Textual TUI)")
     parser.add_argument("--no-cache", action="store_true", help="Disable caching of database schema")
     parser.add_argument(
-        "--initial-load-limit", type=int, default=100, help="Initial number of tables to load (default: 100)"
+        "--initial-load-limit",
+        type=int,
+        default=100,
+        help="Initial number of tables to load (default: 100)",
     )
     parser.add_argument(
-        "--max-display-results", type=int, default=200, help="Maximum results to display in UI (default: 200)"
+        "--max-display-results",
+        type=int,
+        default=200,
+        help="Maximum results to display in UI (default: 200)",
     )
     parser.add_argument(
-        "--search-debounce", type=float, default=0.2, help="Search debounce delay in seconds (default: 0.2)"
+        "--search-debounce",
+        type=float,
+        default=0.2,
+        help="Search debounce delay in seconds (default: 0.2)",
     )
     parser.add_argument(
-        "--stream-search", action="store_true", default=True, help="Enable streaming search results (default: enabled)"
+        "--stream-search",
+        action="store_true",
+        default=True,
+        help="Enable streaming search results (default: enabled)",
     )
     parser.add_argument("--no-stream-search", action="store_true", help="Disable streaming search results")
 
@@ -3499,35 +3563,36 @@ def main():
             print("Please install it with: pip install rich")
             return
         search_and_output(args.search, args.schema, args.limit, args.format, args.mock)
-    else:
-        # Interactive mode - prefer Textual if available
-        if TEXTUAL_AVAILABLE and not args.basic:
-            # Configure streaming search
-            stream_enabled = args.stream_search and not args.no_stream_search
+    # Interactive mode - prefer Textual if available
+    elif TEXTUAL_AVAILABLE and not args.basic:
+        # Configure streaming search
+        stream_enabled = args.stream_search and not args.no_stream_search
 
-            app = DBBrowserApp(
-                schema_filter=args.schema,
-                use_mock=args.mock,
-                use_cache=not args.no_cache,
-                initial_load_limit=args.initial_load_limit,
-            )
-            # Configure performance settings
-            app.max_displayed_results = args.max_display_results
-            app.search_debounce_delay = args.search_debounce
-            app._stream_search_enabled = stream_enabled
-            app.run()
-        elif RICH_AVAILABLE:
-            if not TEXTUAL_AVAILABLE:
-                print("[Note: For full keyboard/mouse support, install Textual: pip install textual]")
-                print()
-            browser = DBBrowserTUI(
-                schema_filter=args.schema, use_mock=args.mock, initial_load_limit=args.initial_load_limit
-            )
-            browser.run()
-        else:
-            print("Error: This tool requires either 'rich' or 'textual' library.")
-            print("Please install with: pip install rich textual")
-            return
+        app = DBBrowserApp(
+            schema_filter=args.schema,
+            use_mock=args.mock,
+            use_cache=not args.no_cache,
+            initial_load_limit=args.initial_load_limit,
+        )
+        # Configure performance settings
+        app.max_displayed_results = args.max_display_results
+        app.search_debounce_delay = args.search_debounce
+        app._stream_search_enabled = stream_enabled
+        app.run()
+    elif RICH_AVAILABLE:
+        if not TEXTUAL_AVAILABLE:
+            print("[Note: For full keyboard/mouse support, install Textual: pip install textual]")
+            print()
+        browser = DBBrowserTUI(
+            schema_filter=args.schema,
+            use_mock=args.mock,
+            initial_load_limit=args.initial_load_limit,
+        )
+        browser.run()
+    else:
+        print("Error: This tool requires either 'rich' or 'textual' library.")
+        print("Please install with: pip install rich textual")
+        return
 
 
 if __name__ == "__main__":

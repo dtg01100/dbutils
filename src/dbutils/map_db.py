@@ -155,7 +155,7 @@ def infer_relationships(
     relationships: Dict[tuple, Dict[str, str]] = {}
 
     # 1. Use actual foreign key constraints (if provided)
-    for fk in (fks or []):
+    for fk in fks or []:
         rel_key = (
             fk["TABSCHEMA"],
             fk["TABNAME"],
@@ -249,7 +249,9 @@ def infer_relationships(
 
 
 def build_schema_map(
-    tables: List[Dict[str, Any]], columns: List[Dict[str, Any]], relationships: List[Dict[str, str]]
+    tables: List[Dict[str, Any]],
+    columns: List[Dict[str, Any]],
+    relationships: List[Dict[str, str]],
 ) -> Dict[str, Any]:
     """Build a schema mapping keyed by 'SCHEMA.TABLE'."""
     schema: Dict[str, Any] = {}
@@ -276,7 +278,7 @@ def build_schema_map(
                     "parent_table": parent_key,
                     "child_column": rel["COLNAME"],
                     "parent_column": rel["REFCOLNAME"],
-                }
+                },
             )
     return schema
 
@@ -318,7 +320,7 @@ async def main():
             tables, columns, pks, fks = await get_schema_details(executor, args.mock)
 
         logging.info(
-            f"Found {len(tables)} tables, {len(columns)} columns, {len(pks)} primary keys, {len(fks)} foreign keys"
+            f"Found {len(tables)} tables, {len(columns)} columns, {len(pks)} primary keys, {len(fks)} foreign keys",
         )
 
         relationships = infer_relationships(tables, columns, pks, fks)

@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-Simple test for Qt application structure without Qt dependencies.
-"""
+"""Simple test for Qt application structure without Qt dependencies."""
 
 
 def test_imports():
@@ -12,6 +10,8 @@ def test_imports():
     try:
         from src.dbutils.catalog import get_all_tables_and_columns
 
+        _ = get_all_tables_and_columns
+
         print("✅ get_all_tables_and_columns import works")
     except ImportError as e:
         print(f"❌ Import error: {e}")
@@ -19,7 +19,9 @@ def test_imports():
 
     # Test data models
     try:
-        from src.dbutils.db_browser import TableInfo, ColumnInfo
+        from src.dbutils.db_browser import ColumnInfo, TableInfo
+
+        _ = ColumnInfo, TableInfo
 
         print("✅ Data models import works")
     except ImportError as e:
@@ -28,7 +30,7 @@ def test_imports():
 
     # Test launcher
     try:
-        from src.dbutils.main_launcher import detect_display_environment, check_gui_availability
+        from src.dbutils.main_launcher import check_gui_availability, detect_display_environment
 
         env = detect_display_environment()
         gui_available = check_gui_availability()

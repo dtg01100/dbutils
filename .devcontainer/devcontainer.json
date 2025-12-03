@@ -1,0 +1,32 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/ubuntu
+{
+	"name": "Ubuntu",
+	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+	"image": "mcr.microsoft.com/devcontainers/base:noble",
+	"features": {
+		"ghcr.io/devcontainers/features/desktop-lite:1": {
+			"version": "latest",
+			"noVncVersion": "1.6.0",
+			"password": "noPassword",
+			"webPort": "6080",
+			"vncPort": "5901"
+		},
+		"ghcr.io/devcontainer-community/devcontainer-features/opencode.ai": {}
+	},
+
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	// "features": {},
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	"forwardPorts": [6080],
+
+	// Use 'postCreateCommand' to run commands after the container is created.
+	"postCreateCommand": "sudo apt-get update && sudo apt-get install -y libegl1 libegl-mesa0 libopengl0 libglu1-mesa fontconfig libxkbcommon0 libxcb1 libx11-6 libx11-xcb1 libxcb-cursor0 libxkbcommon-x11-0 libxcb-util1 libxcb-image0 libxcb-render-util0 libxcb-xkb1 libxrender1 libxi6 libxext6 libxrandr2 libxcb-keysyms1 libxcb-icccm4 libxcb-shape0 libxcb-xinerama0 libxcb-render0 libxcb-shm0 libgl1 && bash -lc 'echo export QT_QPA_PLATFORM=xcb | sudo tee /etc/profile.d/qt_xcb.sh'"
+
+	// Configure tool-specific properties.
+	// "customizations": {},
+
+	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+	// "remoteUser": "root"
+}

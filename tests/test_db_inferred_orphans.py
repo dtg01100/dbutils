@@ -13,7 +13,7 @@ def test_orphans_table_output(capsys):
     db_inferred_orphans.main()
     out = capsys.readouterr().out
     lines = out.splitlines()
-    assert any("CHILD_TABLE" in l for l in lines[:2])
+    assert any("CHILD_TABLE" in ln for ln in lines[:2])
     assert "-- Example orphan detection SQL" in out
     assert "SELECT COUNT(*)" in out
 

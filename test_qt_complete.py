@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-"""
-Test Qt application structure without running the GUI.
-"""
+"""Test Qt application structure without running the GUI."""
 
 import sys
-import os
 
 
 def test_qt_structure():
@@ -15,6 +12,8 @@ def test_qt_structure():
     try:
         from src.dbutils.gui.qt_app import QtDBBrowser
 
+        # Mark imported symbol as used for linters
+        _ = QtDBBrowser
         print("✅ QtDBBrowser import successful")
     except ImportError as e:
         print(f"❌ QtDBBrowser import failed: {e}")
@@ -22,8 +21,9 @@ def test_qt_structure():
 
     # Test 2: Check if we can import the data models
     try:
-        from src.dbutils.gui.qt_app import DatabaseModel, ColumnModel, SearchResult
+        from src.dbutils.gui.qt_app import ColumnModel, DatabaseModel, SearchResult
 
+        _ = ColumnModel, DatabaseModel, SearchResult
         print("✅ Data models import successful")
     except ImportError as e:
         print(f"❌ Data models import failed: {e}")
@@ -31,8 +31,9 @@ def test_qt_structure():
 
     # Test 3: Check if we can import the widgets
     try:
-        from src.dbutils.gui.widgets.enhanced_widgets import StatusIndicator, EnhancedTableItem
+        from src.dbutils.gui.widgets.enhanced_widgets import EnhancedTableItem, StatusIndicator
 
+        _ = EnhancedTableItem, StatusIndicator
         print("✅ Enhanced widgets import successful")
     except ImportError as e:
         print(f"❌ Enhanced widgets import failed: {e}")
@@ -40,11 +41,11 @@ def test_qt_structure():
 
     # Test 4: Check if we can import the launcher
     try:
-        from src.dbutils.main_launcher import detect_display_environment, check_gui_availability
+        from src.dbutils.main_launcher import check_gui_availability, detect_display_environment
 
         env = detect_display_environment()
         gui_available = check_gui_availability()
-        print(f"✅ Launcher import successful")
+        print("✅ Launcher import successful")
         print(f"   Environment: {env}")
         print(f"   GUI Available: {gui_available}")
     except ImportError as e:
@@ -55,6 +56,7 @@ def test_qt_structure():
     try:
         from src.dbutils.catalog import get_all_tables_and_columns
 
+        _ = get_all_tables_and_columns
         print("✅ Catalog function import successful")
     except ImportError as e:
         print(f"❌ Catalog function import failed: {e}")
@@ -62,8 +64,9 @@ def test_qt_structure():
 
     # Test 6: Check if we can import the data models
     try:
-        from src.dbutils.db_browser import TableInfo, ColumnInfo
+        from src.dbutils.db_browser import ColumnInfo, TableInfo
 
+        _ = ColumnInfo, TableInfo
         print("✅ Data models import successful")
     except ImportError as e:
         print(f"❌ Data models import failed: {e}")

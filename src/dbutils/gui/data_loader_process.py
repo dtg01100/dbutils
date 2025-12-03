@@ -1,5 +1,4 @@
-"""
-Subprocess data loader for Qt GUI.
+"""Subprocess data loader for Qt GUI.
 
 Reads a single JSON command on stdin:
   {"cmd":"start", "schema_filter": str|null, "use_mock": bool, "initial_limit": int, "batch_size": int}
@@ -17,14 +16,12 @@ Columns use dicts: {"schema","table","name","typename","length","scale","nulls",
 
 from __future__ import annotations
 
-import sys
-import json
-import os
-import time
 import gzip
+import json
+import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-
 
 # Cache expiration time in seconds (24 hours)
 CACHE_EXPIRATION_SECONDS = 24 * 60 * 60
@@ -73,11 +70,11 @@ def is_cache_valid(cache_path: Path, max_age_seconds: int = CACHE_EXPIRATION_SEC
     """Check if a cache file exists and is not expired."""
     if not cache_path.exists():
         return False
-    
+
     # Check file age
     file_mtime = cache_path.stat().st_mtime
     age_seconds = time.time() - file_mtime
-    
+
     return age_seconds < max_age_seconds
 
 
@@ -85,37 +82,37 @@ def load_cached_data(schema_filter: Optional[str]) -> Optional[Tuple[List[Dict],
     """Load cached table and column data if valid."""
     try:
         cache_path = get_data_cache_path(schema_filter)
-        
+
         if not is_cache_valid(cache_path):
             sys.stderr.write(f"Data cache miss or expired for schema_filter={schema_filter}\n")
             sys.stderr.flush()
             return None
-        
+
         # Read and decompress
         if USE_COMPRESSION:
-            with gzip.open(cache_path, 'rt', encoding='utf-8') as f:
+            with gzip.open(cache_path, "rt", encoding="utf-8") as f:
                 data = json.load(f)
         else:
-            with open(cache_path, 'r') as f:
+            with open(cache_path) as f:
                 data = json.load(f)
-        
-        tables = data.get('tables', [])
-        columns = data.get('columns', [])
-        cached_at = data.get('cached_at', 0)
-        
+
+        tables = data.get("tables", [])
+        columns = data.get("columns", [])
+        cached_at = data.get("cached_at", 0)
+
         age_hours = (time.time() - cached_at) / 3600
         file_size_mb = cache_path.stat().st_size / (1024 * 1024)
         sys.stderr.write(
             f"Data cache hit for schema_filter={schema_filter} "
-            f"(age: {age_hours:.1f}h, {len(tables)} tables, {file_size_mb:.2f}MB)\n"
+            f"(age: {age_hours:.1f}h, {len(tables)} tables, {file_size_mb:.2f}MB)\n",
         )
         sys.stderr.flush()
-        
+
         return tables, columns
     except Exception as e:
         sys.stderr.write(f"Failed to load data cache: {e}\n")
         sys.stderr.flush()
-    
+
     return None
 
 
@@ -123,26 +120,25 @@ def save_data_to_cache(schema_filter: Optional[str], tables: List[Dict], columns
     """Save table and column data to cache with compression."""
     try:
         cache_path = get_data_cache_path(schema_filter)
-        
+
         data = {
-            'tables': tables,
-            'columns': columns,
-            'cached_at': time.time(),
-            'schema_filter': schema_filter
+            "tables": tables,
+            "columns": columns,
+            "cached_at": time.time(),
+            "schema_filter": schema_filter,
         }
-        
+
         # Write with compression
         if USE_COMPRESSION:
-            with gzip.open(cache_path, 'wt', encoding='utf-8', compresslevel=6) as f:
-                json.dump(data, f, separators=(',', ':'))  # Compact JSON
+            with gzip.open(cache_path, "wt", encoding="utf-8", compresslevel=6) as f:
+                json.dump(data, f, separators=(",", ":"))  # Compact JSON
         else:
-            with open(cache_path, 'w') as f:
+            with open(cache_path, "w") as f:
                 json.dump(data, f)
-        
+
         file_size_mb = cache_path.stat().st_size / (1024 * 1024)
         sys.stderr.write(
-            f"Saved {len(tables)} tables and {len(columns)} columns to data cache "
-            f"({file_size_mb:.2f}MB compressed)\n"
+            f"Saved {len(tables)} tables and {len(columns)} columns to data cache ({file_size_mb:.2f}MB compressed)\n",
         )
         sys.stderr.flush()
     except Exception as e:
@@ -156,13 +152,13 @@ def load_cached_schemas() -> Optional[List[str]]:
         cache_path = get_schema_cache_path()
         if cache_path.exists():
             if USE_COMPRESSION:
-                with gzip.open(cache_path, 'rt', encoding='utf-8') as f:
+                with gzip.open(cache_path, "rt", encoding="utf-8") as f:
                     data = json.load(f)
-                    return data.get('schemas', [])
+                    return data.get("schemas", [])
             else:
-                with open(cache_path, 'r') as f:
+                with open(cache_path) as f:
                     data = json.load(f)
-                    return data.get('schemas', [])
+                    return data.get("schemas", [])
     except Exception as e:
         sys.stderr.write(f"Failed to load schema cache: {e}\n")
         sys.stderr.flush()
@@ -173,18 +169,17 @@ def save_schemas_to_cache(schemas: List[str]) -> None:
     """Save schemas to cache file with compression."""
     try:
         cache_path = get_schema_cache_path()
-        
+
         if USE_COMPRESSION:
-            with gzip.open(cache_path, 'wt', encoding='utf-8', compresslevel=6) as f:
-                json.dump({'schemas': schemas}, f, separators=(',', ':'))
+            with gzip.open(cache_path, "wt", encoding="utf-8", compresslevel=6) as f:
+                json.dump({"schemas": schemas}, f, separators=(",", ":"))
         else:
-            with open(cache_path, 'w') as f:
-                json.dump({'schemas': schemas}, f)
-        
+            with open(cache_path, "w") as f:
+                json.dump({"schemas": schemas}, f)
+
         file_size_mb = cache_path.stat().st_size / (1024 * 1024)
         sys.stderr.write(
-            f"Saved {len(schemas)} schemas to cache "
-            f"({file_size_mb:.2f}MB{'compressed' if USE_COMPRESSION else ''})\n"
+            f"Saved {len(schemas)} schemas to cache ({file_size_mb:.2f}MB{'compressed' if USE_COMPRESSION else ''})\n",
         )
         sys.stderr.flush()
     except Exception as e:
@@ -230,7 +225,7 @@ def to_column_dicts(cols) -> List[Dict[str, Any]]:
             scale = c.get("scale") or c.get("NUMERIC_SCALE")
             nulls = c.get("nulls") or c.get("IS_NULLABLE")
             remarks = c.get("remarks") or c.get("COLUMN_TEXT") or ""
-        
+
         # Normalize nulls to Y/N
         if nulls in ("Y", "N"):
             pass
@@ -240,7 +235,7 @@ def to_column_dicts(cols) -> List[Dict[str, Any]]:
             nulls = "N"
         else:
             nulls = "Y" if str(nulls).upper() == "Y" else "N"
-        
+
         out.append(
             {
                 "schema": schema,
@@ -251,12 +246,12 @@ def to_column_dicts(cols) -> List[Dict[str, Any]]:
                 "scale": scale,
                 "nulls": nulls,
                 "remarks": remarks,
-            }
+            },
         )
     return out
 
 
-def main():
+def main():  # noqa: C901
     try:
         line = sys.stdin.readline()
         if not line:
@@ -270,39 +265,89 @@ def main():
         use_mock: bool = bool(cmd.get("use_mock", False))
         initial_limit: int = int(cmd.get("initial_limit", 200))
         batch_size: int = int(cmd.get("batch_size", 500))
+        # Optional resume offset so a restarted loader can continue where the
+        # UI left off instead of re-streaming the same initial pages.
+        start_offset: int = int(cmd.get("start_offset", 0))
 
         # Log to stderr for debugging
-        sys.stderr.write(f"Starting data loader: schema_filter={schema_filter}, use_mock={use_mock}, initial_limit={initial_limit}, batch_size={batch_size}\n")
+        sys.stderr.write(
+            f"Starting data loader: schema_filter={schema_filter}, "
+            f"use_mock={use_mock}, initial_limit={initial_limit}, "
+            f"batch_size={batch_size}\n"
+        )
         sys.stderr.flush()
 
         # Try to load from processed data cache first (24 hour expiration)
         cached_data = load_cached_data(schema_filter)
-        
+
         if cached_data:
             all_tables_dicts, all_columns_dicts = cached_data
-            
-            # Stream the cached data in chunks
-            sys.stderr.write(f"Streaming {len(all_tables_dicts)} tables from cache...\n")
+
+            # Stream the cached data in batches to avoid blocking UI
+            sys.stderr.write(f"Streaming {len(all_tables_dicts)} tables from cache in batches...\n")
             sys.stderr.flush()
             jprint({"type": "progress", "message": "Loading from cache…", "current": 0, "total": 3})
-            
-            # Send all data as initial chunk (already processed)
-            jprint({
-                "type": "chunk",
-                "tables": all_tables_dicts,
-                "columns": all_columns_dicts,
-                "loaded": len(all_tables_dicts),
-                "estimated": len(all_tables_dicts),
-            })
-            jprint({"type": "progress", "message": f"Loaded {len(all_tables_dicts)} tables from cache", "current": 2, "total": 3})
-            
+
+            # Stream in batches to keep UI responsive
+            # Use smaller initial batch for fast first paint, then larger batches
+            first_batch_size = min(initial_limit, 200)  # Quick first chunk
+            subsequent_batch_size = batch_size
+
+            start = start_offset if start_offset else 0
+            total_tables = len(all_tables_dicts)
+
+            # Send first small batch immediately for fast UI response
+            if start < total_tables:
+                end = min(start + first_batch_size, total_tables)
+                batch_tables = all_tables_dicts[start:end]
+                batch_keys = {f"{t['schema']}.{t['name']}" for t in batch_tables}
+                batch_columns = [c for c in all_columns_dicts if f"{c.get('schema')}.{c.get('table')}" in batch_keys]
+
+                jprint(
+                    {
+                        "type": "chunk",
+                        "tables": batch_tables,
+                        "columns": batch_columns,
+                        "loaded": end,
+                        "estimated": total_tables,
+                    }
+                )
+                start = end
+
+            # Stream remaining data in larger batches
+            while start < total_tables:
+                end = min(start + subsequent_batch_size, total_tables)
+                batch_tables = all_tables_dicts[start:end]
+                batch_keys = {f"{t['schema']}.{t['name']}" for t in batch_tables}
+                batch_columns = [c for c in all_columns_dicts if f"{c.get('schema')}.{c.get('table')}" in batch_keys]
+
+                jprint(
+                    {
+                        "type": "chunk",
+                        "tables": batch_tables,
+                        "columns": batch_columns,
+                        "loaded": end,
+                        "estimated": total_tables,
+                    }
+                )
+                start = end
+                sys.stdout.flush()  # Ensure chunks are sent immediately
+            jprint(
+                {
+                    "type": "progress",
+                    "message": f"Loaded {len(all_tables_dicts)} tables from cache",
+                    "current": 2,
+                    "total": 3,
+                }
+            )
+
             # Load schemas from cache
             schemas_list = load_cached_schemas()
             if not schemas_list:
                 # Fallback: build from cached tables
-                schemas_list = sorted({t['schema'] for t in all_tables_dicts})
+                schemas_list = sorted({t["schema"] for t in all_tables_dicts})
                 save_schemas_to_cache(schemas_list)
-            
+
             jprint({"type": "schemas", "schemas": schemas_list})
             jprint({"type": "progress", "message": "Done", "current": 3, "total": 3})
             jprint({"type": "done"})
@@ -315,25 +360,29 @@ def main():
         sys.stderr.flush()
 
         # Import from absolute paths since this runs as __main__
-        import dbutils.db_browser as db_browser
+        from dbutils import db_browser
 
         # Track all loaded tables to build schema list and save to cache
         all_loaded_tables = []
         all_loaded_columns = []
-        
+
         # Initial chunk
         sys.stderr.write("Loading initial chunk...\n")
         sys.stderr.flush()
         jprint({"type": "progress", "message": "Connecting…", "current": 0, "total": 3})
 
-        cached = db_browser.load_from_cache(schema_filter, limit=initial_limit, offset=0)
+        cached = db_browser.load_from_cache(schema_filter, limit=initial_limit, offset=start_offset)
         sys.stderr.write(f"DB cache result: {'hit' if cached else 'miss'}\n")
         sys.stderr.flush()
         if cached:
             tables, columns = cached
         else:
             tables, columns = db_browser.get_all_tables_and_columns(
-                schema_filter, use_mock, use_cache=True, limit=initial_limit, offset=0
+                schema_filter,
+                use_mock,
+                use_cache=True,
+                limit=initial_limit,
+                offset=0,
             )
 
         all_loaded_tables.extend(tables)
@@ -354,31 +403,35 @@ def main():
                 "columns": to_column_dicts(columns),
                 "loaded": loaded_total,
                 "estimated": estimated_total,
-            }
+            },
         )
         sys.stderr.write("Sent chunk\n")
         sys.stderr.flush()
         jprint({"type": "progress", "message": f"Loaded {loaded_total} tables…", "current": 1, "total": 3})
 
         # Stream remaining pages with dynamic batch sizing
-        offset = initial_limit
+        offset = start_offset + initial_limit
         current_batch_size = batch_size
         chunk_times = []  # Track recent chunk load times for adaptive sizing
-        
+
         while True:
             chunk_start = time.time()
-            
+
             cached = db_browser.load_from_cache(schema_filter, limit=current_batch_size, offset=offset)
             if cached:
                 t_chunk, c_chunk = cached
             else:
                 t_chunk, c_chunk = db_browser.get_all_tables_and_columns(
-                    schema_filter, use_mock, use_cache=True, limit=current_batch_size, offset=offset
+                    schema_filter,
+                    use_mock,
+                    use_cache=True,
+                    limit=current_batch_size,
+                    offset=offset,
                 )
 
             chunk_time_ms = (time.time() - chunk_start) * 1000
             chunk_times.append(chunk_time_ms)
-            
+
             if not t_chunk:
                 break
 
@@ -392,26 +445,30 @@ def main():
                     "columns": to_column_dicts(c_chunk),
                     "loaded": loaded_total,
                     "estimated": estimated_total,
-                }
+                },
             )
             jprint({"type": "progress", "message": f"Loaded {loaded_total} tables…", "current": 2, "total": 3})
 
             # Adaptive batch sizing: adjust based on recent performance
             if len(chunk_times) >= 3:
                 avg_time = sum(chunk_times[-3:]) / 3
-                
+
                 if avg_time < TARGET_CHUNK_TIME_MS * 0.5:
                     # Too fast, increase batch size for efficiency
                     new_size = min(int(current_batch_size * 1.5), MAX_BATCH_SIZE)
                     if new_size != current_batch_size:
-                        sys.stderr.write(f"Increasing batch size: {current_batch_size} -> {new_size} (avg {avg_time:.0f}ms)\n")
+                        sys.stderr.write(
+                            f"Increasing batch size: {current_batch_size} -> {new_size} (avg {avg_time:.0f}ms)\n"
+                        )
                         sys.stderr.flush()
                         current_batch_size = new_size
                 elif avg_time > TARGET_CHUNK_TIME_MS * 1.5:
                     # Too slow, decrease batch size for responsiveness
                     new_size = max(int(current_batch_size * 0.7), MIN_BATCH_SIZE)
                     if new_size != current_batch_size:
-                        sys.stderr.write(f"Decreasing batch size: {current_batch_size} -> {new_size} (avg {avg_time:.0f}ms)\n")
+                        sys.stderr.write(
+                            f"Decreasing batch size: {current_batch_size} -> {new_size} (avg {avg_time:.0f}ms)\n"
+                        )
                         sys.stderr.flush()
                         current_batch_size = new_size
 
@@ -426,7 +483,7 @@ def main():
 
         # Try to load schemas from cache first
         schemas_list = load_cached_schemas()
-        
+
         if schemas_list:
             sys.stderr.write(f"Loaded {len(schemas_list)} schemas from cache\n")
             sys.stderr.flush()
@@ -450,7 +507,7 @@ def main():
             ]
             # Save to cache for next time
             save_schemas_to_cache(schemas_list)
-        
+
         sys.stderr.write(f"Sending completion: {len(schemas_list)} schemas\n")
         sys.stderr.flush()
         jprint({"type": "schemas", "schemas": schemas_list})
@@ -462,10 +519,11 @@ def main():
         return 0
     except Exception as e:
         import traceback
+
         error_details = traceback.format_exc()
         sys.stderr.write(f"ERROR in data loader:\n{error_details}\n")
         sys.stderr.flush()
-        jprint({"type": "error", "message": f"{type(e).__name__}: {str(e)}"})
+        jprint({"type": "error", "message": f"{type(e).__name__}: {e!s}"})
         return 1
 
 

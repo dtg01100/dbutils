@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-DB2 Database Health Check Tool
+"""DB2 Database Health Check Tool
 
 Analyze database health, performance metrics, and potential issues.
 
@@ -30,7 +29,7 @@ def check_database_health() -> Dict:
     # Get basic database info
     try:
         db_info = query_runner(
-            "SELECT SERVICE_LEVEL, FIXPACK_NUM, DB_NAME FROM TABLE(SYSPROC.ENV_GET_INST_INFO()) AS T"
+            "SELECT SERVICE_LEVEL, FIXPACK_NUM, DB_NAME FROM TABLE(SYSPROC.ENV_GET_INST_INFO()) AS T",
         )
         if db_info:
             health_report["summary"]["db_version"] = (
@@ -76,8 +75,9 @@ def check_database_health() -> Dict:
     # Check for fragmented indexes
     try:
         # Note: IBM i indexes don't have NLEAF/NLEVELS like LUW
-        # Using basic index info instead
-        all_indexes = catalog.get_indexes()
+        # Using basic index info instead - we intentionally do not iterate
+        # over all indexes here to avoid unnecessary work in the health check.
+        _ = catalog.get_indexes()
 
         # For IBM i, we can't easily detect fragmentation, so skip this check
         fragmented_indexes = []
@@ -165,14 +165,14 @@ def check_schema_health(schema_name: str) -> Dict:
                 schema_report["warnings"].append(f"Table {table_name} has 0 rows (might be unused)")
             elif table_data["row_count"] > 1000000:
                 schema_report["recommendations"].append(
-                    f"Table {table_name} has {table_data['row_count']} rows, consider partitioning"
+                    f"Table {table_name} has {table_data['row_count']} rows, consider partitioning",
                 )
 
             if table_data["last_stats"] is None:
                 schema_report["warnings"].append(f"Table {table_name} has no statistics")
 
     except Exception as e:
-        schema_report["warnings"].append(f"Could not analyze schema {schema_name}: {str(e)}")
+        schema_report["warnings"].append(f"Could not analyze schema {schema_name}: {e!s}")
 
     return schema_report
 
@@ -196,7 +196,8 @@ def main():
         output = format_text_output(results, args.schema is not None)
 
     if args.output:
-        with open(args.output, "w") as f:
+        # Explicitly set encoding to avoid platform differences
+        with open(args.output, "w", encoding="utf-8") as f:
             f.write(output)
     else:
         print(output)

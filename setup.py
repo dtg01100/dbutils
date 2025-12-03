@@ -1,8 +1,7 @@
 """Setup configuration for Cython extensions."""
 
-from setuptools import setup, Extension
 from Cython.Build import cythonize
-import os
+from setuptools import Extension, setup
 
 # Define Cython extensions
 extensions = [
@@ -11,7 +10,7 @@ extensions = [
         ["src/dbutils/fast_ops.pyx"],
         extra_compile_args=["-O3", "-march=native"],
         language="c",
-    )
+    ),
 ]
 
 setup(

@@ -17,7 +17,7 @@ from dbutils.db_relate import (
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     parser = argparse.ArgumentParser(
-        description="List inferred relationships with heuristic scores (no data sampling)."
+        description="List inferred relationships with heuristic scores (no data sampling).",
     )
     parser.add_argument("--mock", action="store_true", help="Use mock catalog data")
     parser.add_argument(
@@ -83,8 +83,8 @@ def main():
                     str(r.get("REFTABNAME", "")).ljust(widths["REFTABNAME"]),
                     str(r.get("REFCOLNAME", "")).ljust(widths["REFCOLNAME"]),
                     str(r.get("score", "")).ljust(widths["SCORE"]),
-                ]
-            )
+                ],
+            ),
         )
 
 

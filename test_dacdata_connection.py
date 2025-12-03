@@ -16,7 +16,7 @@ def query_runner(sql: str):
         temp_file = f.name
 
     try:
-        result = subprocess.run(["query_runner", "-t", "db2", temp_file], capture_output=True, text=True)
+        result = subprocess.run(["query_runner", "-t", "db2", temp_file], check=False, capture_output=True, text=True)
         print(f"Return code: {result.returncode}")
         print(f"STDOUT:\n{result.stdout[:500]}")
         if result.stderr:

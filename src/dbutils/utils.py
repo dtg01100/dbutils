@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Shared utilities for dbutils modules.
+"""Shared utilities for dbutils modules.
 
 - query_runner: Execute SQL using external `query_runner` tool, parse JSON or delimited text
 - edit_distance, fuzzy_match: Optimized fuzzy matching helpers inspired by db_browser
@@ -29,7 +28,7 @@ def query_runner(sql: str) -> List[Dict]:
         temp_file = f.name
 
     try:
-        result = subprocess.run(["query_runner", "-t", "db2", temp_file], capture_output=True, text=True)
+        result = subprocess.run(["query_runner", "-t", "db2", temp_file], check=False, capture_output=True, text=True)
         if result.returncode != 0:
             raise RuntimeError(f"query_runner failed: {result.stderr}")
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Quick demo of C extensions performance."""
 
-from dbutils.accelerated import fast_search_tables, fast_search_columns
-from dbutils.db_browser import TableInfo, ColumnInfo
+from dbutils.accelerated import fast_search_columns, fast_search_tables
+from dbutils.db_browser import ColumnInfo, TableInfo
 
 # Sample data
 tables = [

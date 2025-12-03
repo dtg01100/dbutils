@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-DB2 Data Search Tool
+"""DB2 Data Search Tool
 
 Search for values across multiple tables and columns in a DB2 database.
 
@@ -52,7 +51,11 @@ def get_columns(table_name: str, schema: str) -> List[Dict]:
 
 
 def search_in_table(
-    table_schema: str, table_name: str, columns: List[Dict], search_term: str, max_results: int = 10
+    table_schema: str,
+    table_name: str,
+    columns: List[Dict],
+    search_term: str,
+    max_results: int = 10,
 ) -> List[Dict]:
     """Search for a term in a specific table."""
     results = []
@@ -103,7 +106,10 @@ def search_in_table(
 
 
 def search_data(
-    search_term: str, schema: Optional[str] = None, max_results: int = 10, max_tables: Optional[int] = None
+    search_term: str,
+    schema: Optional[str] = None,
+    max_results: int = 10,
+    max_tables: Optional[int] = None,
 ) -> List[Dict]:
     """Search for a term across all accessible tables."""
     all_results = []
@@ -148,24 +154,26 @@ def main():
     args = parser.parse_args()
 
     results = search_data(
-        args.search_term, schema=args.schema, max_results=args.max_results, max_tables=args.max_tables
+        args.search_term,
+        schema=args.schema,
+        max_results=args.max_results,
+        max_tables=args.max_tables,
     )
 
     if args.format == "json":
         output = json.dumps(results, indent=2)
-    else:  # csv format
-        if results:
-            import io
+    elif results:
+        import io
 
-            output_io = io.StringIO()
-            fieldnames = list(results[0].keys()) if results else ["TABLE_SCHEMA", "TABLE_NAME", "SEARCH_RESULT"]
-            writer = csv.DictWriter(output_io, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(results)
-            output = output_io.getvalue()
-            output_io.close()
-        else:
-            output = "No results found\n"
+        output_io = io.StringIO()
+        fieldnames = list(results[0].keys()) if results else ["TABLE_SCHEMA", "TABLE_NAME", "SEARCH_RESULT"]
+        writer = csv.DictWriter(output_io, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(results)
+        output = output_io.getvalue()
+        output_io.close()
+    else:
+        output = "No results found\n"
 
     if args.output:
         with open(args.output, "w") as f:

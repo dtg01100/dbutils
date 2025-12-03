@@ -26,7 +26,13 @@ def query_runner(sql: str) -> List[Dict]:
         temp_file = f.name
 
     try:
-        result = subprocess.run(["query_runner", "-t", "db2", temp_file], capture_output=True, text=True, timeout=60)
+        result = subprocess.run(
+            ["query_runner", "-t", "db2", temp_file],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
 
         if result.returncode != 0:
             print(f"Query failed: {result.stderr}")
@@ -57,9 +63,13 @@ def test_lazy_loading():
     print("\n1. Loading first 10 tables...")
     start_time = time.time()
     tables1, columns1 = get_all_tables_and_columns(
-        schema_filter=None, use_mock=False, use_cache=False, limit=10, offset=0
+        schema_filter=None,
+        use_mock=False,
+        use_cache=False,
+        limit=10,
+        offset=0,
     )
-    load_time1 = time.time() - start_time
+    _load_time1 = time.time() - start_time
     print(".2f")
     print(f"   Loaded {len(tables1)} tables and {len(columns1)} columns")
 
@@ -67,9 +77,13 @@ def test_lazy_loading():
     print("\n2. Loading next 10 tables...")
     start_time = time.time()
     tables2, columns2 = get_all_tables_and_columns(
-        schema_filter=None, use_mock=False, use_cache=False, limit=10, offset=10
+        schema_filter=None,
+        use_mock=False,
+        use_cache=False,
+        limit=10,
+        offset=10,
     )
-    load_time2 = time.time() - start_time
+    _load_time2 = time.time() - start_time
     print(".2f")
     print(f"   Loaded {len(tables2)} tables and {len(columns2)} columns")
 
@@ -108,7 +122,7 @@ def test_query_optimization():
     schema_result = query_runner(schema_sql)
     if not schema_result:
         print("   No schemas found, skipping query optimization test")
-        return
+        return None
 
     test_schema = schema_result[0]["TABLE_SCHEMA"]
     print(f"   Using schema: {test_schema}")
@@ -116,9 +130,13 @@ def test_query_optimization():
     # Test optimized query (JOIN)
     start_time = time.time()
     tables, columns = get_all_tables_and_columns(
-        schema_filter=test_schema, use_mock=False, use_cache=False, limit=50, offset=0
+        schema_filter=test_schema,
+        use_mock=False,
+        use_cache=False,
+        limit=50,
+        offset=0,
     )
-    optimized_time = time.time() - start_time
+    _optimized_time = time.time() - start_time
 
     print(".2f")
     print(f"   Loaded {len(tables)} tables and {len(columns)} columns")
@@ -140,12 +158,16 @@ def test_search_indexing():
     # Load some test data
     print("\n1. Loading test data for search indexing...")
     tables, columns = get_all_tables_and_columns(
-        schema_filter=None, use_mock=False, use_cache=False, limit=100, offset=0
+        schema_filter=None,
+        use_mock=False,
+        use_cache=False,
+        limit=100,
+        offset=0,
     )
 
     if not tables:
         print("   No tables loaded, skipping search test")
-        return
+        return None
 
     print(f"   Loaded {len(tables)} tables and {len(columns)} columns")
 
@@ -154,7 +176,7 @@ def test_search_indexing():
     start_time = time.time()
     search_index = SearchIndex()
     search_index.build_index(tables, columns)
-    index_time = time.time() - start_time
+    _index_time = time.time() - start_time
     print(".2f")
 
     # Test search performance
@@ -167,7 +189,7 @@ def test_search_indexing():
 
         start_time = time.time()
         trie_results = search_index.search_tables(test_table_name)
-        trie_time = time.time() - start_time
+        _trie_time = time.time() - start_time
 
         print(".4f")
         print(f"   Found {len(trie_results)} matches")
@@ -179,7 +201,7 @@ def test_search_indexing():
 
         start_time = time.time()
         col_results = search_index.search_columns(test_col_name)
-        col_time = time.time() - start_time
+        _col_time = time.time() - start_time
 
         print(".4f")
         print(f"   Found {len(col_results)} matches")
@@ -198,12 +220,16 @@ def test_memory_optimization():
     # Load data and check string interning
     print("\n1. Testing string interning...")
     tables, columns = get_all_tables_and_columns(
-        schema_filter=None, use_mock=False, use_cache=False, limit=50, offset=0
+        schema_filter=None,
+        use_mock=False,
+        use_cache=False,
+        limit=50,
+        offset=0,
     )
 
     if not tables:
         print("   No data loaded, skipping memory test")
-        return
+        return None
 
     # Check that strings are properly interned
     schema_strings = {t.schema for t in tables}
@@ -231,14 +257,22 @@ def test_caching():
     # First query (should cache)
     start_time = time.time()
     tables1, columns1 = get_all_tables_and_columns(
-        schema_filter=None, use_mock=False, use_cache=True, limit=20, offset=0
+        schema_filter=None,
+        use_mock=False,
+        use_cache=True,
+        limit=20,
+        offset=0,
     )
     first_query_time = time.time() - start_time
 
     # Second query (should use cache)
     start_time = time.time()
     tables2, columns2 = get_all_tables_and_columns(
-        schema_filter=None, use_mock=False, use_cache=True, limit=20, offset=0
+        schema_filter=None,
+        use_mock=False,
+        use_cache=True,
+        limit=20,
+        offset=0,
     )
     second_query_time = time.time() - start_time
 

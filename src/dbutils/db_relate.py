@@ -46,8 +46,8 @@ def query_runner(sql):
             data = list(reader)
             logging.info("Successfully parsed tab-separated response with %s rows", len(data))
             return data
-    except Exception as e:  # noqa: BLE001 - broad to wrap subprocess/parse errors
-        logging.error("Error running query: %s", e)
+    except Exception as e:
+        logging.exception("Error running query: %s", e)
         raise
     finally:
         try:
@@ -223,7 +223,7 @@ def infer_relationships(tables, columns, pks, use_mock=False):
                     "REFTABSCHEMA": fk["REFTABSCHEMA"],
                     "REFTABNAME": fk["REFTABNAME"],
                     "REFCOLNAME": fk["REFCOLNAME"],
-                }
+                },
             )
     except Exception:
         # If we can't get actual foreign keys, fall back to inference methods
@@ -262,7 +262,7 @@ def infer_relationships(tables, columns, pks, use_mock=False):
                                         "REFTABSCHEMA": pk["TABSCHEMA"],
                                         "REFTABNAME": pk["TABNAME"],
                                         "REFCOLNAME": pk["COLNAME"],
-                                    }
+                                    },
                                 )
                                 break  # Only one per col
                 # Fallback to naming heuristics
@@ -284,7 +284,7 @@ def infer_relationships(tables, columns, pks, use_mock=False):
                                     "REFTABSCHEMA": pk["TABSCHEMA"],
                                     "REFTABNAME": pk["TABNAME"],
                                     "REFCOLNAME": pk_col,
-                                }
+                                },
                             )
     return relationships
 
@@ -311,7 +311,7 @@ def score_relationships(relationships, columns, pks):
         child_key = (rel["TABSCHEMA"], rel["TABNAME"], rel["COLNAME"])
         parent_key = (rel["REFTABSCHEMA"], rel["REFTABNAME"], rel["REFCOLNAME"])
         child_col = col_map.get(child_key, {})
-        parent_col = col_map.get(parent_key, {})
+        # parent_col not needed directly; remove to satisfy linters
         parent_pk_type = pk_types.get(parent_key)
         child_type = child_col.get("TYPENAME")
 
@@ -550,7 +550,7 @@ def main():
             print("No path found")
 
     except Exception as e:
-        logging.error("An error occurred during processing: %s", e)
+        logging.exception("An error occurred during processing: %s", e)
         raise
 
 

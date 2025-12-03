@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-Performance comparison between pure Python and Cython-accelerated implementations.
-"""
+"""Performance comparison between pure Python and Cython-accelerated implementations."""
 
 import sys
 import time
@@ -23,8 +21,10 @@ def create_test_data(num_tables=1000, num_columns_per_table=20):
         table_name = f"TABLE_{i:04d}"
         tables.append(
             TableInfo(
-                schema=schema_name, name=table_name, remarks=f"Test table {i} with some additional descriptive text"
-            )
+                schema=schema_name,
+                name=table_name,
+                remarks=f"Test table {i} with some additional descriptive text",
+            ),
         )
 
         for j in range(num_columns_per_table):
@@ -38,7 +38,7 @@ def create_test_data(num_tables=1000, num_columns_per_table=20):
                     scale=0,
                     nulls="Y",
                     remarks=f"Test column {j} with description",
-                )
+                ),
             )
 
     return tables, columns
@@ -116,7 +116,7 @@ def benchmark_string_operations():
 
     # Test word splitting
     start_time = time.time()
-    words = [s.split() for s in normalized]
+    _words = [s.split() for s in normalized]
     split_time = time.time() - start_time
     print(".6f")
 
@@ -143,8 +143,8 @@ def main():
         return
 
     # Run benchmarks
-    search_results = benchmark_search_index()
-    string_results = benchmark_string_operations()
+    _search_results = benchmark_search_index()
+    _string_results = benchmark_string_operations()
 
     # Summary
     print("\n" + "=" * 60)

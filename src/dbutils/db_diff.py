@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-DB2 Schema Comparison Tool
+"""DB2 Schema Comparison Tool
 
 Compare table schemas between different schemas or databases using query_runner.
 

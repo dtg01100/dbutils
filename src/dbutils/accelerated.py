@@ -1,5 +1,4 @@
-"""
-Fast operations module with Cython acceleration.
+"""Fast operations module with Cython acceleration.
 
 This module provides high-performance implementations of performance-critical
 operations using Cython. If the Cython extensions are not available, it falls
@@ -65,8 +64,7 @@ except ImportError:
 
 
 class AcceleratedSearchIndex:
-    """
-    Search index that uses Cython acceleration when available.
+    """Search index that uses Cython acceleration when available.
 
     This class provides the same interface as the pure Python SearchIndex
     but uses optimized Cython implementations for better performance.

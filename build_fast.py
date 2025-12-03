@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Build script for Cython extensions in dbutils.
+"""Build script for Cython extensions in dbutils.
 
 This script compiles the performance-critical Cython modules for better performance.
 """
@@ -50,7 +49,7 @@ def build_cython_extensions():
         ]
 
         print(f"Running: {' '.join(cmd)}")
-        result = subprocess.run(cmd, cwd=Path.cwd(), capture_output=True, text=True)
+        result = subprocess.run(cmd, check=False, cwd=Path.cwd(), capture_output=True, text=True)
 
         if result.returncode == 0:
             print("✓ Cython extensions built successfully")

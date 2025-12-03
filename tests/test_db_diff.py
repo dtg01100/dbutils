@@ -12,9 +12,9 @@ def test_format_text_output():
             "added_columns": [{"COLNAME": "NEW_COL", "TYPENAME": "VARCHAR"}],
             "removed_columns": [{"COLNAME": "OLD_COL", "TYPENAME": "INTEGER"}],
             "modified_columns": [
-                {"column_name": "MOD_COL", "differences": {"TYPENAME": {"source": "INTEGER", "target": "VARCHAR"}}}
+                {"column_name": "MOD_COL", "differences": {"TYPENAME": {"source": "INTEGER", "target": "VARCHAR"}}},
             ],
-        }
+        },
     ]
 
     output = format_text_output(mock_results)

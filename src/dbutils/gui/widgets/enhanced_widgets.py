@@ -1,36 +1,34 @@
-"""
-Custom Qt widgets for enhanced database browser interface.
-"""
+"""Custom Qt widgets for enhanced database browser interface."""
 
 try:
+    from PySide6.QtCore import QEasingCurve, QEvent, QObject, QPoint, QPropertyAnimation, QRect, Qt, QTimer
+    from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPalette, QPen
     from PySide6.QtWidgets import (
-        QWidget,
-        QVBoxLayout,
+        QFrame,
+        QGraphicsOpacityEffect,
         QHBoxLayout,
         QLabel,
         QPushButton,
-        QFrame,
         QSizePolicy,
-        QGraphicsOpacityEffect,
+        QVBoxLayout,
+        QWidget,
     )
-    from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect, QObject, QEvent, QPoint
-    from PySide6.QtGui import QFont, QColor, QPalette, QPainter, QBrush, QPen
 
     QT_AVAILABLE = True
 except ImportError:
     try:
+        from PyQt6.QtCore import QEasingCurve, QEvent, QObject, QPoint, QPropertyAnimation, QRect, Qt, QTimer
+        from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPalette, QPen
         from PyQt6.QtWidgets import (
-            QWidget,
-            QVBoxLayout,
+            QFrame,
+            QGraphicsOpacityEffect,
             QHBoxLayout,
             QLabel,
             QPushButton,
-            QFrame,
             QSizePolicy,
-            QGraphicsOpacityEffect,
+            QVBoxLayout,
+            QWidget,
         )
-        from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect, QObject, QEvent, QPoint
-        from PyQt6.QtGui import QFont, QColor, QPalette, QPainter, QBrush, QPen
 
         QT_AVAILABLE = True
     except ImportError:
@@ -38,6 +36,7 @@ except ImportError:
 
 # Provide minimal stubs when Qt is not available so imports during tests don't fail
 if not QT_AVAILABLE:
+
     class _Dummy:
         def __getattr__(self, name):
             return 0
@@ -71,14 +70,17 @@ if not QT_AVAILABLE:
     class QFont:  # type: ignore
         def setPointSize(self, *args, **kwargs):
             pass
+
         def setBold(self, *args, **kwargs):
             pass
 
     class QColor:  # type: ignore
         def __init__(self, *args, **kwargs):
             pass
+
         def name(self):
             return "#000000"
+
         def lighter(self, *args, **kwargs):
             return self
 
@@ -88,18 +90,25 @@ if not QT_AVAILABLE:
     class QPainter:  # type: ignore
         def setRenderHint(self, *args, **kwargs):
             pass
+
         def fillRect(self, *args, **kwargs):
             pass
+
         def setPen(self, *args, **kwargs):
             pass
+
         def setBrush(self, *args, **kwargs):
             pass
+
         def drawArc(self, *args, **kwargs):
             pass
+
         def font(self):
             return QFont()
+
         def setFont(self, *args, **kwargs):
             pass
+
         def drawText(self, *args, **kwargs):
             pass
 
@@ -109,12 +118,14 @@ if not QT_AVAILABLE:
     class QPen:  # type: ignore
         def __init__(self, *args, **kwargs):
             pass
+
         def setCapStyle(self, *args, **kwargs):
             pass
 
     class QRect:  # type: ignore
         def __init__(self, *args, **kwargs):
             pass
+
         def moveCenter(self, *args, **kwargs):
             pass
 
@@ -125,30 +136,41 @@ if not QT_AVAILABLE:
     class QTimer:  # type: ignore
         def __init__(self, *args, **kwargs):
             pass
+
         def setInterval(self, *args, **kwargs):
             pass
+
         def timeout(self):
             return self
+
         def connect(self, *args, **kwargs):
             pass
+
         def start(self, *args, **kwargs):
             pass
+
         def stop(self):
             pass
 
     class QPropertyAnimation:  # type: ignore
         def __init__(self, *args, **kwargs):
             pass
+
         def setDuration(self, *args, **kwargs):
             pass
+
         def setStartValue(self, *args, **kwargs):
             pass
+
         def setEndValue(self, *args, **kwargs):
             pass
+
         def setEasingCurve(self, *args, **kwargs):
             pass
+
         def stop(self):
             pass
+
         def start(self):
             pass
 
@@ -169,15 +191,17 @@ if not QT_AVAILABLE:
             AlignCenter = 0
             AlignLeft = 0
             AlignVCenter = 0
+
         class BrushStyle:
             NoBrush = 0
+
         class PenCapStyle:
             RoundCap = 0
+
         class WidgetAttribute:
             WA_NoSystemBackground = 0
             WA_StyledBackground = 0
             WA_TransparentForMouseEvents = 0
-
 
 
 class StatusIndicator(QWidget):
@@ -667,4 +691,3 @@ class BusyOverlay(QWidget):
             text_rect = QRect(0, 0, self.width(), 30)
             text_rect.moveCenter(center + QPoint(0, radius + 10))
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, self._message)
-

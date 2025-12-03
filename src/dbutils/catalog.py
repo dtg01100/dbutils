@@ -1,5 +1,4 @@
-"""
-Catalog query abstraction for IBM i (DB2 for i) via QSYS2.
+"""Catalog query abstraction for IBM i (DB2 for i) via QSYS2.
 
 All queries return normalized dictionaries with consistent field names:
 - TABSCHEMA, TABNAME for tables
@@ -16,8 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_tables(schema: Optional[str] = None, mock: bool = False) -> List[Dict[str, Any]]:
-    """
-    Get all tables from QSYS2.SYSTABLES for IBM i.
+    """Get all tables from QSYS2.SYSTABLES for IBM i.
 
     Args:
         schema: Optional schema filter (e.g., 'MYSCHEMA')
@@ -25,6 +23,7 @@ def get_tables(schema: Optional[str] = None, mock: bool = False) -> List[Dict[st
 
     Returns:
         List of dicts with keys: TABSCHEMA, TABNAME, TYPE, REMARKS
+
     """
     if mock:
         return [
@@ -39,7 +38,7 @@ def get_tables(schema: Optional[str] = None, mock: bool = False) -> List[Dict[st
     where_clause = "WHERE " + " AND ".join(where_parts)
 
     sql = f"""
-        SELECT 
+        SELECT
             TABLE_SCHEMA AS TABSCHEMA,
             TABLE_NAME AS TABNAME,
             TABLE_TYPE AS TYPE,
@@ -64,8 +63,7 @@ def get_all_tables_and_columns(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """
-    Get both tables and columns in a single call.
+    """Get both tables and columns in a single call.
 
     This is a convenience function that combines get_tables() and get_columns()
     to avoid multiple database queries.
@@ -79,6 +77,7 @@ def get_all_tables_and_columns(
 
     Returns:
         Tuple of (tables, columns)
+
     """
     from .db_browser import get_all_tables_and_columns as browser_func
 
@@ -86,8 +85,7 @@ def get_all_tables_and_columns(
 
 
 def get_columns(schema: Optional[str] = None, table: Optional[str] = None, mock: bool = False) -> List[Dict[str, Any]]:
-    """
-    Get column metadata from QSYS2.SYSCOLUMNS for IBM i.
+    """Get column metadata from QSYS2.SYSCOLUMNS for IBM i.
 
     Args:
         schema: Optional schema filter
@@ -95,7 +93,11 @@ def get_columns(schema: Optional[str] = None, table: Optional[str] = None, mock:
         mock: Return mock data if True
 
     Returns:
-        List of dicts with keys: TABSCHEMA, TABNAME, COLNAME, DATA_TYPE, LENGTH, SCALE, ORDINAL_POSITION, REMARKS, IS_NULLABLE
+        List of dicts with keys including:
+            - TABSCHEMA, TABNAME
+            - COLNAME, DATA_TYPE, LENGTH, SCALE
+            - ORDINAL_POSITION, REMARKS, IS_NULLABLE
+
     """
     if mock:
         return [
@@ -176,7 +178,7 @@ def get_columns(schema: Optional[str] = None, table: Optional[str] = None, mock:
     where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
 
     sql = f"""
-        SELECT 
+        SELECT
             TABLE_SCHEMA AS TABSCHEMA,
             TABLE_NAME AS TABNAME,
             COLUMN_NAME AS COLNAME,
@@ -200,8 +202,7 @@ def get_columns(schema: Optional[str] = None, table: Optional[str] = None, mock:
 
 
 def get_primary_keys(schema: Optional[str] = None, mock: bool = False) -> List[Dict[str, Any]]:
-    """
-    Get primary key constraints from QSYS2.SYSCST and QSYS2.SYSCSTCOL for IBM i.
+    """Get primary key constraints from QSYS2.SYSCST and QSYS2.SYSCSTCOL for IBM i.
 
     Args:
         schema: Optional schema filter
@@ -209,6 +210,7 @@ def get_primary_keys(schema: Optional[str] = None, mock: bool = False) -> List[D
 
     Returns:
         List of dicts with keys: TABSCHEMA, TABNAME, COLNAME, CONSTRAINT_NAME
+
     """
     if mock:
         return [
@@ -220,13 +222,13 @@ def get_primary_keys(schema: Optional[str] = None, mock: bool = False) -> List[D
     where_clause = f"WHERE cst.CONSTRAINT_SCHEMA = '{schema}'" if schema else ""
 
     sql = f"""
-        SELECT 
+        SELECT
             cst.TABLE_SCHEMA AS TABSCHEMA,
             cst.TABLE_NAME AS TABNAME,
             col.COLUMN_NAME AS COLNAME,
             cst.CONSTRAINT_NAME
         FROM QSYS2.SYSCST cst
-        JOIN QSYS2.SYSCSTCOL col 
+        JOIN QSYS2.SYSCSTCOL col
             ON cst.CONSTRAINT_SCHEMA = col.CONSTRAINT_SCHEMA
             AND cst.CONSTRAINT_NAME = col.CONSTRAINT_NAME
         {where_clause}
@@ -243,8 +245,7 @@ def get_primary_keys(schema: Optional[str] = None, mock: bool = False) -> List[D
 
 
 def get_indexes(schema: Optional[str] = None, table: Optional[str] = None, mock: bool = False) -> List[Dict[str, Any]]:
-    """
-    Get index metadata from QSYS2.SYSINDEXES for IBM i.
+    """Get index metadata from QSYS2.SYSINDEXES for IBM i.
 
     Args:
         schema: Optional schema filter
@@ -253,6 +254,7 @@ def get_indexes(schema: Optional[str] = None, table: Optional[str] = None, mock:
 
     Returns:
         List of dicts with keys: TABSCHEMA, TABNAME, INDEX_SCHEMA, INDEX_NAME, COLUMN_NAME, IS_UNIQUE, ORDINAL_POSITION
+
     """
     if mock:
         return [
@@ -285,7 +287,7 @@ def get_indexes(schema: Optional[str] = None, table: Optional[str] = None, mock:
     where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
 
     sql = f"""
-        SELECT 
+        SELECT
             idx.TABLE_SCHEMA AS TABSCHEMA,
             idx.TABLE_NAME AS TABNAME,
             idx.INDEX_SCHEMA,
@@ -310,8 +312,7 @@ def get_indexes(schema: Optional[str] = None, table: Optional[str] = None, mock:
 
 
 def get_table_sizes(schema: Optional[str] = None, mock: bool = False) -> List[Dict[str, Any]]:
-    """
-    Get table size information from QSYS2.SYSTABLESTAT for IBM i.
+    """Get table size information from QSYS2.SYSTABLESTAT for IBM i.
 
     Args:
         schema: Optional schema filter
@@ -319,6 +320,7 @@ def get_table_sizes(schema: Optional[str] = None, mock: bool = False) -> List[Di
 
     Returns:
         List of dicts with keys: TABSCHEMA, TABNAME, ROWCOUNT, DATA_SIZE
+
     """
     if mock:
         return [
@@ -329,7 +331,7 @@ def get_table_sizes(schema: Optional[str] = None, mock: bool = False) -> List[Di
     where_clause = f"WHERE TABLE_SCHEMA = '{schema}'" if schema else ""
 
     sql = f"""
-        SELECT 
+        SELECT
             TABLE_SCHEMA AS TABSCHEMA,
             TABLE_NAME AS TABNAME,
             COALESCE(NUMBER_ROWS, 0) AS ROWCOUNT,
@@ -348,8 +350,7 @@ def get_table_sizes(schema: Optional[str] = None, mock: bool = False) -> List[Di
 
 
 def get_foreign_keys(schema: Optional[str] = None, mock: bool = False) -> List[Dict[str, Any]]:
-    """
-    Get foreign key relationships from QSYS2.SYSREFCST for IBM i.
+    """Get foreign key relationships from QSYS2.SYSREFCST for IBM i.
 
     Args:
         schema: Optional schema filter
@@ -357,6 +358,7 @@ def get_foreign_keys(schema: Optional[str] = None, mock: bool = False) -> List[D
 
     Returns:
         List of dicts with keys: FK_SCHEMA, FK_TABLE, FK_COLUMN, PK_SCHEMA, PK_TABLE, PK_COLUMN, CONSTRAINT_NAME
+
     """
     if mock:
         return []
@@ -364,7 +366,7 @@ def get_foreign_keys(schema: Optional[str] = None, mock: bool = False) -> List[D
     where_clause = f"WHERE ref.CONSTRAINT_SCHEMA = '{schema}'" if schema else ""
 
     sql = f"""
-        SELECT 
+        SELECT
             ref.CONSTRAINT_SCHEMA AS FK_SCHEMA,
             fkcst.TABLE_NAME AS FK_TABLE,
             fkcol.COLUMN_NAME AS FK_COLUMN,

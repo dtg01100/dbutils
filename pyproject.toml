@@ -8,6 +8,8 @@ dependencies = [
     "rich>=13.0.0",
     "textual>=6.6.0",
     "PySide6>=6.5.0",
+    "JPype1>=1.5.0",
+    "JayDeBeApi>=1.2.3",
 ]
 
 [build-system]
@@ -23,7 +25,9 @@ build-backend = "setuptools.build_meta"
       "ruff>=0.1.0",
       "pytest>=7.0.0",
       "PySide6>=6.5.0",
-      "PyQt6>=6.5.0"
+      "PyQt6>=6.5.0",
+      "JPype1>=1.5.0",
+      "JayDeBeApi>=1.2.3"
   ]
   cython = [
       "cython>=3.0.0",

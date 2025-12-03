@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""Mock query_runner that uses SQLite for testing."""
+
+import json
+import csv
+import io
+import sqlite3
+import sys
+import os
+from pathlib import Path
+
+def main():
+    if len(sys.argv) < 3 or sys.argv[1] != "-t":
+        print("Usage: query_runner -t db2 <sql_file>", file=sys.stderr)
+        sys.exit(1)
+    
+    db_type = sys.argv[2]
+    sql_file = sys.argv[3]
+    
+    # Use our test database if it exists, otherwise create a simple in-memory one
+    db_path = "test_sample.db"
+    if not os.path.exists(db_path):
+        # Create a simple in-memory database with basic tables
+        conn = sqlite3.connect(":memory:")
+        cursor = conn.cursor()
+        
+        # Create basic tables for testing
+        cursor.execute("""
+            CREATE TABLE customers (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT
+            )
+        """)
+        
+        cursor.execute("""
+            CREATE TABLE orders (
+                id INTEGER PRIMARY KEY,
+                customer_id INTEGER,
+                total_amount REAL
+            )
+        """)
+        
+        # Insert sample data
+        cursor.execute("INSERT INTO customers (name, email) VALUES (?, ?)", ("John Doe", "john@example.com"))
+        cursor.execute("INSERT INTO customers (name, email) VALUES (?, ?)", ("Jane Smith", "jane@example.com"))
+        cursor.execute("INSERT INTO orders (customer_id, total_amount) VALUES (?, ?)", (1, 100.0))
+        cursor.execute("INSERT INTO orders (customer_id, total_amount) VALUES (?, ?)", (2, 50.0))
+        
+        conn.commit()
+    else:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+    
+    try:
+        # Read SQL from file
+        with open(sql_file, 'r') as f:
+            sql = f.read().strip()
+        
+        # Handle different database types
+        if db_type == "db2":
+            # Convert DB2 catalog queries to SQLite equivalent
+            if "QSYS2.SYSTABLES" in sql:
+                # Convert DB2 table catalog query to SQLite
+                if "TABLE_SCHEMA" in sql and "TABLE_NAME" in sql:
+                    sql = """
+                    SELECT 
+                        'main' as TABLE_SCHEMA,
+                        name as TABLE_NAME,
+                        'T' as TABLE_TYPE,
+                        'N' as SYSTEM_TABLE,
+                        '' as TABLE_TEXT
+                    FROM sqlite_master 
+                    WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+                    """
+                elif "TABLE_SCHEMA" in sql:
+                    sql = """
+                    SELECT 1 FROM sqlite_master 
+                    WHERE type = 'table' AND name NOT LIKE 'sqlite_%' 
+                    LIMIT 1
+                    """
+                else:
+                    sql = "SELECT name FROM sqlite_master WHERE type = 'table'"
+            
+            elif "QSYS2.SYSCOLUMNS" in sql or "SYSCAT.COLUMNS" in sql:
+                # Convert DB2 column catalog query to SQLite
+                sql = """
+                SELECT 
+                    'main' as TABLE_SCHEMA,
+                    name as TABLE_NAME,
+                    cid as COLUMN_NAME,
+                    upper(type) as DATA_TYPE,
+                    CASE WHEN type LIKE '%NOT NULL%' THEN 'N' ELSE 'Y' END as NULLS,
+                    cid as ORDINAL_POSITION,
+                    '' as COLUMN_TEXT,
+                    CASE WHEN type LIKE '%PRIMARY KEY%' THEN 'YES' ELSE 'NO' END as IS_IDENTITY
+                FROM pragma_table_info(name)
+                """
+            
+            # Convert some basic DB2 syntax to SQLite
+            sql = sql.replace("CURRENT TIMESTAMP", "datetime('now')")
+            sql = sql.replace("SYSIBM.SYSDUMMY1", "sqlite_master")
+            sql = sql.replace("FETCH FIRST", "LIMIT")
+            sql = sql.replace("WITH UR", "")
+            sql = sql.replace("VARCHAR", "TEXT")
+            sql = sql.replace("DECIMAL", "REAL")
+            sql = sql.replace("INTEGER", "INTEGER")
+        
+        # Execute the query
+        cursor.execute(sql)
+        
+        # Get column names
+        columns = [description[0] for description in cursor.description] if cursor.description else []
+        
+        # Fetch all rows
+        rows = cursor.fetchall()
+        
+        # Convert to list of dictionaries
+        result = []
+        for row in rows:
+            result.append(dict(zip(columns, row)))
+        
+        # Output as JSON
+        print(json.dumps(result, default=str))
+        
+    except Exception as e:
+        print(f"Error executing query: {e}", file=sys.stderr)
+        sys.exit(1)
+    finally:
+        conn.close()
+
+if __name__ == "__main__":
+    main()

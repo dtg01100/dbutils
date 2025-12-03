@@ -35,3 +35,7 @@ Thumbs.db
 .cache/
 # dbutils schema cache files
 *.pkl
+
+# Jar Files
+jars/
+*.jar

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-DB2 Table Analysis Tool
+"""DB2 Table Analysis Tool
 
 Provides comprehensive analysis of table statistics, performance metrics,
 and recommendations for optimization.
@@ -59,7 +58,7 @@ def analyze_table(table_name: str, schema: Optional[str] = None) -> Dict:
                 "CONSTNAME": pk.get("CONSTRAINT_NAME"),
                 "TYPE": "PRIMARY KEY",
                 "COLNAME": pk.get("COLNAME"),
-            }
+            },
         )
 
     # Foreign keys
@@ -73,7 +72,7 @@ def analyze_table(table_name: str, schema: Optional[str] = None) -> Dict:
                 "COLNAME": fk.get("FKCOLUMN_NAME"),
                 "REFTABNAME": fk.get("PKTABLE_NAME"),
                 "REFCOLNAME": fk.get("PKCOLUMN_NAME"),
-            }
+            },
         )
 
     analysis["constraints"] = constraints

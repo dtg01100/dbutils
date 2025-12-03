@@ -11,8 +11,8 @@ def test_ohhst_table_path_and_search():
     assert t.schema.upper() == "DACDATA"
 
     # Search should find table by full name and partials
-    assert any("OHHST" == table.name for table in browser.filter_items(browser.tables, "ohhst"))
-    assert any("OHHST" == table.name for table in browser.filter_items(browser.tables, "ohh"))
+    assert any(table.name == "OHHST" for table in browser.filter_items(browser.tables, "ohhst"))
+    assert any(table.name == "OHHST" for table in browser.filter_items(browser.tables, "ohh"))
 
     # Search by description
-    assert any("OHHST" == table.name for table in browser.filter_items(browser.tables, "history"))
+    assert any(table.name == "OHHST" for table in browser.filter_items(browser.tables, "history"))

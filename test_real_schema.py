@@ -16,7 +16,13 @@ def query_runner(sql: str):
         temp_file = f.name
 
     try:
-        result = subprocess.run(["query_runner", "-t", "db2", temp_file], capture_output=True, text=True, timeout=30)
+        result = subprocess.run(
+            ["query_runner", "-t", "db2", temp_file],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
 
         if result.returncode != 0:
             print(f"Error: {result.stderr}")
@@ -103,7 +109,7 @@ print("\n" + "=" * 70)
 print("Test: List all schemas with their table counts")
 print("=" * 70)
 sql3 = """
-SELECT 
+SELECT
     TABLE_SCHEMA,
     COUNT(*) AS TABLE_COUNT
 FROM QSYS2.SYSTABLES
