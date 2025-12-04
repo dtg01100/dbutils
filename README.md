@@ -2,7 +2,7 @@
 
 Utilities to discover and reason about DB2 schemas and relationships.
 
-This repository provides a set of command-line utilities that help generate JOIN snippets, produce a JSON representation of your DB2 schema, and perform other database analysis tasks. They are intended to be run against a live DB2 instance via an external `query_runner` command that executes SQL and returns results. The tools are resilient to different DB2 catalog dialects (SYSCAT, QSYS2, SYSIBM) and to `query_runner` output formats (JSON, CSV, TSV).
+This repository provides a set of command-line utilities that help generate JOIN snippets, produce a JSON representation of your DB2 schema, and perform other database analysis tasks. They are intended to be run against a live DB2 instance via JDBC connections that execute SQL and return results. The tools are resilient to different DB2 catalog dialects (SYSCAT, QSYS2, SYSIBM) and work with any database accessible via JDBC drivers.
 
 IMPORTANT: These tools are designed to run against a real database. The `--mock` flags are provided for unit tests and local development only — avoid using mocks for production runs or integration tests.
 
@@ -22,7 +22,7 @@ The following scripts are available as command-line tools after installation:
 - `db-inferred-ref-coverage`: Show inferred relationship pairs with heuristic scores (no data scan).
 - `db-inferred-orphans`: Generate orphan-detection SQL for inferred relationships.
 
-All commands call an external `query_runner` binary on PATH. `query_runner` may return JSON, CSV, or tab-separated (TSV) output — `dbutils` will try to parse JSON first and fall back to delimited parsing and normalization.
+All commands use JDBC connections configured through environment variables. JDBC drivers can be configured for any database system — `dbutils` connects directly via JDBC without requiring external binaries.
 
 ## DB Browser Features
 
@@ -140,10 +140,10 @@ uvx . db-inferred-orphans --mock --json --min-score 0.4
 
 ## Troubleshooting
 
-- If a command fails with catalog errors, your DB2 environment likely exposes a different catalog schema. `dbutils` already tries several common catalog queries — check the output for `SQL Error` text from `query_runner` and confirm your `query_runner` works directly by running a sanity query:
+- If a command fails with catalog errors, your DB2 environment likely exposes a different catalog schema. `dbutils` already tries several common catalog queries — check the output for `JDBC Error` messages and confirm your JDBC connection works by running a sanity query:
 
   ```bash
-  python -c "from dbutils.map_db import query_runner; print(query_runner('SELECT 1 AS ONE FROM SYSIBM.SYSDUMMY1'))"
+  python -c "from dbutils.db_browser import query_runner; print(query_runner('SELECT 1 AS ONE FROM SYSIBM.SYSDUMMY1'))"
   ```
 
-- If `query_runner` returns tab-separated output (TSV), `dbutils` will detect it automatically. If your environment uses a different delimiter or encoding, wrap the SQL with a small wrapper that normalizes output to JSON or CSV.
+- If you encounter JDBC-specific issues, ensure your JDBC driver, URL, and credentials are properly configured through the environment variables.

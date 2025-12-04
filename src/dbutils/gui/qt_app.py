@@ -2093,7 +2093,7 @@ class QtDBBrowser(QMainWindow):
 
         def _open_providers():
             try:
-                from dbutils.gui.provider_config import ProviderConfigDialog
+                from dbutils.gui.provider_config_dialog import ProviderConfigDialog
 
                 dlg = ProviderConfigDialog(self)
                 dlg.exec()

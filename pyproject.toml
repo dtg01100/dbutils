@@ -1,12 +1,11 @@
 [project]
 name = "dbutils"
 version = "0.1.0"
-description = "DB2 relationship resolver"
+description = "Qt GUI Database Browser with JDBC support"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "rich>=13.0.0",
-    "textual>=6.6.0",
     "PySide6>=6.5.0",
     "JPype1>=1.5.0",
     "JayDeBeApi>=1.2.3",
@@ -35,18 +34,8 @@ build-backend = "setuptools.build_meta"
   ]
 
 [project.scripts]
-  db-relate = "dbutils.db_relate:main"
-  db-map = "dbutils.map_db:main"
-  db-analyze = "dbutils.db_analyze:main"
-  db-search = "dbutils.db_search:main"
-  db-diff = "dbutils.db_diff:main"
-  db-health = "dbutils.db_health:main"
   db-browser = "dbutils.main_launcher:main"
   db-browser-gui = "dbutils.gui.qt_app:main"
-  db-table-sizes = "dbutils.db_table_sizes:main"
-  db-indexes = "dbutils.db_indexes:main"
-  db-inferred-ref-coverage = "dbutils.db_inferred_ref_coverage:main"
-  db-inferred-orphans = "dbutils.db_inferred_orphans:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -79,12 +68,7 @@ select = [
     "E501",  # Allow long lines for SQL queries
     "C901"   # Allow complex function for relationship inference
 ]
-"src/dbutils/db_diff.py" = [
-    "C901"   # Allow complex function for table comparison
-]
-"src/dbutils/db_health.py" = [
-    "C901"   # Allow complex functions for health checks
-]
+# Removed references to db_diff.py and db_health.py which are no longer part of the source tree
 "src/dbutils/db_search.py" = [
     "E501"   # Allow long lines for SQL queries
 ]

@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This report provides a comprehensive analysis of the `query_runner` functionality and query validation infrastructure within the dbutils project. The project uses an external JDBC-based query runner for executing and validating SQL queries against DB2 databases.
+This report provides a comprehensive analysis of the JDBC-based query validation infrastructure within the dbutils project. The project now uses direct JDBC connections for executing and validating SQL queries against databases through JayDeBeApi and JPype1.
 
 ---
 
@@ -16,7 +16,7 @@ This report provides a comprehensive analysis of the `query_runner` functionalit
 
 ### 1.1 Overview
 
-The `query_runner` is an **external JDBC-based command-line tool** located at `/var/home/dlafreniere/bin/query_runner`. It is not part of the Python codebase but is invoked as a subprocess by all dbutils modules.
+The JDBC connection system is a **direct Python-to-JDBC integration** using JayDeBeApi and JPype1. It is implemented within the Python codebase and connects directly to databases without requiring external binaries.
 
 ### 1.2 Key Features
 
@@ -29,10 +29,21 @@ The `query_runner` is an **external JDBC-based command-line tool** located at `/
 
 ### 1.3 Command-Line Interface
 
-```bash
-query_runner [OPTIONS] [QUERY_FILE]
+```python
+import os
+from dbutils.jdbc_provider import connect
 
-Key Options:
+# Set environment variables
+os.environ["DBUTILS_JDBC_PROVIDER"] = "MyDB2Provider"
+os.environ["DBUTILS_JDBC_USER"] = "username"
+os.environ["DBUTILS_JDBC_PASSWORD"] = "password"
+
+# Connect directly via JDBC
+conn = connect("MyDB2Provider", {"host": "localhost", "port": 50000, "database": "SAMPLE"})
+results = conn.query("SELECT * FROM TABLE")
+```
+
+### 1.3 Key Features:
   -f, --format FORMAT     Output format: text, csv, json, pretty
   -t, --type TYPE         Database type (auto-detect if not specified)
   -h, --host HOST         Database host (overrides .env)
@@ -48,10 +59,10 @@ Key Options:
 
 ### 2.1 Validation Methods
 
-The query_runner provides **implicit validation** through:
+The JDBC provider system provides **validation** through:
 
 1. **Syntax Validation**: SQL syntax errors are caught by the JDBC driver
-2. **Connection Validation**: `--test-connection` flag tests database connectivity
+2. **Connection Validation**: Connection establishment validates database accessibility
 3. **Execution Validation**: Queries are executed against the live database
 4. **Error Reporting**: Returns detailed SQL error codes and messages
 
@@ -88,27 +99,36 @@ SQL Query → query_runner → JDBC Driver → DB2 Database
 
 ## 3. Python Integration
 
-### 3.1 Query Runner Wrapper Functions
+### 3.1 JDBC Query Functions
 
-All dbutils modules implement a `query_runner()` function that wraps the external tool. There are **two implementation patterns**:
+All dbutils modules implement a `query_runner()` function that connects directly via JDBC. There is **now a unified implementation pattern**:
 
-#### Pattern 1: Direct Input (map_db.py, db_relate.py)
-```python
-def query_runner(sql: str, runner_cmd: Optional[List[str]] = None):
-    cmd = runner_cmd or ["query_runner", "-t", "db2"]
-    result = subprocess.run(cmd, input=sql, text=True, capture_output=True)
-    # Parse JSON or CSV output
-```
-
-#### Pattern 2: Temporary File (db_analyze.py, db_health.py, db_search.py, db_diff.py, db_browser.py)
+#### JDBC Connection Pattern (used across all modules)
 ```python
 def query_runner(sql: str) -> List[Dict]:
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
-        f.write(sql)
-        temp_file = f.name
-    
-    result = subprocess.run(["query_runner", "-t", "db2", temp_file], ...)
-    # Parse and return results
+    """Execute SQL via JDBC and return rows as list[dict]."""
+    # JDBC path only - no fallback to external query runner
+    provider_name = os.environ.get("DBUTILS_JDBC_PROVIDER")
+    if not provider_name:
+        raise RuntimeError("DBUTILS_JDBC_PROVIDER environment variable not set")
+
+    try:
+        from dbutils.jdbc_provider import connect as _jdbc_connect
+
+        url_params_raw = os.environ.get("DBUTILS_JDBC_URL_PARAMS", "{}")
+        try:
+            url_params = json.loads(url_params_raw) if url_params_raw else {}
+        except Exception:
+            url_params = {}
+        user = os.environ.get("DBUTILS_JDBC_USER")
+        password = os.environ.get("DBUTILS_JDBC_PASSWORD")
+        conn = _jdbc_connect(provider_name, url_params, user=user, password=password)
+        try:
+            return conn.query(sql)
+        finally:
+            conn.close()
+    except Exception as e:
+        raise RuntimeError(f"JDBC query failed: {e}") from e
 ```
 
 ### 3.2 Output Parsing
@@ -253,7 +273,7 @@ The project uses **runtime validation** through:
 
 | Tool | Purpose | Validation Capability |
 |------|---------|----------------------|
-| `query_runner` | External JDBC executor | Syntax + execution validation |
+| JDBC Connection | Direct JDBC executor via JayDeBeApi | Syntax + execution validation |
 | `db-health` | Database health checks | Query performance validation |
 | `db-analyze` | Table analysis | Schema query validation |
 | `db-diff` | Schema comparison | Cross-schema query validation |
@@ -332,7 +352,7 @@ def test_analysis_structure():
 ### 8.2 Code Quality
 
 1. **Consistency**
-   - Standardize query_runner implementation (choose one pattern)
+   - All modules now use unified JDBC connection implementation
    - Unify error handling across all modules
    - Consistent logging for query execution
 
@@ -357,53 +377,72 @@ def test_analysis_structure():
 
 ## 9. Conclusion
 
-The dbutils project has a **robust query validation infrastructure** built around an external JDBC-based query_runner tool. Key findings:
+The dbutils project has a **robust query validation infrastructure** built around direct JDBC connections using JayDeBeApi. Key findings:
 
 ### Strengths:
-✅ External query_runner provides reliable SQL validation  
-✅ Multi-dialect support for different DB2 environments  
-✅ Comprehensive error reporting with SQL state codes  
+✅ JDBC connections provide reliable SQL validation
+✅ Multi-dialect support for different database environments
+✅ Comprehensive error reporting with SQL state codes
 ✅ Fallback mechanisms for catalog compatibility  
 ✅ Both SQL files validated successfully  
 
 ### Areas for Improvement:
-⚠️ Inconsistent query_runner wrapper implementations  
-⚠️ Limited pre-execution validation  
-⚠️ No centralized query catalog or documentation  
+⚠️ Consider JDBC connection pool optimization
+⚠️ Limited pre-execution validation
+⚠️ No centralized query catalog or documentation
 ⚠️ Test coverage focuses on structure, not execution  
 
 ### Overall Assessment:
-The query validation approach is **production-ready** with effective runtime validation through live database execution. The external query_runner tool provides comprehensive syntax and execution validation, making it suitable for validating both standalone SQL files and embedded queries in the Python codebase.
+The query validation approach is **production-ready** with effective runtime validation through live database execution. The JDBC connection system provides comprehensive syntax and execution validation, making it suitable for validating both standalone SQL files and embedded queries in the Python codebase.
 
 ---
 
-## Appendix A: Query Runner Command Reference
+## Appendix A: JDBC Connection Reference
 
 ### Basic Usage
-```bash
-# Validate SQL file
-query_runner -t db2 query.sql
+```python
+# Configure environment variables
+import os
+os.environ["DBUTILS_JDBC_PROVIDER"] = "MyDBProvider"
+os.environ["DBUTILS_JDBC_USER"] = "username"
+os.environ["DBUTILS_JDBC_PASSWORD"] = "password"
 
-# Test connection
-query_runner -t db2 --test-connection
+# Execute query directly via JDBC
+from dbutils.db_browser import query_runner
+results = query_runner("SELECT * FROM SYSCAT.TABLES")
 
-# JSON output
-query_runner -t db2 -f json query.sql
-
-# From stdin
-echo "SELECT 1 FROM SYSIBM.SYSDUMMY1" | query_runner -t db2
+# Results returned as list of dictionaries
+for row in results:
+    print(row["TABLE_NAME"])
 ```
 
 ### Python Integration
 ```python
-from dbutils.map_db import query_runner
+from dbutils.db_browser import query_runner
 
 # Execute query
 results = query_runner("SELECT * FROM SYSCAT.TABLES")
 
-# With custom command
-results = query_runner(sql, runner_cmd=["query_runner", "-t", "db2", "-f", "json"])
+# Results returned as list of dictionaries
+for row in results:
+    print(row["TABLE_NAME"])
 ```
+
+### Configuration
+
+Configuration is done via environment variables:
+- `DBUTILS_JDBC_PROVIDER` - Name of registered JDBC provider
+- `DBUTILS_JDBC_USER/PASSWORD` - Credentials (optional if configured in provider)
+- `DBUTILS_JDBC_URL_PARAMS` - Additional URL parameters as JSON (optional)
+
+### Error Handling
+
+| Code | Description | Action |
+|------|-------------|---------|
+| `JDBC_PROVIDER_NOT_SET` | DBUTILS_JDBC_PROVIDER environment variable missing | Set the environment variable to a valid provider |
+| `CONNECTION_FAILED` | Database connection failed | Check credentials and connectivity |
+| `INVALID_SQL` | SQL syntax error | Fix SQL query |
+| `JDBC_ERROR` | General JDBC error during execution | Check JDBC driver and database compatibility |
 
 ---
 

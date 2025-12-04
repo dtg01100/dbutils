@@ -16,70 +16,35 @@ import tempfile
 from typing import Dict, List
 
 
-def query_runner(sql: str, timeout: int = 30) -> List[Dict]:
-    """Run an external `query_runner` command and return parsed results.
+def query_runner(sql: str) -> List[Dict]:
+    """Execute SQL via JDBC and return rows as list[dict].
 
-    Tries JSON first; if not JSON, auto-detects TSV vs CSV by inspecting the header line.
-    Normalizes DictReader keys by stripping whitespace.
-    Added timeout parameter to prevent hanging queries.
+    This function now uses only JDBC provider via JayDeBeApi.
+    Requires DBUTILS_JDBC_PROVIDER environment variable to be set.
+    Optionally pass DBUTILS_JDBC_URL_PARAMS (JSON) and DBUTILS_JDBC_USER/PASSWORD.
     """
-    # Write SQL to a temp file to support larger queries and parity with other modules
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
-        f.write(sql)
-        temp_file = f.name
+    # JDBC path only - no fallback to external query runner
+    provider_name = os.environ.get("DBUTILS_JDBC_PROVIDER")
+    if not provider_name:
+        raise RuntimeError("DBUTILS_JDBC_PROVIDER environment variable not set")
 
     try:
-        # Use timeout to prevent hanging queries
-        result = subprocess.run(
-            ["query_runner", "-t", "db2", temp_file],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=timeout  # Add timeout to prevent blocking
-        )
-        if result.returncode != 0:
-            raise RuntimeError(f"query_runner failed: {result.stderr}")
+        from dbutils.jdbc_provider import connect as _jdbc_connect
 
-        stdout = result.stdout or ""
-        # Try JSON first
+        url_params_raw = os.environ.get("DBUTILS_JDBC_URL_PARAMS", "{}")
         try:
-            parsed = json.loads(stdout)
-            # Ensure we always return a list of dicts
-            if isinstance(parsed, list):
-                return parsed
-            if isinstance(parsed, dict):
-                return [parsed]
-            return []
-        except json.JSONDecodeError:
-            # Fallback: delimited text with header (TSV or CSV)
-            text = stdout.strip()
-            if not text:
-                return []
-            first_line = text.splitlines()[0]
-            delimiter = "\t" if "\t" in first_line else ","
-            reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
-            rows: List[Dict] = []
-            for r in reader:
-                if r is None:
-                    continue
-                # Normalize keys (strip whitespace)
-                normalized = {(k.strip() if isinstance(k, str) else k): v for k, v in r.items()}
-                rows.append(normalized)
-            return rows
-    except subprocess.TimeoutExpired:
-        # Clean up the temp file if timeout occurs
-        try:
-            os.unlink(temp_file)
+            url_params = json.loads(url_params_raw) if url_params_raw else {}
         except Exception:
-            pass
-        raise RuntimeError(f"query_runner timed out after {timeout} seconds")
-    finally:
+            url_params = {}
+        user = os.environ.get("DBUTILS_JDBC_USER")
+        password = os.environ.get("DBUTILS_JDBC_PASSWORD")
+        conn = _jdbc_connect(provider_name, url_params, user=user, password=password)
         try:
-            # Only try to delete if we haven't already (in timeout case)
-            if os.path.exists(temp_file):
-                os.unlink(temp_file)
-        except Exception:
-            pass
+            return conn.query(sql)
+        finally:
+            conn.close()
+    except Exception as e:
+        raise RuntimeError(f"JDBC query failed: {e}") from e
 
 
 def edit_distance(s1: str, s2: str) -> int:

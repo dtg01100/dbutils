@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""dbutils.db_browser - DB2 Schema Browser TUI
+"""dbutils.db_browser - DB2 Schema Browser Backend
 
-Interactive terminal UI for searching and browsing DB2 tables and columns.
-Provides a fzf-like search experience for database schemas.
+Core functionality for searching and browsing DB2 tables and columns.
+Provides data structures and methods used by the Qt GUI browser.
 """
 
 import argparse
@@ -239,77 +239,35 @@ class SearchIndex:
 
 
 def query_runner(sql: str, timeout: int = 30) -> List[Dict]:
-    """Execute SQL and return rows as list[dict].
+    """Execute SQL via JDBC and return rows as list[dict].
 
-    Priority:
-    1) If environment variable DBUTILS_JDBC_PROVIDER is set, use JDBC provider via JayDeBeApi.
-       Optionally pass DBUTILS_JDBC_URL_PARAMS (JSON) and DBUTILS_JDBC_USER/PASSWORD.
-    2) Otherwise, fall back to the external `query_runner` command (legacy) and parse output.
+    This function now uses only JDBC provider via JayDeBeApi.
+    Requires DBUTILS_JDBC_PROVIDER environment variable to be set.
+    Optionally pass DBUTILS_JDBC_URL_PARAMS (JSON) and DBUTILS_JDBC_USER/PASSWORD.
     Added timeout parameter to prevent hanging queries.
     """
-    # Attempt JDBC path first if configured
+    # JDBC path only - no fallback to external query runner
     provider_name = os.environ.get("DBUTILS_JDBC_PROVIDER")
-    if provider_name:
-        try:
-            from dbutils.jdbc_provider import connect as _jdbc_connect
-
-            url_params_raw = os.environ.get("DBUTILS_JDBC_URL_PARAMS", "{}")
-            try:
-                url_params = json.loads(url_params_raw) if url_params_raw else {}
-            except Exception:
-                url_params = {}
-            user = os.environ.get("DBUTILS_JDBC_USER")
-            password = os.environ.get("DBUTILS_JDBC_PASSWORD")
-            conn = _jdbc_connect(provider_name, url_params, user=user, password=password)
-            try:
-                return conn.query(sql)
-            finally:
-                conn.close()
-        except Exception as e:
-            # Fall back to legacy path if JDBC fails, but log the reason
-            try:
-                sys.stderr.write(f"[db_browser] JDBC path failed, falling back to external runner: {e}\n")
-                sys.stderr.flush()
-            except Exception:
-                pass
-
-    # Legacy external runner path
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
-        f.write(sql)
-        temp_file = f.name
+    if not provider_name:
+        raise RuntimeError("DBUTILS_JDBC_PROVIDER environment variable not set")
 
     try:
-        result = subprocess.run(
-            ["query_runner", "-t", "db2", temp_file],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=timeout  # Add timeout to prevent hanging queries
-        )
-        if result.returncode != 0:
-            raise RuntimeError(f"query_runner failed: {result.stderr}")
+        from dbutils.jdbc_provider import connect as _jdbc_connect
 
-        # Try JSON first
+        url_params_raw = os.environ.get("DBUTILS_JDBC_URL_PARAMS", "{}")
         try:
-            return json.loads(result.stdout)
-        except json.JSONDecodeError:
-            # Assume tab-separated with header
-            reader = csv.DictReader(io.StringIO(result.stdout), delimiter="\t")
-            return list(reader)
-    except subprocess.TimeoutExpired:
-        # Clean up the temp file if timeout occurs
-        try:
-            os.unlink(temp_file)
+            url_params = json.loads(url_params_raw) if url_params_raw else {}
         except Exception:
-            pass
-        raise RuntimeError(f"query_runner timed out after {timeout} seconds")
-    finally:
-        # Clean up temp file in all cases except when it's already been deleted during timeout
+            url_params = {}
+        user = os.environ.get("DBUTILS_JDBC_USER")
+        password = os.environ.get("DBUTILS_JDBC_PASSWORD")
+        conn = _jdbc_connect(provider_name, url_params, user=user, password=password)
         try:
-            if os.path.exists(temp_file):
-                os.unlink(temp_file)
-        except Exception:
-            pass  # If file cleanup fails, continue with the function
+            return conn.query(sql)
+        finally:
+            conn.close()
+    except Exception as e:
+        raise RuntimeError(f"JDBC query failed: {e}") from e
 
 
 def mock_get_tables() -> List[TableInfo]:

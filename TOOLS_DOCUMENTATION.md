@@ -538,17 +538,11 @@ All functions support schema filtering and mock data for testing.
 
 ### query_runner
 
-Core utility for executing SQL queries via the external `query_runner` command.
+Core utility for executing SQL queries via direct JDBC connections using JayDeBeApi.
 
-- **Auto-format Detection**: Handles JSON, CSV, and TSV output formats
+- **JDBC Integration**: Direct Python-to-JDBC communication via JayDeBeApi
 - **Error Handling**: Comprehensive error reporting and logging
-- **Temporary Files**: Secure SQL file handling with automatic cleanup
-
-### Configuration
-
-- **Environment Variables**: Database connection settings via `.env` file
-- **Auto-detection**: Automatically detects database types and catalog schemas
-- **Fallback Parsing**: Robust parsing for different `query_runner` output formats
+- **Direct Processing**: No external file creation needed
 
 ## Configuration
 
@@ -566,17 +560,17 @@ DB_USER=your-user
 DB_PASSWORD=your-password
 ```
 
-### query_runner Setup
+### JDBC Provider Setup
 
-Ensure `query_runner` is available on your PATH. The tool should be configured for your DB2 environment.
+Configure JDBC providers through the GUI or by setting up providers.json. The system should be connected to your database environment via JDBC.
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **"query_runner command not found"**
-   - Ensure `query_runner` is installed and on PATH
-   - Check that JDBC drivers are available
+1. **"JDBC provider not found"**
+   - Ensure DBUTILS_JDBC_PROVIDER environment variable is set
+   - Check that JDBC drivers are properly configured
 
 2. **"No tables found"**
    - Verify database connection settings
@@ -594,8 +588,8 @@ Ensure `query_runner` is available on your PATH. The tool should be configured f
 ### Debug Commands
 
 ```bash
-# Test query_runner connection
-query_runner --test-connection
+# Test JDBC connection
+python -c "from dbutils.db_browser import query_runner; print(query_runner('SELECT 1 AS ONE FROM SYSIBM.SYSDUMMY1'))"
 
 # Test basic catalog query
 python -c "from dbutils.catalog import get_tables; print(get_tables()[:5])"
