@@ -182,6 +182,107 @@ class TestProviderConfigDialog:
         # Restore original
         dialog.driver_class_input.setText(original_driver)
 
+    def test_license_prompt_for_manual_drivers(self, dialog):
+        """Ensure drivers that require licenses show a checkbox and block actions until accepted."""
+        # We expect 'oracle' to be configured as requires_license
+        d, download_btn, manual_btn, checkbox, _, _, _, _ = dialog.create_download_dialog('oracle')
+        assert checkbox is not None
+        assert download_btn.isEnabled() is False
+        assert manual_btn.isEnabled() is False
+
+        # Accept the license - UI should enable action buttons
+        checkbox.setChecked(True)
+        assert download_btn.isEnabled() is True
+        assert manual_btn.isEnabled() is True
+
+    def test_no_license_for_maven_drivers(self, dialog):
+        """Drivers available via Maven should not require a license checkbox by default."""
+        d, download_btn, manual_btn, checkbox, version_choice, specific_input, repo_label, repo_btn = dialog.create_download_dialog('sqlite')
+        # sqlite should not require license acceptance
+        assert checkbox is None
+        assert download_btn.isEnabled() is True
+        assert manual_btn.isEnabled() is True
+
+    def test_persistent_license_acceptance_saved(self, temp_config_dir, qapp):
+        """Test that accepting a license is persisted to disk under config dir."""
+        # Create a fresh dialog within the patched config dir environment
+        dlg = ProviderConfigDialog(None)
+        d, download_btn, manual_btn, checkbox, _, _, _, _ = dlg.create_download_dialog('oracle')
+        assert checkbox is not None
+
+        # Ensure not accepted initially
+        from dbutils.gui import license_store
+        assert not license_store.is_license_accepted('oracle')
+
+        # Accept and click download
+        checkbox.setChecked(True)
+        download_btn.click()
+
+        # Now it should be persisted
+        assert license_store.is_license_accepted('oracle')
+
+    def test_persistent_license_acceptance_manual(self, temp_config_dir, qapp):
+        """License acceptance should also be saved when user opens download page manually."""
+        dlg = ProviderConfigDialog(None)
+        d, download_btn, manual_btn, checkbox, _, _, _, _ = dlg.create_download_dialog('oracle')
+
+    def test_version_selection_for_maven_drivers(self, dialog):
+        # SQLite is maven-backed and should have version controls and repo info
+        d, download_btn, manual_btn, checkbox, version_choice, specific_input, repo_label, repo_btn = dialog.create_download_dialog('sqlite')
+        assert version_choice is not None
+        assert specific_input is not None
+        # default should disable specific input
+        assert specific_input.isEnabled() is False
+
+        # switching to specific enables input
+        version_choice.setCurrentText('specific')
+        assert specific_input.isEnabled() is True
+
+    def test_repo_config_persistence(self, temp_config_dir, dialog):
+        from dbutils.gui.downloader_prefs import set_maven_repos, get_maven_repos
+
+        set_maven_repos(['https://custom.repo/npm/','https://mirror.example/maven/'])
+
+        d, download_btn, manual_btn, checkbox, version_choice, specific_input, repo_label, repo_btn = dialog.create_download_dialog('sqlite')
+        assert 'https://custom.repo/npm/' in repo_label.text()
+
+    def test_perform_download_passes_version(self, temp_config_dir, monkeypatch):
+        # Ensure perform_jdbc_download passes requested version to manager
+        from dbutils.gui import provider_config_dialog as pcd
+
+        dlg = ProviderConfigDialog(None)
+
+        called = {}
+
+        def fake_download(database_type, on_progress=None, version=None):
+            called['database_type'] = database_type
+            called['version'] = version
+            # create a fake downloaded file
+            tmp_driver = os.path.join(os.environ.get('DBUTILS_DRIVER_DIR', '/tmp'), 'sqlite-jdbc-TEST.jar')
+            # ensure dir exists
+            os.makedirs(os.path.dirname(tmp_driver), exist_ok=True)
+            with open(tmp_driver, 'wb') as fh:
+                fh.write(b'test')
+            return tmp_driver
+
+        monkeypatch.setenv('DBUTILS_DRIVER_DIR', str(temp_config_dir / 'drivers'))
+        monkeypatch.setattr('dbutils.gui.jdbc_driver_manager.download_jdbc_driver', fake_download)
+
+        dlg.perform_jdbc_download('sqlite', version='3.42.0.0')
+
+        assert called.get('database_type') == 'sqlite'
+        assert called.get('version') == '3.42.0.0'
+        assert checkbox is not None
+
+        from dbutils.gui import license_store
+        license_store.revoke_license('oracle')
+        assert not license_store.is_license_accepted('oracle')
+
+        checkbox.setChecked(True)
+        manual_btn.click()
+
+        assert license_store.is_license_accepted('oracle')
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

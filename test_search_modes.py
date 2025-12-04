@@ -5,9 +5,9 @@ import sys
 
 sys.path.insert(0, "src")
 
-from dbutils.db_browser import TEXTUAL_AVAILABLE
+from dbutils.db_browser import RICH_AVAILABLE
 
-if TEXTUAL_AVAILABLE:
+if RICH_AVAILABLE:
     print("✓ Textual TUI with dual search modes is available!")
     print("\n📋 Search Modes:")
     print("  1. Table Search (default)")
@@ -32,4 +32,4 @@ if TEXTUAL_AVAILABLE:
     print()
     print("Run: db-browser --mock")
 else:
-    print("✗ Textual not available")
+    print("✗ Textual TUI has been removed; use DBBrowserTUI or one-shot search instead.")
