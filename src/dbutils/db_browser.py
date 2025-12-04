@@ -130,11 +130,18 @@ class TrieNode:
         return result
 
     def _collect_all_items(self, node: "TrieNode", result: Set[str]) -> None:
-        """Recursively collect all items from this node and descendants."""
-        if node.is_end_of_word:
-            result.update(node.items)
-        for child in node.children.values():
-            self._collect_all_items(child, result)
+        """Iteratively collect all items from this node and descendants using a stack.
+
+        This prevents potential stack overflow for very deep tries.
+        """
+        # Use iterative approach with a stack to avoid recursion depth issues
+        stack = [node]
+        while stack:
+            current = stack.pop()
+            if current.is_end_of_word:
+                result.update(current.items)
+            # Add all children to the stack for processing
+            stack.extend(current.children.values())
 
 
 class SearchIndex:
@@ -231,13 +238,14 @@ class SearchIndex:
         return [self.column_keys[key] for key in matching_keys if key in self.column_keys]
 
 
-def query_runner(sql: str) -> List[Dict]:
+def query_runner(sql: str, timeout: int = 30) -> List[Dict]:
     """Execute SQL and return rows as list[dict].
 
     Priority:
     1) If environment variable DBUTILS_JDBC_PROVIDER is set, use JDBC provider via JayDeBeApi.
        Optionally pass DBUTILS_JDBC_URL_PARAMS (JSON) and DBUTILS_JDBC_USER/PASSWORD.
     2) Otherwise, fall back to the external `query_runner` command (legacy) and parse output.
+    Added timeout parameter to prevent hanging queries.
     """
     # Attempt JDBC path first if configured
     provider_name = os.environ.get("DBUTILS_JDBC_PROVIDER")
@@ -271,7 +279,13 @@ def query_runner(sql: str) -> List[Dict]:
         temp_file = f.name
 
     try:
-        result = subprocess.run(["query_runner", "-t", "db2", temp_file], check=False, capture_output=True, text=True)
+        result = subprocess.run(
+            ["query_runner", "-t", "db2", temp_file],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout  # Add timeout to prevent hanging queries
+        )
         if result.returncode != 0:
             raise RuntimeError(f"query_runner failed: {result.stderr}")
 
@@ -282,8 +296,20 @@ def query_runner(sql: str) -> List[Dict]:
             # Assume tab-separated with header
             reader = csv.DictReader(io.StringIO(result.stdout), delimiter="\t")
             return list(reader)
+    except subprocess.TimeoutExpired:
+        # Clean up the temp file if timeout occurs
+        try:
+            os.unlink(temp_file)
+        except Exception:
+            pass
+        raise RuntimeError(f"query_runner timed out after {timeout} seconds")
     finally:
-        os.unlink(temp_file)
+        # Clean up temp file in all cases except when it's already been deleted during timeout
+        try:
+            if os.path.exists(temp_file):
+                os.unlink(temp_file)
+        except Exception:
+            pass  # If file cleanup fails, continue with the function
 
 
 def mock_get_tables() -> List[TableInfo]:
