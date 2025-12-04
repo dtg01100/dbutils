@@ -133,20 +133,9 @@ class TestDataClasses:
 class TestDatabaseAnalysisModules:
     """Test various database analysis modules."""
     
-    def test_db_analyze_import(self):
-        # db_analyze is no longer part of the codebase; this test is obsolete.
-        import pytest
-        pytest.skip("db_analyze removed from project")
-    
-    def test_db_diff_import(self):
-        # db_diff removed from project — skip test
-        import pytest
-        pytest.skip("db_diff removed from project")
-    
-    def test_db_health_import(self):
-        # db_health removed from project — skip test
-        import pytest
-        pytest.skip("db_health removed from project")
+    # The database analysis modules (db_analyze, db_diff, db_health) were
+    # removed from the codebase. The tests that asserted their presence have
+    # been deleted as part of repository cleanup.
 
 
 if __name__ == "__main__":
