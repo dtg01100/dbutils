@@ -548,35 +548,59 @@ if QT_BINDINGS:
                 )
 
         def download_jdbc_driver_gui(self):
-            """Download JDBC driver for the selected category."""
+            """Download JDBC driver for the selected category with enhanced UI feedback."""
             from .jdbc_auto_downloader import find_existing_drivers
             from .jdbc_auto_downloader import get_jdbc_driver_download_info as get_download_info
+            from .jdbc_driver_downloader import JDBCDriverRegistry
 
             category = self.category_input.currentText()
             if not category or category == "Generic":
                 # Try to guess from driver class field if category is generic
                 driver_class = self.driver_class_input.text().strip().lower()
-                if "postgres" in driver_class:
-                    category = "postgresql"
-                elif "mysql" in driver_class:
-                    category = "mysql"
-                elif "mariadb" in driver_class:
-                    category = "mariadb"
-                elif "oracle" in driver_class:
-                    category = "oracle"
-                elif "sqlserver" in driver_class or "microsoft" in driver_class:
-                    category = "sqlserver"
-                elif "db2" in driver_class:
-                    category = "db2"
-                elif "sqlite" in driver_class:
-                    category = "sqlite"
-                elif "h2" in driver_class:
-                    category = "h2"
+
+                # Enhanced automatic driver detection
+                detected_category = None
+                detection_confidence = 0
+
+                # Check for common driver class patterns
+                driver_patterns = {
+                    'postgresql': ['postgres', 'pgjdbc'],
+                    'mysql': ['mysql', 'mariadb', 'cj.jdbc'],
+                    'oracle': ['oracle', 'ojdbc'],
+                    'sqlserver': ['sqlserver', 'microsoft', 'mssql'],
+                    'db2': ['db2', 'ibm'],
+                    'sqlite': ['sqlite', 'xerial'],
+                    'h2': ['h2'],
+                    'jt400': ['jt400', 'as400', 'ibm.i']
+                }
+
+                for db_type, patterns in driver_patterns.items():
+                    for pattern in patterns:
+                        if pattern in driver_class:
+                            detected_category = db_type
+                            detection_confidence += 1
+                            break
+
+                if detected_category:
+                    category = detected_category
+                    QMessageBox.information(
+                        self,
+                        "Driver Detected",
+                        f"Automatically detected {category} driver based on driver class."
+                    )
                 else:
+                    # If no automatic detection, suggest common drivers
+                    suggestion_msg = "Could not automatically detect driver type. Common options:\n\n"
+                    suggestion_msg += "- PostgreSQL: org.postgresql.Driver\n"
+                    suggestion_msg += "- MySQL: com.mysql.cj.jdbc.Driver\n"
+                    suggestion_msg += "- Oracle: oracle.jdbc.OracleDriver\n"
+                    suggestion_msg += "- SQL Server: com.microsoft.sqlserver.jdbc.SQLServerDriver\n"
+                    suggestion_msg += "- SQLite: org.sqlite.JDBC\n"
+
                     QMessageBox.information(
                         self,
                         "Select Category",
-                        "Please select a database category first or fill in the driver class field to help identify the database type."
+                        suggestion_msg + "\nPlease select a database category or update the driver class field."
                     )
                     return
 
@@ -610,7 +634,13 @@ if QT_BINDINGS:
             # Build dialog (use helper so tests can inspect controls)
             dialog, download_btn, manual_btn, license_checkbox, _, _, _, _ = self.create_download_dialog(category)
 
-            # Show modal dialog
+            # If running under test mode, avoid blocking GUI; return the dialog and controls so tests
+            # can interact with the returned widgets directly without opening a native modal dialog.
+            if os.environ.get('DBUTILS_TEST_MODE'):
+                # Return controls for inspection by tests
+                return dialog, download_btn, manual_btn, license_checkbox
+
+            # Show modal dialog otherwise
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 # User chose to download automatically
                 # Read any pending options captured when Download/Manual was clicked
@@ -627,6 +657,8 @@ if QT_BINDINGS:
             from .jdbc_driver_downloader import JDBCDriverRegistry
 
             dialog = QDialog(self)
+            # Make dialog non-modal by default to avoid blocking test runners or non-modal use cases
+            dialog.setModal(False)
             dialog.setWindowTitle(f"Download {category} JDBC Driver")
             dialog.resize(500, 400)
 
@@ -755,10 +787,18 @@ if QT_BINDINGS:
                 artifact_layout.addRow("Specific Version:", specific_version_input)
 
                 # Repo list display + edit button
-                from .downloader_prefs import get_maven_repos, set_maven_repos
+                from .downloader_prefs import get_maven_repos, set_maven_repos, validate_repositories
 
                 repos = get_maven_repos()
-                repo_list_label = QLabel('\n'.join(repos))
+                repo_status = validate_repositories(repos)
+
+                # Create a more informative repo status display
+                repo_status_text = []
+                for repo, valid, message in repo_status:
+                    status_icon = "✓" if valid else "✗"
+                    repo_status_text.append(f"{status_icon} {repo} - {message}")
+
+                repo_list_label = QLabel('\n'.join(repo_status_text))
                 repo_list_label.setWordWrap(True)
                 repo_edit_btn = QPushButton("Edit Repositories…")
 
@@ -800,11 +840,21 @@ if QT_BINDINGS:
                 download_btn.setEnabled(False)
                 manual_btn.setEnabled(False)
 
-                def on_license_toggled(checked):
-                    download_btn.setEnabled(checked)
-                    manual_btn.setEnabled(checked)
+                def on_license_toggled(checked: bool):
+                    """Enable/disable action buttons based on checkbox toggle."""
+                    download_btn.setEnabled(bool(checked))
+                    manual_btn.setEnabled(bool(checked))
 
-                license_checkbox.stateChanged.connect(lambda state: on_license_toggled(state == Qt.CheckState.Checked))
+                # Use the toggled(boolean) signal to ensure we get a boolean value
+                # This avoids mismatches between Qt.CheckState enum values and plain ints
+                license_checkbox.toggled.connect(on_license_toggled)
+
+                # Check if license was previously accepted
+                from .license_store import is_license_accepted
+                if is_license_accepted(category.lower()):
+                    license_checkbox.setChecked(True)
+                    download_btn.setEnabled(True)
+                    manual_btn.setEnabled(True)
 
             # Return controls so tests can interact and calling code can read selection
             return dialog, download_btn, manual_btn, license_checkbox, version_choice, specific_version_input, repo_list_label, repo_edit_btn
@@ -815,6 +865,10 @@ if QT_BINDINGS:
 
             driver_info = JDBCDriverRegistry.get_driver_info(category)
             if driver_info:
+                # Avoid launching a real browser when running tests
+                if os.environ.get('DBUTILS_TEST_MODE'):
+                    # In test mode, return the URL for assertions instead of opening a browser
+                    return driver_info.download_url
                 import webbrowser
                 webbrowser.open(driver_info.download_url)
             else:
@@ -825,11 +879,22 @@ if QT_BINDINGS:
                 )
 
         def perform_jdbc_download(self, category, version: str | None = None):
-            """Actually perform the JDBC driver download."""
+            """Actually perform the JDBC driver download with enhanced feedback."""
             import os
 
             # Prefer richer manager which supports maven artifacts and multi-jar downloads
             from .jdbc_driver_manager import download_jdbc_driver as download_auto
+
+            # Ensure there is a progress widget available
+            if not hasattr(self, 'download_progress') or self.download_progress is None:
+                # Create a lightweight progress bar if it doesn't exist (tests may call this directly)
+                self.download_progress = QProgressBar(self)
+                self.download_progress.setVisible(False)
+
+            # Create a status label for detailed feedback
+            if not hasattr(self, 'download_status_label') or self.download_status_label is None:
+                self.download_status_label = QLabel()
+                self.download_status_label.setWordWrap(True)
 
             # Show progress
             self.download_progress.setVisible(True)
@@ -842,10 +907,14 @@ if QT_BINDINGS:
                     self.download_progress.setValue(downloaded)
                 QApplication.processEvents()
 
+            def status_callback(message):
+                self.download_status_label.setText(message)
+                QApplication.processEvents()
+
             try:
                 # Use requested version if provided, otherwise default to 'latest'
                 requested = version or 'latest'
-                result = download_auto(category, on_progress=progress_callback, version=requested)
+                result = download_auto(category, on_progress=progress_callback, on_status=status_callback, version=requested)
                 if result:
                     # Support single-path or list-of-paths
                     if isinstance(result, list):

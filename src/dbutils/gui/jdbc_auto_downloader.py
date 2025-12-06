@@ -3,6 +3,12 @@ JDBC Driver Auto-Downloader - Automatic download of JDBC drivers for Qt GUI.
 
 This module provides functionality to automatically download JDBC drivers based on
 database requirements, with a focus on Qt GUI integration.
+
+Enhanced with:
+- Robust error handling and retry logic
+- Detailed progress tracking
+- License management integration
+- Repository connectivity testing
 """
 
 import os
@@ -10,9 +16,13 @@ import shutil
 import tempfile
 import urllib.request
 import urllib.error
+import time
+import random
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 import xml.etree.ElementTree as ET
+import logging
+from datetime import datetime, timedelta
 
 
 # Maven repository URLs for common JDBC drivers
@@ -20,6 +30,14 @@ MAVEN_REPOSITORIES = [
     "https://repo1.maven.org/maven2/",
     "https://repo.maven.apache.org/maven2/",
 ]
+
+# Maximum retry attempts for transient failures
+MAX_RETRY_ATTEMPTS = 3
+RETRY_DELAY_BASE = 1.0  # seconds
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Database-specific JDBC driver coordinates
 JDBC_DRIVER_COORDINATES = {
@@ -62,138 +80,256 @@ JDBC_DRIVER_COORDINATES = {
 
 
 def get_latest_version_from_maven_metadata(metadata_url: str) -> Optional[str]:
-    """Retrieve the latest version from Maven metadata XML."""
-    try:
-        response = urllib.request.urlopen(metadata_url)
-        metadata_xml = response.read().decode('utf-8')
-        root = ET.fromstring(metadata_xml)
-        
-        # Find the latest release version
-        versioning = root.find('versioning')
-        if versioning is not None:
-            latest = versioning.find('latest')
-            if latest is not None:
-                return latest.text
-            
-            release = versioning.find('release')
-            if release is not None:
-                return release.text
-        
-        # If no latest/release found, get the last version in the list
-        versions = root.find('versioning/versions')
-        if versions is not None:
-            version_elements = versions.findall('version')
-            if version_elements:
-                return version_elements[-1].text
-        
-        return None
-    except Exception as e:
-        print(f"Could not fetch version metadata from {metadata_url}: {e}")
-        return None
+    """Retrieve the latest version from Maven metadata XML with retry logic."""
+    for attempt in range(MAX_RETRY_ATTEMPTS):
+        try:
+            response = urllib.request.urlopen(metadata_url)
+            metadata_xml = response.read().decode('utf-8')
+            root = ET.fromstring(metadata_xml)
+
+            # Find the latest release version
+            versioning = root.find('versioning')
+            if versioning is not None:
+                latest = versioning.find('latest')
+                if latest is not None:
+                    return latest.text
+
+                release = versioning.find('release')
+                if release is not None:
+                    return release.text
+
+            # If no latest/release found, get the last version in the list
+            versions = root.find('versioning/versions')
+            if versions is not None:
+                version_elements = versions.findall('version')
+                if version_elements:
+                    return version_elements[-1].text
+
+            return None
+        except urllib.error.URLError as e:
+            if attempt < MAX_RETRY_ATTEMPTS - 1:
+                delay = RETRY_DELAY_BASE * (2 ** attempt) + random.uniform(0, 1)
+                logger.warning(f"Attempt {attempt + 1} failed to fetch metadata from {metadata_url}: {e}. Retrying in {delay:.1f}s...")
+                time.sleep(delay)
+                continue
+            logger.error(f"Could not fetch version metadata from {metadata_url} after {MAX_RETRY_ATTEMPTS} attempts: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error fetching version metadata from {metadata_url}: {e}")
+            return None
+    return None
 
 
-def get_jdbc_driver_url(db_type: str, version: str = "latest") -> Optional[str]:
-    """Get the download URL for a specific JDBC driver and version."""
+def get_jdbc_driver_url(db_type: str, version: str = "latest", repo_index: int = 0) -> Optional[str]:
+    """Get the download URL for a specific JDBC driver and version with repository fallback."""
     if db_type not in JDBC_DRIVER_COORDINATES:
         return None
-    
+
     coords = JDBC_DRIVER_COORDINATES[db_type]
-    
+
     # Get latest version if requested
     if version == "latest" and coords.get('metadata_url'):
         latest_ver = get_latest_version_from_maven_metadata(coords['metadata_url'])
         if latest_ver:
             version = latest_ver
-    
-    # Construct Maven URL: https://repo1.maven.org/maven2/group_id/artifact_id/version/artifact_id-version.jar
-    maven_repo = MAVEN_REPOSITORIES[0]  # Use primary repo
+
+    # Try repositories in order until we find one that works
+    for i, maven_repo in enumerate(MAVEN_REPOSITORIES[repo_index:]):
+        group_path = coords['group_id'].replace('.', '/')
+        jar_filename = f"{coords['artifact_id']}-{version}.jar"
+        download_url = f"{maven_repo}{group_path}/{coords['artifact_id']}/{version}/{jar_filename}"
+
+        # Test if URL is accessible
+        try:
+            success, message = test_repository_connectivity(maven_repo)
+            if success:
+                logger.info(f"Using repository {maven_repo} for {db_type}")
+                return download_url
+            else:
+                logger.warning(f"Repository {maven_repo} unavailable: {message}")
+        except Exception as e:
+            logger.warning(f"Error testing repository {maven_repo}: {e}")
+
+    # If all repositories failed, return URL with primary repo anyway
+    # (user might have network issues that could be resolved)
+    maven_repo = MAVEN_REPOSITORIES[0]
     group_path = coords['group_id'].replace('.', '/')
     jar_filename = f"{coords['artifact_id']}-{version}.jar"
     download_url = f"{maven_repo}{group_path}/{coords['artifact_id']}/{version}/{jar_filename}"
-    
+
     return download_url
 
 
 def download_jdbc_driver(
-    db_type: str, 
-    version: str = "latest", 
-    target_dir: Optional[str] = None, 
-    on_progress: Optional[Callable[[int, int], None]] = None
+    db_type: str,
+    version: str = "latest",
+    target_dir: Optional[str] = None,
+    on_progress: Optional[Callable[[int, int], None]] = None,
+    on_status: Optional[Callable[[str], None]] = None
 ) -> Optional[str]:
     """
-    Download a JDBC driver JAR file for the specified database type.
-    
+    Download a JDBC driver JAR file for the specified database type with enhanced error handling.
+
     Args:
         db_type: Type of database (e.g., 'postgresql', 'mysql', 'oracle')
         version: Version to download ('latest' or specific version)
         target_dir: Directory to save the JAR (defaults to standard location)
         on_progress: Callback for progress updates (downloaded, total bytes)
-    
+        on_status: Callback for status messages (enhanced user feedback)
+
     Returns:
         Path to downloaded JAR file, or None if failed
     """
+    # License validation before download
+    license_key = f"jdbc_driver_{db_type}"
+    if not license_store.is_license_accepted(license_key):
+        error_msg = f"License not accepted for {db_type}. Please accept the license before downloading."
+        logger.error(error_msg)
+        if on_status:
+            on_status(f"Error: {error_msg}")
+        return None
+
     # Get the download URL
     download_url = get_jdbc_driver_url(db_type, version)
     if not download_url:
-        print(f"No download URL available for {db_type}")
+        error_msg = f"No download URL available for {db_type}"
+        logger.error(error_msg)
+        if on_status:
+            on_status(f"Error: {error_msg}")
         return None
-    
+
     # Set target directory
     if target_dir is None:
         target_dir = get_driver_directory()
-    
+
     # Create target directory if it doesn't exist
     Path(target_dir).mkdir(parents=True, exist_ok=True)
-    
+
     # Determine filename from URL
     filename = os.path.basename(download_url)
-    
+
     # Check if file already exists
     target_path = os.path.join(target_dir, filename)
     if os.path.exists(target_path):
-        print(f"File {filename} already exists at {target_path}")
+        logger.info(f"File {filename} already exists at {target_path}")
+        if on_status:
+            on_status(f"Driver already exists: {filename}")
         return target_path
-    
-    try:
-        # Create temporary file for download
-        temp_fd, temp_path = tempfile.mkstemp(suffix='.jar', dir=target_dir)
-        
-        with os.fdopen(temp_fd, 'wb') as temp_file:
-            # Create request with user agent
-            req = urllib.request.Request(download_url)
-            req.add_header('User-Agent', 'dbutils-jdbc-downloader/1.0')
-            
-            # Open the URL and download
-            with urllib.request.urlopen(req) as response:
-                total_size = int(response.headers.get('Content-Length', 0))
-                downloaded = 0
-                chunk_size = 8192
-                
-                while True:
-                    chunk = response.read(chunk_size)
-                    if not chunk:
-                        break
-                        
-                    temp_file.write(chunk)
-                    downloaded += len(chunk)
-                    
-                    if on_progress:
-                        on_progress(downloaded, total_size)
-        
-        # Move temp file to final location
-        shutil.move(temp_path, target_path)
-        print(f"Successfully downloaded {filename} to {target_path}")
-        return target_path
-        
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            print(f"JDBC driver not found for {db_type} version {version}. URL tried: {download_url}")
-        else:
-            print(f"HTTP error downloading JDBC driver: {e}")
-        return None
-    except Exception as e:
-        print(f"Error downloading JDBC driver: {e}")
-        return None
+
+    # Enhanced download with retry logic
+    for attempt in range(MAX_RETRY_ATTEMPTS):
+        try:
+            # Create temporary file for download
+            temp_fd, temp_path = tempfile.mkstemp(suffix='.jar', dir=target_dir)
+
+            with os.fdopen(temp_fd, 'wb') as temp_file:
+                # Create request with user agent
+                req = urllib.request.Request(download_url)
+                req.add_header('User-Agent', 'dbutils-jdbc-downloader/1.0')
+
+                # Open the URL and download
+                with urllib.request.urlopen(req) as response:
+                    total_size = int(response.headers.get('Content-Length', 0))
+                    downloaded = 0
+                    chunk_size = 8192
+                    start_time = time.time()
+                    last_update_time = start_time
+
+                    if on_status:
+                        on_status(f"Starting download from {download_url}")
+
+                    while True:
+                        chunk = response.read(chunk_size)
+                        if not chunk:
+                            break
+
+                        temp_file.write(chunk)
+                        downloaded += len(chunk)
+
+                        # Calculate download speed and estimated time remaining
+                        current_time = time.time()
+                        elapsed = current_time - start_time
+                        if elapsed > 0:
+                            speed = downloaded / elapsed  # bytes per second
+                            if total_size > 0:
+                                remaining = (total_size - downloaded) / speed if speed > 0 else 0
+                                if current_time - last_update_time >= 0.5:  # Update every 0.5 seconds
+                                    status_msg = f"Downloading {filename}: {downloaded/1024/1024:.1f}MB of {total_size/1024/1024:.1f}MB ({speed/1024/1024:.1f}MB/s, {int(remaining)}s remaining)"
+                                    if on_status:
+                                        on_status(status_msg)
+                                    last_update_time = current_time
+
+                        if on_progress:
+                            on_progress(downloaded, total_size)
+
+            # Move temp file to final location
+            shutil.move(temp_path, target_path)
+            logger.info(f"Successfully downloaded {filename} to {target_path}")
+            if on_status:
+                on_status(f"Download complete: {filename}")
+            return target_path
+
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                # Try fallback repository if available
+                if attempt < MAX_RETRY_ATTEMPTS - 1 and len(MAVEN_REPOSITORIES) > 1:
+                    fallback_url = get_jdbc_driver_url(db_type, version, repo_index=attempt + 1)
+                    if fallback_url and fallback_url != download_url:
+                        logger.warning(f"Driver not found at {download_url}, trying fallback repository...")
+                        if on_status:
+                            on_status(f"Trying fallback repository for {db_type}...")
+                        download_url = fallback_url
+                        continue
+                error_msg = f"JDBC driver not found for {db_type} version {version}. URL tried: {download_url}"
+                logger.error(error_msg)
+                if on_status:
+                    on_status(f"Error: {error_msg}")
+                return None
+            elif e.code in [500, 502, 503, 504]:  # Server errors, retry
+                if attempt < MAX_RETRY_ATTEMPTS - 1:
+                    delay = RETRY_DELAY_BASE * (2 ** attempt) + random.uniform(0, 1)
+                    logger.warning(f"Server error {e.code} downloading {db_type}: {e}. Retrying in {delay:.1f}s...")
+                    if on_status:
+                        on_status(f"Server error {e.code}. Retrying in {delay:.1f}s...")
+                    time.sleep(delay)
+                    continue
+                else:
+                    error_msg = f"Server error {e.code} downloading {db_type} after {MAX_RETRY_ATTEMPTS} attempts: {e}"
+                    logger.error(error_msg)
+                    if on_status:
+                        on_status(f"Error: {error_msg}")
+                    return None
+            else:
+                error_msg = f"HTTP error {e.code} downloading JDBC driver: {e}"
+                logger.error(error_msg)
+                if on_status:
+
+                    on_status(f"Error: {error_msg}")
+                return None
+
+        except urllib.error.URLError as e:
+            if attempt < MAX_RETRY_ATTEMPTS - 1:
+                delay = RETRY_DELAY_BASE * (2 ** attempt) + random.uniform(0, 1)
+                logger.warning(f"Network error downloading {db_type}: {e}. Retrying in {delay:.1f}s...")
+                if on_status:
+                    on_status(f"Network error. Retrying in {delay:.1f}s...")
+                time.sleep(delay)
+                continue
+            else:
+                error_msg = f"Network error downloading JDBC driver after {MAX_RETRY_ATTEMPTS} attempts: {e}"
+                logger.error(error_msg)
+                if on_status:
+                    on_status(f"Error: {error_msg}")
+                return None
+
+        except Exception as e:
+            error_msg = f"Error downloading JDBC driver: {e}"
+            logger.error(error_msg)
+            if on_status:
+                on_status(f"Error: {error_msg}")
+            return None
+
+    return None
 
 
 def get_driver_directory() -> str:
@@ -233,24 +369,65 @@ def find_existing_drivers(db_type: str) -> List[str]:
 
 
 def get_jdbc_driver_download_info(db_type: str) -> Optional[str]:
-    """Get download information for a specific database type."""
+    """Get download information for a specific database type with enhanced details."""
     coords = JDBC_DRIVER_COORDINATES.get(db_type)
     if not coords:
         return f"No download information available for {db_type}"
-    
+
     # Get latest version
     latest_version = "Unknown"
     if coords.get('metadata_url'):
         latest_version = get_latest_version_from_maven_metadata(coords['metadata_url']) or "Unknown"
-    
+
+    # Test repository connectivity
+    repo_status = "Unknown"
+    if coords.get('metadata_url'):
+        try:
+            response = urllib.request.urlopen(coords['metadata_url'])
+            response.close()
+            repo_status = "Available"
+        except Exception:
+            repo_status = "Unavailable"
+
     info = [
         f"JDBC Driver: {db_type.title()}",
         f"Group ID: {coords['group_id']}",
         f"Artifact: {coords['artifact_id']}",
         f"Latest Version: {latest_version}",
+        f"Repository Status: {repo_status}",
         f"Download Location: {get_driver_directory()}",
         "",
         f"Will download from: {get_jdbc_driver_url(db_type, 'latest') or 'N/A'}"
     ]
-    
+
     return "\n".join(info)
+
+def test_repository_connectivity(repository_url: str) -> Tuple[bool, str]:
+    """
+    Test connectivity to a Maven repository with detailed status.
+
+    Returns:
+        Tuple of (success: bool, status_message: str)
+    """
+    try:
+        # Test with a simple HEAD request to the repository root
+        req = urllib.request.Request(repository_url, method='HEAD')
+        req.add_header('User-Agent', 'dbutils-jdbc-downloader/1.0')
+        with urllib.request.urlopen(req, timeout=5) as response:
+            status_code = response.getcode()
+            if status_code == 200:
+                return True, f"Repository {repository_url} is available (HTTP 200)"
+            else:
+                return False, f"Repository {repository_url} returned HTTP {status_code}"
+    except urllib.error.URLError as e:
+        return False, f"Repository {repository_url} is unavailable: {e.reason}"
+    except Exception as e:
+        return False, f"Repository {repository_url} error: {str(e)}"
+
+def get_repository_status() -> List[Tuple[str, bool, str]]:
+    """Get status of all configured Maven repositories with detailed messages."""
+    results = []
+    for repo in MAVEN_REPOSITORIES:
+        success, message = test_repository_connectivity(repo)
+        results.append((repo, success, message))
+    return results
