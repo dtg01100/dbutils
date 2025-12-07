@@ -8,9 +8,11 @@ variable support and configuration file management.
 
 import os
 import json
-from typing import List, Optional, Dict, Tuple
-from .path_config import PathConfig, get_driver_directory, find_driver_jar, get_best_driver_path
-from .url_config import URLConfig, get_maven_repositories, construct_maven_artifact_url, construct_metadata_url
+from typing import List, Optional, Tuple
+
+from .path_config import PathConfig, find_driver_jar, get_best_driver_path, get_driver_directory
+from .url_config import URLConfig, construct_maven_artifact_url, construct_metadata_url, get_maven_repositories
+
 
 class DBUtilsConfig:
     """Unified configuration manager for DBUtils."""
@@ -97,6 +99,11 @@ config = DBUtilsConfig()
 
 def get_driver_directory() -> str:
     """Get the primary driver directory."""
+    # Respect explicit environment override at call time for dynamic testability and flexibility
+    env_dir = os.environ.get('DBUTILS_DRIVER_DIR')
+    if env_dir:
+        os.makedirs(env_dir, exist_ok=True)
+        return env_dir
     return config.get_driver_directory()
 
 def find_driver_jar(database_type: str) -> List[str]:
@@ -109,6 +116,17 @@ def get_best_driver_path(database_type: str) -> Optional[str]:
 
 def get_maven_repositories() -> List[str]:
     """Get all configured Maven repository URLs."""
+    # Allow overriding via environment variable for tests and runtime configuration
+    env_repos = os.environ.get('DBUTILS_MAVEN_REPOS')
+    if env_repos:
+        try:
+            # Try JSON array first
+            parsed = json.loads(env_repos)
+            if isinstance(parsed, list):
+                return parsed
+        except Exception:
+            # Fallback to comma-separated list
+            return [r.strip() for r in env_repos.split(',') if r.strip()]
     return config.get_maven_repositories()
 
 def construct_maven_artifact_url(

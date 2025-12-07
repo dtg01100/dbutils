@@ -5,11 +5,11 @@ This module provides configurable URL patterns for Maven repositories,
 download URLs, and other web resources with environment variable support.
 """
 
-import os
 import json
-import urllib.parse
-from typing import List, Optional, Dict, Tuple
 import logging
+import os
+import urllib.parse
+from typing import Dict, List, Optional, Tuple
 
 # Configure logging
 logger = logging.getLogger(__name__)

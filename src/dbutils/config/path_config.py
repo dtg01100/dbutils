@@ -5,11 +5,11 @@ This module provides a comprehensive system for discovering and managing
 JAR file paths, driver directories, and other file system locations.
 """
 
-import os
 import json
-from pathlib import Path
-from typing import List, Optional, Dict, Union
 import logging
+import os
+from pathlib import Path
+from typing import Dict, List, Optional
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -113,17 +113,44 @@ class PathConfig:
         """
         paths = []
 
-        # Add driver directories
+        # Refresh from environment in case tests or runtime changed them dynamically
+        env_driver_dir = os.environ.get('DBUTILS_DRIVER_DIR')
+        if env_driver_dir and env_driver_dir not in self._config['driver_dirs']:
+            # Prepend environment driver dir to give it priority
+            paths.append(env_driver_dir)
+
+        # Add driver directories from loaded config
         if self._config['driver_dirs']:
             paths.extend(self._config['driver_dirs'])
 
         # Add search paths
         if self._config['search_paths']:
             paths.extend(self._config['search_paths'])
+        # Also include environment search paths if set (colon-delimited)
+        env_search_paths = os.environ.get('DBUTILS_JAR_SEARCH_PATHS')
+        if env_search_paths:
+            for p in env_search_paths.split(':'):
+                p = p.strip()
+                if p and p not in paths:
+                    paths.append(p)
 
         # Add custom paths
         if self._config['custom_paths']:
             paths.extend(self._config['custom_paths'])
+        # Also include environment custom paths as JSON or comma separated list
+        env_custom_paths = os.environ.get('DBUTILS_CUSTOM_JAR_PATHS')
+        if env_custom_paths:
+            try:
+                parsed = json.loads(env_custom_paths)
+                if isinstance(parsed, list):
+                    for p in parsed:
+                        if p not in paths:
+                            paths.append(p)
+            except Exception:
+                for p in env_custom_paths.split(','):
+                    p = p.strip()
+                    if p and p not in paths:
+                        paths.append(p)
 
         # Add standard default locations
         default_paths = [

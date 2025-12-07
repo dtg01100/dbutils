@@ -8,10 +8,10 @@ schema information and validate connections.
 """
 
 import json
-import os
-from typing import Dict, Any, Optional, List
-from dataclasses import dataclass
 import logging
+import os
+from dataclasses import dataclass
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -123,42 +123,69 @@ class EntrypointQueryManager:
         hardcoded_defaults = {
             "PostgreSQL": {
                 "identity_query": "SELECT CURRENT_TIMESTAMP as current_timestamp",
-                "schema_query": "SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog', 'information_schema')",
+                "schema_query": (
+                    "SELECT table_schema, table_name FROM information_schema.tables "
+                    "WHERE table_schema NOT IN ('pg_catalog', 'information_schema')"
+                ),
                 "database_info_query": "SELECT version() as database_version"
             },
             "MySQL": {
                 "identity_query": "SELECT NOW() as current_timestamp",
-                "schema_query": "SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')",
+                "schema_query": (
+                    "SELECT table_schema, table_name FROM information_schema.tables "
+                    "WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')"
+                ),
                 "database_info_query": "SELECT VERSION() as database_version"
             },
             "MariaDB": {
                 "identity_query": "SELECT NOW() as current_timestamp",
-                "schema_query": "SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')",
+                "schema_query": (
+                    "SELECT table_schema, table_name FROM information_schema.tables "
+                    "WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')"
+                ),
                 "database_info_query": "SELECT VERSION() as database_version"
             },
             "Oracle": {
                 "identity_query": "SELECT SYSTIMESTAMP as current_timestamp FROM dual",
-                "schema_query": "SELECT owner, table_name FROM all_tables WHERE owner NOT IN ('SYS', 'SYSTEM')",
-                "database_info_query": "SELECT banner as database_version FROM v$version WHERE rownum = 1"
+                "schema_query": (
+                    "SELECT owner, table_name FROM all_tables "
+                    "WHERE owner NOT IN ('SYS', 'SYSTEM')"
+                ),
+                "database_info_query": (
+                    "SELECT banner as database_version FROM v$version "
+                    "WHERE rownum = 1"
+                )
             },
             "SQL Server": {
                 "identity_query": "SELECT GETDATE() as current_timestamp",
-                "schema_query": "SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema NOT IN ('sys', 'INFORMATION_SCHEMA')",
+                "schema_query": (
+                    "SELECT table_schema, table_name FROM information_schema.tables "
+                    "WHERE table_schema NOT IN ('sys', 'INFORMATION_SCHEMA')"
+                ),
                 "database_info_query": "SELECT @@VERSION as database_version"
             },
             "DB2": {
                 "identity_query": "SELECT CURRENT_TIMESTAMP as current_timestamp FROM SYSIBM.SYSDUMMY1",
-                "schema_query": "SELECT table_schema, table_name FROM syscat.tables WHERE table_schema NOT IN ('SYS', 'SYSCAT', 'SYSTOOLS')",
+                "schema_query": (
+                    "SELECT table_schema, table_name FROM syscat.tables "
+                    "WHERE table_schema NOT IN ('SYS', 'SYSCAT', 'SYSTOOLS')"
+                ),
                 "database_info_query": "SELECT service_level as database_version FROM sysibm.sysversions"
             },
             "SQLite": {
                 "identity_query": "SELECT datetime('now') as current_timestamp",
-                "schema_query": "SELECT name as table_name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+                "schema_query": (
+                    "SELECT name as table_name FROM sqlite_master "
+                    "WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                ),
                 "database_info_query": "SELECT sqlite_version() as database_version"
             },
             "H2": {
                 "identity_query": "SELECT CURRENT_TIMESTAMP as current_timestamp",
-                "schema_query": "SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema NOT IN ('INFORMATION_SCHEMA', 'PUBLIC')",
+                "schema_query": (
+                    "SELECT table_schema, table_name FROM information_schema.tables "
+                    "WHERE table_schema NOT IN ('INFORMATION_SCHEMA', 'PUBLIC')"
+                ),
                 "database_info_query": "SELECT H2VERSION() as database_version"
             }
         }
