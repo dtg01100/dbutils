@@ -8,10 +8,10 @@ This module provides a flexible configuration system that can load from:
 """
 
 import json
+import logging
 import os
 import re
-from typing import Dict, List, Optional, Any
-import logging
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 

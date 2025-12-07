@@ -6,8 +6,8 @@ and DBeaver-like user experience features.
 """
 
 import json
-import os
 import logging
+import os
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -22,9 +22,8 @@ except ImportError:
     jaydebeapi = None
     jpype = None
 
-from PySide6.QtCore import QObject, Signal, QThread
+from PySide6.QtCore import QObject, QThread, Signal
 from PySide6.QtWidgets import QMessageBox
-
 
 # Define standard categories that match common database types
 STANDARD_CATEGORIES = [
@@ -45,8 +44,8 @@ STANDARD_CATEGORIES = [
 ]
 
 # Import configuration manager
-from dbutils.config_manager import ConfigManager, get_default_config_manager
 from dbutils.config.entrypoint_query_manager import EntrypointQueryManager, get_default_entrypoint_query_manager
+from dbutils.config_manager import ConfigManager, get_default_config_manager
 
 
 @dataclass
@@ -74,6 +73,10 @@ class JDBCProvider:
 
 class PredefinedProviderTemplates:
     """Collection of templates for common database providers loaded from configuration."""
+    # NOTE: The templates API provides convenience class methods (get_categories,
+    # get_template, create_provider_from_template) so callers can use the class
+    # directly (e.g., PredefinedProviderTemplates.get_categories()) for
+    # backward-compatibility with previous usage patterns.
 
     def __init__(self, config_manager: Optional[ConfigManager] = None):
         self.config_manager = config_manager or get_default_config_manager()
@@ -147,18 +150,21 @@ class PredefinedProviderTemplates:
             }
         }
 
-    def get_template(self, category: str) -> Optional[Dict]:
+    @classmethod
+    def get_template(cls, category: str) -> Optional[Dict]:
         """Get a template for a specific category."""
-        return self._templates.get(category)
+        return cls()._templates.get(category)
 
-    def get_categories(self) -> List[str]:
-        """Get all available category names."""
-        return list(self._templates.keys())
+    @classmethod
+    def get_categories(cls) -> List[str]:
+        """Get all available category names as a classmethod for backward compatibility."""
+        return list(cls()._templates.keys())
 
-    def create_provider_from_template(self, category: str, name: str, host: str = "localhost",
+    @classmethod
+    def create_provider_from_template(cls, category: str, name: str, host: str = "localhost",
                                     database: str = "") -> Optional[JDBCProvider]:
         """Create a provider instance from a template."""
-        template = self.get_template(category)
+        template = cls.get_template(category)
         if not template:
             return None
 
@@ -177,22 +183,22 @@ class PredefinedProviderTemplates:
 
 class JDBCConnection(QObject):
     """Enhanced JDBC connection with Qt async support."""
-    
+
     # Qt signals for asynchronous operations
     connected = Signal()
     disconnected = Signal()
     error_occurred = Signal(str)  # Error message
     query_finished = Signal(list)  # Query results
-    
-    def __init__(self, provider: JDBCProvider, username: Optional[str] = None, 
+
+    def __init__(self, provider: JDBCProvider, username: Optional[str] = None,
                  password: Optional[str] = None):
         super().__init__()
-        
+
         self.provider = provider
         self.username = username or provider.default_user
         self.password = password or provider.default_password
         self._connection = None
-        
+
     def connect(self) -> bool:
         """Establish connection to database."""
         try:
@@ -203,9 +209,9 @@ class JDBCConnection(QObject):
                 extra_cp = os.environ.get("DBUTILS_JDBC_CLASSPATH", "")
                 if extra_cp:
                     classpath = f"{classpath}:{extra_cp}"
-                    
+
                 jpype.startJVM(jvm_path, f"-Djava.class.path={classpath}")
-            
+
             # Format connection URL
             url_params = {
                 'host': self.provider.default_host,
@@ -213,26 +219,26 @@ class JDBCConnection(QObject):
                 'database': self.provider.default_database
             }
             url = self.provider.url_template.format(**url_params)
-            
+
             # Create connection with properties
             props = {"user": self.username or "", "password": self.password or ""}
             if self.provider.extra_properties:
                 props.update(self.provider.extra_properties)
-            
+
             self._connection = jaydebeapi.connect(
                 self.provider.driver_class,
                 url,
                 props
             )
-            
+
             self.connected.emit()
             return True
-            
+
         except Exception as e:
             error_msg = f"Connection failed: {str(e)}"
             self.error_occurred.emit(error_msg)
             return False
-    
+
     def disconnect(self):
         """Close the database connection."""
         if self._connection:
@@ -242,29 +248,29 @@ class JDBCConnection(QObject):
                 pass
             self._connection = None
             self.disconnected.emit()
-    
+
     def execute_query_async(self, sql: str):
         """Execute query asynchronously using a worker thread."""
         worker = QueryWorker(self._connection, sql)
         worker.query_finished.connect(self.query_finished)
         worker.error_occurred.connect(self.error_occurred)
-        
+
         thread = QThread()
         worker.moveToThread(thread)
-        
+
         def cleanup():
             thread.quit()
             thread.wait()
             thread.deleteLater()
             worker.deleteLater()
-        
+
         thread.started.connect(worker.run)
         worker.finished.connect(thread.quit)
         worker.finished.connect(worker.deleteLater)
         worker.finished.connect(cleanup)
-        
+
         thread.start()
-        
+
         # Store references to prevent garbage collection during operation
         if not hasattr(self, '_active_threads'):
             self._active_threads = []
@@ -273,40 +279,40 @@ class JDBCConnection(QObject):
 
 class QueryWorker(QObject):
     """Worker for executing database queries in background thread."""
-    
+
     query_finished = Signal(list)  # Results
     error_occurred = Signal(str)  # Error message
     finished = Signal()
-    
+
     def __init__(self, connection, sql: str):
         super().__init__()
         self.connection = connection
         self.sql = sql
         self._cancelled = False
-        
+
     def cancel(self):
         """Request cancellation of the query."""
         self._cancelled = True
-        
+
     def run(self):
         """Execute the query."""
         if self._cancelled:
             self.finished.emit()
             return
-            
+
         try:
             if not self.connection:
                 raise RuntimeError("No active database connection")
-                
+
             cursor = self.connection.cursor()
             cursor.execute(self.sql)
-            
+
             # Get column info
             columns = [desc[0] for desc in cursor.description] if cursor.description else []
-            
+
             # Fetch all results
             rows = cursor.fetchall()
-            
+
             # Convert to list of dictionaries
             results = []
             for row in rows:
@@ -316,7 +322,7 @@ class QueryWorker(QObject):
                 for i, col_name in enumerate(columns):
                     result_dict[col_name] = row[i] if i < len(row) else None
                 results.append(result_dict)
-                
+
             if not self._cancelled:
                 self.query_finished.emit(results)
         except Exception as e:
@@ -328,6 +334,9 @@ class QueryWorker(QObject):
             except Exception:
                 pass
             self.finished.emit()
+
+
+_REGISTRY_INSTANCES = []
 
 
 class EnhancedProviderRegistry(QObject):
@@ -346,9 +355,9 @@ class EnhancedProviderRegistry(QObject):
         # Initialize entrypoint query manager
         self.entrypoint_query_manager = entrypoint_query_manager or get_default_entrypoint_query_manager()
 
-        # Default config path
+        # Default config path (allow env override for testability)
         if config_path is None:
-            config_dir = os.path.expanduser("~/.config/dbutils")
+            config_dir = os.environ.get('DBUTILS_CONFIG_DIR', os.path.expanduser("~/.config/dbutils"))
             os.makedirs(config_dir, exist_ok=True)
             config_path = os.path.join(config_dir, "jdbc_providers.json")
 
@@ -356,14 +365,18 @@ class EnhancedProviderRegistry(QObject):
         self.providers: Dict[str, JDBCProvider] = {}
 
         self._load_providers()
-    
+        # register this instance for cross-instance synchronization
+        _REGISTRY_INSTANCES.append(self)
+
     def _load_providers(self):
         """Load providers from configuration file."""
         try:
+            # Reset providers to ensure we load the file as the current source of truth
+            self.providers = {}
             if os.path.exists(self.config_path):
                 with open(self.config_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    
+
                 # Convert from list/dict format to our provider dict
                 if isinstance(data, list):
                     # Old format: list of provider dicts
@@ -405,7 +418,7 @@ class EnhancedProviderRegistry(QObject):
             # If config loading fails, initialize with empty providers
             print(f"Warning: Could not load JDBC providers from {self.config_path}: {e}")
             self._initialize_default_providers()
-    
+
     def _initialize_default_providers(self):
         """Initialize with sensible default providers from configuration."""
         try:
@@ -488,12 +501,12 @@ class EnhancedProviderRegistry(QObject):
                 custom_entrypoint_query_set=None
             )
             self.providers[example_provider.name] = example_provider
-    
+
     def save_providers(self):
         """Save providers to configuration file."""
         try:
             os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
-            
+
             # Convert to dict format for saving
             data = {}
             for name, provider in self.providers.items():
@@ -511,32 +524,39 @@ class EnhancedProviderRegistry(QObject):
                     "extra_properties": provider.extra_properties or {},
                     "custom_entrypoint_query_set": provider.custom_entrypoint_query_set
                 }
-            
+
             with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
-                
+
             self.providers_changed.emit()
+            # Notify and reload other registry instances to keep them in sync
+            for inst in _REGISTRY_INSTANCES:
+                try:
+                    if inst is not self:
+                        inst._load_providers()
+                except Exception:
+                    pass
         except Exception as e:
             QMessageBox.critical(None, "Error", f"Failed to save providers: {e}")
-    
+
     def add_provider(self, provider: JDBCProvider) -> bool:
         """Add a new provider."""
         if provider.name in self.providers:
             return False  # Provider already exists
-            
+
         self.providers[provider.name] = provider
         self.save_providers()
         return True
-    
+
     def update_provider(self, provider: JDBCProvider) -> bool:
         """Update an existing provider."""
         if provider.name not in self.providers:
             return False  # Provider doesn't exist
-            
+
         self.providers[provider.name] = provider
         self.save_providers()
         return True
-    
+
     def remove_provider(self, name: str) -> bool:
         """Remove a provider by name."""
         if name in self.providers:
@@ -544,19 +564,23 @@ class EnhancedProviderRegistry(QObject):
             self.save_providers()
             return True
         return False
-    
+
     def get_provider(self, name: str) -> Optional[JDBCProvider]:
         """Get a provider by name."""
         return self.providers.get(name)
-    
+
     def list_providers(self) -> List[JDBCProvider]:
         """Get all providers."""
         return list(self.providers.values())
-    
+
+    def list_names(self) -> List[str]:
+        """Get list of provider names for compatibility with older code/tests."""
+        return list(self.providers.keys())
+
     def get_providers_by_category(self, category: str) -> List[JDBCProvider]:
         """Get all providers of a specific category."""
         return [p for p in self.providers.values() if p.category == category]
-    
+
     def create_connection(self, provider_name: str, username: str = None,
                          password: str = None) -> Optional[JDBCConnection]:
         """Create a connection object for a provider."""

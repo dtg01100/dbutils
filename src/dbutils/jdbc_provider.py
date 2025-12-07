@@ -43,7 +43,7 @@ PROVIDERS_JSON = DEFAULT_PROVIDERS_JSON
 PROVIDERS_JSON = DEFAULT_PROVIDERS_JSON
 
 # Import configuration manager
-from dbutils.config_manager import ConfigManager, get_default_config_manager
+from dbutils.config_manager import get_default_config_manager
 
 
 @dataclass

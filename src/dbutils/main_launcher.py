@@ -5,9 +5,7 @@ Launches the Qt GUI interface exclusively with JDBC support.
 """
 
 import argparse
-import os
 import sys
-from typing import Optional
 
 
 def check_gui_availability() -> bool:
