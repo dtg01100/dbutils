@@ -1,6 +1,72 @@
 import os
 import tempfile
 import urllib.error
+from unittest.mock import MagicMock
+import pytest
+
+from dbutils.gui.jdbc_auto_downloader import (
+    get_latest_version_from_maven_metadata,
+    get_jdbc_driver_url,
+    download_jdbc_driver,
+    get_driver_directory,
+    list_installed_drivers,
+    find_existing_drivers,
+)
+
+
+def test_get_latest_version_from_maven_metadata(monkeypatch):
+    xml = '<metadata><versioning><latest>1.2.3</latest></versioning></metadata>'
+    class FakeResp:
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc, tb):
+            return False
+        def read(self):
+            return xml.encode('utf-8')
+
+    monkeypatch.setattr('urllib.request.urlopen', lambda url: FakeResp())
+    v = get_latest_version_from_maven_metadata('https://repo/maven')
+    assert v == '1.2.3'
+
+
+def test_get_jdbc_driver_url_latest(monkeypatch):
+    # Monkeypatch get_latest_version_from_maven_metadata indirectly via urlopen
+    xml = '<metadata><versioning><latest>9.8.7</latest></versioning></metadata>'
+    class FakeResp:
+        def __enter__(self): return self
+        def __exit__(self, a, b, c): return False
+        def read(self): return xml.encode('utf-8')
+
+    monkeypatch.setattr('urllib.request.urlopen', lambda url: FakeResp())
+    url = get_jdbc_driver_url('sqlite', 'latest')
+    assert url and url.endswith('.jar')
+
+
+def test_download_jdbc_driver_not_found(monkeypatch, tmp_path):
+    # Simulate HTTPError 404
+    def fake_urlopen(req):
+        raise urllib.error.HTTPError(req.full_url, 404, 'Not Found', hdrs=None, fp=None)
+
+    monkeypatch.setenv('DBUTILS_DRIVER_DIR', str(tmp_path))
+    monkeypatch.setattr('urllib.request.urlopen', fake_urlopen)
+    out = download_jdbc_driver('sqlite', version='latest', target_dir=str(tmp_path))
+    assert out is None
+
+
+def test_list_and_find_existing_drivers(tmp_path, monkeypatch):
+    # Create fake driver files
+    d1 = tmp_path / 'sqlite-jdbc-latest.jar'
+    d1.write_bytes(b'fake')
+    d2 = tmp_path / 'other.jar'
+    d2.write_bytes(b'fake')
+    monkeypatch.setenv('DBUTILS_DRIVER_DIR', str(tmp_path))
+    ld = list_installed_drivers()
+    assert 'sqlite-jdbc-latest.jar' in ld
+    found = find_existing_drivers('sqlite')
+    assert any('sqlite-jdbc' in p for p in found)
+import os
+import tempfile
+import urllib.error
 from pathlib import Path
 
 import pytest

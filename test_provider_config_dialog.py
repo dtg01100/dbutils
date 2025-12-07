@@ -272,16 +272,49 @@ class TestProviderConfigDialog:
 
         assert called.get('database_type') == 'sqlite'
         assert called.get('version') == '3.42.0.0'
-        assert checkbox is not None
 
+        # Now test that license acceptance is persisted when user opens the manual
+        # download page for a driver that requires a license (oracle).
+        d2, download_btn2, manual_btn2, checkbox2, _, _, _, _ = dlg.create_download_dialog('oracle')
         from dbutils.gui import license_store
         license_store.revoke_license('oracle')
         assert not license_store.is_license_accepted('oracle')
 
-        checkbox.setChecked(True)
-        manual_btn.click()
-
+        # Accept license and click manual download - this should persist acceptance
+        checkbox2.setChecked(True)
+        manual_btn2.click()
         assert license_store.is_license_accepted('oracle')
+
+    def test_perform_download_handles_multiple_paths(self, temp_config_dir, dialog, monkeypatch):
+        # Ensure perform_jdbc_download can handle a manager that returns a list of paths
+        from dbutils.gui import provider_config_dialog as pcd
+
+        dlg = dialog
+
+        # Ensure driver dir exists in temp config and create two fake jar files
+        driver_dir = temp_config_dir / 'drivers'
+        driver_dir.mkdir(parents=True, exist_ok=True)
+        jar1 = driver_dir / 'sqlite-jdbc-3.42.0.0.jar'
+        jar2 = driver_dir / 'sqlite-jdbc-3.42.0.1.jar'
+        jar1.write_bytes(b'test1')
+        jar2.write_bytes(b'test2')
+
+        called = {}
+
+        def fake_download(database_type, on_progress=None, version=None):
+            called['database_type'] = database_type
+            called['version'] = version
+            return [str(jar1), str(jar2)]
+
+        monkeypatch.setenv('DBUTILS_DRIVER_DIR', str(driver_dir))
+        monkeypatch.setattr('dbutils.gui.jdbc_driver_manager.download_jdbc_driver', fake_download)
+
+        # Call perform_jdbc_download - should set jar_path_input to first path
+        dlg.perform_jdbc_download('sqlite', version='3.42.0.0')
+
+        assert dlg.jar_path_input.text() == str(jar1)
+        assert called.get('database_type') == 'sqlite'
+        assert called.get('version') == '3.42.0.0'
 
 
 if __name__ == "__main__":

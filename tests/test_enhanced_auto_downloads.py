@@ -36,6 +36,9 @@ from dbutils.gui.jdbc_auto_downloader import (
 from dbutils.gui import license_store
 from dbutils.gui.jdbc_driver_manager import JDBCDriverDownloader, download_jdbc_driver as manager_download
 
+# Import test configuration
+from conftest import get_test_config_manager
+
 # Test data and utilities
 class MockResponse:
     """Mock HTTP response for testing."""
@@ -374,12 +377,16 @@ class TestRepositoryManagement:
         assert success is False
         assert "unavailable" in message.lower()
 
-    def test_repository_prioritization_logic(self):
+    def test_repository_prioritization_logic(self, test_config):
         """Test repository prioritization logic."""
         # The jdbc_auto_downloader uses MAVEN_REPOSITORIES[0] as primary
         # The JDBCDriverDownloader has more sophisticated prioritization
-        assert len(MAVEN_REPOSITORIES) >= 2
-        assert MAVEN_REPOSITORIES[0] == "https://repo1.maven.org/maven2/"
+
+        # Get repositories from test configuration
+        maven_repos = test_config.get_network_setting('maven_repositories', MAVEN_REPOSITORIES)
+
+        assert len(maven_repos) >= 2
+        assert maven_repos[0] == "https://repo1.maven.org/maven2/"
 
     def test_error_handling_invalid_repositories(self, monkeypatch):
         """Test error handling for invalid repositories."""
