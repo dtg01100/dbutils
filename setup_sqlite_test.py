@@ -4,10 +4,10 @@
 import json
 import os
 import sqlite3
-import sys
 import subprocess
-from pathlib import Path
-from typing import Optional, Dict, Any
+import sys
+from typing import Any, Dict, Optional
+
 
 def check_dependencies() -> Dict[str, bool]:
     """Check if required dependencies are installed."""
@@ -287,9 +287,9 @@ def main():
         print("  pytest tests/test_sqlite_integration.py")
         print("\nEnvironment variables are already set for this session.")
         print("If running in a new terminal, set these variables:")
-        print(f"  export DBUTILS_JDBC_PROVIDER=\"SQLite (Test Integration)\"")
+        print("  export DBUTILS_JDBC_PROVIDER=\"SQLite (Test Integration)\"")
         print(f"  export DBUTILS_CONFIG_DIR=\"{os.path.abspath('test_config')}\"")
-        print(f"  export DBUTILS_TEST_MODE=\"1\"")
+        print("  export DBUTILS_TEST_MODE=\"1\"")
     else:
         print("\nSetup failed. Please check the error messages above.")
         cleanup_test_environment()

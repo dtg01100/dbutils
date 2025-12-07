@@ -3,8 +3,8 @@
 dbutils launcher with JDBC configuration manager fix
 """
 
-import sys
 import os
+import sys
 
 # Add the src directory to Python path
 src_path = os.path.join(os.path.dirname(__file__), 'src')
@@ -15,7 +15,7 @@ def main():
     try:
         # Import the Qt application
         from dbutils.gui.qt_app import main as qt_main
-        
+
         # Run the Qt application main function
         qt_main()
     except ImportError as e:

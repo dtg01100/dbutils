@@ -77,4 +77,43 @@ select = [
     "C901",   # Allow complex functions for search functionality
     "E501"    # Allow long lines for mock data definitions
 ]
+"src/dbutils/gui/jdbc_auto_downloader.py" = [
+    "C901"   # Allow complex functions for driver download logic
+]
+"src/dbutils/gui/jdbc_driver_downloader.py" = [
+    "C901"   # Allow complex functions for driver download logic
+]
+"src/dbutils/gui/jdbc_driver_manager.py" = [
+    "C901"   # Allow complex functions for driver management logic
+]
+"src/dbutils/gui/provider_config_dialog.py" = [
+    "C901"   # Allow complex functions for GUI dialog logic
+]
+"src/dbutils/jdbc_provider.py" = [
+    "C901"   # Allow complex functions for JVM management
+]
+"tests/test_config_manager.py" = [
+    "C901"   # Allow complex functions for test configuration
+]
+"tests/test_enhanced_auto_downloads_simple.py" = [
+    "C901"   # Allow complex functions for comprehensive test cases
+]
+"tests/database_test_utils.py" = [
+    "C901"   # Allow complex functions for test utilities
+]
+"run_auto_download_tests.py" = [
+    "C901"   # Allow complex functions for test runner
+]
+"setup_multi_database_test.py" = [
+    "C901"   # Allow complex functions for test setup
+]
+"test_auto_download_infrastructure.py" = [
+    "C901"   # Allow complex functions for infrastructure testing
+]
+"test_jt400_simple.py" = [
+    "C901"   # Allow complex functions for JAR inspection
+]
+"verify_multi_database_setup.py" = [
+    "C901"   # Allow complex functions for verification reporting
+]
 

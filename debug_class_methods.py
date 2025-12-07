@@ -1,4 +1,5 @@
 import sys
+
 sys.path.insert(0, 'src')
 
 # Test to see all methods in the class
@@ -9,7 +10,7 @@ methods = [method for method in dir(ProviderConfigDialog) if not method.startswi
 for method in sorted(methods):
     if 'download' in method.lower() or 'Download' in method:
         print(f"  - {method}")
-        
+
 print("\nAll methods (including private):")
 all_methods = [method for method in dir(ProviderConfigDialog) if callable(getattr(ProviderConfigDialog, method, None))]
 download_related = [m for m in all_methods if 'download' in m.lower()]
@@ -21,7 +22,7 @@ print(f"\ndownload_jdbc_driver method exists: {has_method}")
 
 if has_method:
     import inspect
-    method = getattr(ProviderConfigDialog, 'download_jdbc_driver')
+    method = ProviderConfigDialog.download_jdbc_driver
     print(f"Method signature: {inspect.signature(method)}")
     print("Method properly bound to class: SUCCESS")
 else:

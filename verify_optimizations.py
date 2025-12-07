@@ -1,21 +1,21 @@
 # Final verification of all optimizations implemented
 
-import time
 import os
-from pathlib import Path
+import time
+
+from dbutils.utils import edit_distance
 
 print("🔍 FINAL VERIFICATION OF OPTIMIZATIONS")
 print("="*50)
 
 # 1. Verify the optimized edit_distance function
 print("\n1. Testing edit_distance optimization...")
-from dbutils.utils import edit_distance
 
 start = time.time()
-for i in range(5000):
-    d1 = edit_distance("TABLE_NAME_EXAMPLE", "TBL_NM_EXMPL")
-    d2 = edit_distance("CUSTOMER_INFORMATION", "CUST_INFO")
-    d3 = edit_distance("ORDER_TRANSACTION", "ORD_TRNS")
+for _ in range(5000):
+    edit_distance("TABLE_NAME_EXAMPLE", "TBL_NM_EXMPL")
+    edit_distance("CUSTOMER_INFORMATION", "CUST_INFO")
+    edit_distance("ORDER_TRANSACTION", "ORD_TRNS")
 elapsed = time.time() - start
 
 print(f"   15,000 operations completed in {elapsed:.3f}s ({elapsed/15000*1000:.3f}ms per op)")
@@ -49,7 +49,7 @@ except Exception as e:
 
 # 4. Verify performance improvements in data structures
 print("\n4. Verifying improved data structures...")
-from dbutils.db_browser import SearchIndex, TrieNode
+from dbutils.db_browser import SearchIndex
 
 # Create search index and test
 si = SearchIndex()
@@ -58,7 +58,7 @@ print("   ✅ Enhanced SearchIndex available")
 # Check if optimizations are in place
 with open("/workspaces/dbutils/src/dbutils/utils.py", 'r') as f:
     utils_content = f.read()
-    
+
 if "single array instead of two arrays" in utils_content or "cache-friendly" in utils_content:
     print("   ✅ Memory-efficient optimizations in utils")
 else:
@@ -93,7 +93,7 @@ if os.path.exists(provider_config_path):
 print("\n7. Checking for performance monitoring features...")
 # Check for performance improvements
 perf_files = []
-for root, dirs, files in os.walk("/workspaces/dbutils/src/dbutils"):
+for root, _, files in os.walk("/workspaces/dbutils/src/dbutils"):
     for file in files:
         if file.endswith(".py") and ("perf" in file or "monitor" in file):
             perf_files.append(os.path.join(root, file))
@@ -109,7 +109,7 @@ print("   • Edit distance algorithm optimized")
 print("   • Qt-only application architecture")
 print("   • Automated JDBC driver downloads")
 print("   • Improved data loading performance")
-print("   • Streaming search with debouncing") 
+print("   • Streaming search with debouncing")
 print("   • Proper threading and UI responsiveness")
 print("   • Enhanced provider configuration")
 print("="*50)

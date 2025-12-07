@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
-import ssl
-import urllib.request
-import urllib.error
-import json
-import sys
-import os
-from urllib.parse import urlparse
-
 # We'll import the registry & coords from the project
-import importlib.util
+import json
+import ssl
+import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -16,8 +12,8 @@ SRC = ROOT / 'src'
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from dbutils.gui.jdbc_driver_downloader import JDBCDriverRegistry
 from dbutils.gui.jdbc_auto_downloader import JDBC_DRIVER_COORDINATES, get_jdbc_driver_url
+from dbutils.gui.jdbc_driver_downloader import JDBCDriverRegistry
 
 # SSL context that ignores certificate verification for the purpose of this simple check
 ssl_ctx = ssl.create_default_context()
@@ -41,11 +37,9 @@ def check_url(url, method='HEAD'):
             except Exception:
                 pass
         return e.code, None
-    except urllib.error.HTTPError as e:
-        return e.code, None
-    except urllib.error.URLError as e:
+    except urllib.error.URLError:
         return None, None
-    except Exception as e:
+    except Exception:
         return None, None
 
 # Check JDBCDriverRegistry download_url and license urls

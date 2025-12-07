@@ -8,13 +8,12 @@ the auto-download system instead of hardcoded paths.
 
 import os
 import sys
-import json
-from pathlib import Path
 
 # Add src to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from dbutils.gui.jdbc_provider_config import get_configured_provider
+
 
 def get_jar_path_for_type(db_type: str) -> str:
     """Get the JAR path for a database type using auto-download system."""

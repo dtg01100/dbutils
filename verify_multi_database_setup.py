@@ -5,11 +5,11 @@ This script verifies that all configurations, dependencies, and test structures
 are properly set up for multi-database testing.
 """
 
-import os
-import sys
 import json
 import logging
-from typing import Dict, Any
+import os
+import sys
+from typing import Any, Dict
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -104,13 +104,7 @@ def check_provider_configurations() -> Dict[str, bool]:
 
     except Exception as e:
         logger.error(f"Error checking provider configurations: {e}")
-        return {provider: False for provider in [
-            "SQLite (Test Integration)",
-            "H2 (Test Integration)",
-            "Apache Derby (Test Integration)",
-            "HSQLDB (Test Integration)",
-            "DuckDB (Test Integration)"
-        ]}
+        return dict.fromkeys(["SQLite (Test Integration)", "H2 (Test Integration)", "Apache Derby (Test Integration)", "HSQLDB (Test Integration)", "DuckDB (Test Integration)"], False)
 
 def check_test_structure() -> Dict[str, Any]:
     """Check the overall test structure and configuration."""
@@ -248,7 +242,7 @@ def test_database_connections() -> Dict[str, bool]:
 
     except Exception as e:
         logger.error(f"Database connection testing failed: {e}")
-        return {db_type: False for db_type in ["sqlite", "h2", "derby", "hsqldb", "duckdb"]}
+        return dict.fromkeys(["sqlite", "h2", "derby", "hsqldb", "duckdb"], False)
 
 def generate_verification_report() -> Dict[str, Any]:
     """Generate a comprehensive verification report with detailed error information."""

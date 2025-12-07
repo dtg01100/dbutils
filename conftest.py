@@ -3,19 +3,18 @@
 This file contains pytest configuration and fixtures used across all test modules.
 """
 import logging
+import os
+import sys
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Configure logging for test debugging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-import os
-import sys
-import pytest
-from unittest.mock import patch, MagicMock
-
 # Import test configuration manager
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "tests"))
-from test_config_manager import get_test_config_manager
 
 # Add src directory to path so we can import dbutils
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
@@ -26,18 +25,18 @@ def mock_jdbc_connection():
     """Mock JDBC connection for testing without actual database."""
     with patch("dbutils.jdbc_provider.jaydebeapi") as mock_jaydebeapi, \
          patch("dbutils.jdbc_provider.jpype") as mock_jpype:
-        
+
         # Setup mock JPype
         mock_jpype.isJVMStarted.return_value = False
         mock_jpype.getDefaultJVMPath.return_value = "/fake/java/path"
-        
+
         # Setup mock JayDeBeApi connection
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
-        
+
         mock_jaydebeapi.connect.return_value = mock_conn
-        
+
         yield {
             "jaydebeapi": mock_jaydebeapi,
             "jpype": mock_jpype,
@@ -49,8 +48,8 @@ def mock_jdbc_connection():
 @pytest.fixture
 def mock_db_data():
     """Provide mock database schema data for testing."""
-    from dbutils.db_browser import TableInfo, ColumnInfo
-    
+    from dbutils.db_browser import ColumnInfo, TableInfo
+
     tables = [
         TableInfo(schema="TEST", name="USERS", remarks="User information table"),
         TableInfo(schema="TEST", name="ORDERS", remarks="Order records table"),
@@ -58,7 +57,7 @@ def mock_db_data():
         TableInfo(schema="DACDATA", name="CUSTOMERS", remarks="Customer data"),
         TableInfo(schema="DACDATA", name="INVOICES", remarks="Invoice records"),
     ]
-    
+
     columns = [
         ColumnInfo(
             schema="TEST",
@@ -111,7 +110,7 @@ def mock_db_data():
             remarks="Foreign key to USERS",
         ),
     ]
-    
+
     return {"tables": tables, "columns": columns}
 
 
@@ -135,7 +134,6 @@ def enable_test_mode_env():
 @pytest.fixture(scope='session', autouse=True)
 def setup_sqlite_provider_for_tests():
     """Setup SQLite JDBC provider configuration for testing."""
-    import json
     from dbutils.jdbc_provider import JDBCProvider, ProviderRegistry
 
     # Set up test-specific config directory
@@ -253,8 +251,9 @@ def disable_qt_message_boxes(monkeypatch):
     Returns default values where appropriate and avoids blocking dialogs.
     """
     try:
-        from PySide6.QtWidgets import QMessageBox, QFileDialog, QInputDialog
         import webbrowser
+
+        from PySide6.QtWidgets import QFileDialog, QInputDialog, QMessageBox
 
         monkeypatch.setattr(QMessageBox, 'question', lambda *args, **kwargs: QMessageBox.StandardButton.Yes)
         monkeypatch.setattr(QMessageBox, 'information', lambda *args, **kwargs: None)
@@ -287,8 +286,8 @@ def check_dependencies_and_skip(request):
 
     # Check for JDBC dependencies
     try:
-        import jaydebeapi
-        import jpype
+        import jaydebeapi  # noqa: F401
+        import jpype  # noqa: F401
     except ImportError as e:
         logger.warning(f"JDBC dependencies missing: {e}")
         if "test_sqlite_integration" in str(request.node.nodeid):
@@ -296,7 +295,7 @@ def check_dependencies_and_skip(request):
 
     # Check for GUI dependencies (PySide6)
     try:
-        import PySide6
+        import PySide6  # noqa: F401
     except ImportError:
         logger.warning("PySide6 not available - GUI tests will be skipped")
         if "test_provider_config_dialog" in str(request.node.nodeid) or "test_widgets" in str(request.node.nodeid):
@@ -317,8 +316,8 @@ def pytest_runtest_setup(item):
     if "test_sqlite_integration" in str(item.nodeid):
         # Check if JDBC dependencies are available
         try:
-            import jaydebeapi
-            import jpype
+            import jaydebeapi  # noqa: F401
+            import jpype  # noqa: F401
         except ImportError:
             pytest.skip("JDBC dependencies not available for SQLite integration tests")
 
@@ -428,7 +427,6 @@ def database_test_data():
 @pytest.fixture
 def create_test_database(request):
     """Create a test database for the specified database type."""
-    import tempfile
     import sqlite3
 
     db_type = request.param
@@ -472,7 +470,10 @@ def create_test_database(request):
         # Insert test data
         cursor.execute("INSERT INTO users (name, email) VALUES (?, ?)", ("John Doe", "john@example.com"))
         cursor.execute("INSERT INTO users (name, email) VALUES (?, ?)", ("Jane Smith", "jane@example.com"))
-        cursor.execute("INSERT INTO products (name, price, category) VALUES (?, ?, ?)", ("Laptop", 999.99, "Electronics"))
+        cursor.execute(
+            "INSERT INTO products (name, price, category) VALUES (?, ?, ?)",
+            ("Laptop", 999.99, "Electronics")
+        )
         cursor.execute("INSERT INTO products (name, price, category) VALUES (?, ?, ?)", ("Book", 19.99, "Books"))
         cursor.execute("INSERT INTO orders (user_id, total_amount) VALUES (?, ?)", (1, 1019.98))
         cursor.execute("INSERT INTO orders (user_id, total_amount) VALUES (?, ?)", (2, 19.99))
@@ -524,8 +525,8 @@ def database_connection(request, multi_database_providers):
     if "test_multi_database_integration" in str(item.nodeid):
         # Check if JDBC dependencies are available
         try:
-            import jaydebeapi
-            import jpype
+            import jaydebeapi  # noqa: F401
+            import jpype  # noqa: F401
         except ImportError:
             pytest.skip("JDBC dependencies not available for multi-database integration tests")
 
@@ -550,6 +551,7 @@ def database_connection(request, multi_database_providers):
 @pytest.fixture(scope='session')
 def test_config():
     """Provide centralized test configuration management."""
+    from tests.test_config_manager import get_test_config_manager
     config_manager = get_test_config_manager()
     return config_manager
 

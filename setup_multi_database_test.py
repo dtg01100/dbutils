@@ -12,14 +12,12 @@ The script handles JDBC driver configurations, environment setup, and test datab
 """
 
 import json
+import logging
 import os
 import sqlite3
-import sys
 import subprocess
-import tempfile
-from pathlib import Path
-from typing import Optional, Dict, Any, List
-import logging
+import sys
+from typing import Any, Dict, Optional
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -442,7 +440,7 @@ def main():
         print("  pytest tests/test_multi_database_integration.py")
         print("\nEnvironment variables are already set for this session.")
         print("If running in a new terminal, set these variables:")
-        print(f"  export DBUTILS_TEST_MODE=\"1\"")
+        print("  export DBUTILS_TEST_MODE=\"1\"")
         print(f"  export DBUTILS_CONFIG_DIR=\"{os.path.abspath('test_config')}\"")
     else:
         print("\nSetup failed. Please check the error messages above.")

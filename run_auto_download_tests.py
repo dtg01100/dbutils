@@ -3,14 +3,15 @@
 Simple test runner for enhanced auto downloads functionality.
 """
 
-import sys
 import os
+import sys
 
 # Add src to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 # Import the test module directly
 from tests.test_enhanced_auto_downloads import *
+
 
 def run_tests():
     """Run the enhanced auto downloads tests."""
@@ -87,7 +88,7 @@ def run_tests():
         except Exception as e:
             print(f"Error creating test instance: {e}")
 
-    print(f"\n=== Test Results ===")
+    print("\n=== Test Results ===")
     if results:
         print("Failed tests:")
         for test_class, failures in results.items():

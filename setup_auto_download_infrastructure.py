@@ -6,22 +6,21 @@ This script configures the project to use the built-in JDBC driver auto-download
 system instead of manual JAR file downloads.
 """
 
-import os
-import sys
 import json
 import logging
-from pathlib import Path
+import os
+import sys
 
 # Add src to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+
+from dbutils.gui.jdbc_auto_downloader import get_driver_directory
+from dbutils.gui.jdbc_provider_config import ensure_all_drivers_available, setup_auto_download_infrastructure
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from dbutils.gui.jdbc_provider_config import setup_auto_download_infrastructure, ensure_all_drivers_available
-from dbutils.gui.downloader_prefs import set_maven_repos, get_maven_repos, save_prefs
-from dbutils.gui.jdbc_auto_downloader import get_driver_directory
 
 def update_configuration_files():
     """Update configuration files to use auto-download system."""
@@ -84,11 +83,11 @@ def setup_downloader_preferences_config():
 
     # Import the new configuration system
     try:
-        from dbutils.config.url_config import add_maven_repository, get_maven_repositories
         from dbutils.config.dbutils_config import save_configuration
+        from dbutils.config.url_config import add_maven_repository, get_maven_repositories
     except ImportError:
         # Fallback to old system if new config not available
-        from dbutils.gui.downloader_prefs import set_maven_repos, save_prefs
+        from dbutils.gui.downloader_prefs import save_prefs, set_maven_repos
 
         # Configure Maven repositories (fallback)
         maven_repos = [

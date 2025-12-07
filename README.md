@@ -108,6 +108,17 @@ For development, you can install the project in editable mode with its developme
 
     ```bash
     pytest -q
+### Testing & Compatibility Notes
+
+- For running GUI tests, the test harness sets `DBUTILS_TEST_MODE=1` (autouse fixture) so GUI dialogs and user interactions are avoided during automated tests.
+- Useful environment variables you can set when running tests manually:
+    - `DBUTILS_TEST_MODE=1` — run in test mode to favor test-friendly behavior.
+    - `DBUTILS_DRIVER_DIR` — when testing driver downloads, set this to a temporary directory to avoid touching your development driver cache.
+    - `DBUTILS_MAVEN_REPOS` — override Maven repositories as a JSON array or comma-separated list when testing repository priorities.
+    - `DBUTILS_CONFIG_DIR` — point to a temporary config directory used by ProviderRegistry and other config files.
+- GUI helpers: `BusyOverlay` supports overriding its `_create_painter()` method in tests to allow `MagicMock` painter assertions without requiring a real Qt paint engine; prefer doing this in unit tests rather than mocking `QPainter` globally.
+
+If you have trouble reproducing a GUI failure, try setting `DBUTILS_TEST_MODE=1` and using `pytest -k <test_name>` to isolate the failing test.
 
 ### New Utility Examples
 

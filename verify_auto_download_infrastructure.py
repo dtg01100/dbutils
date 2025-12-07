@@ -6,22 +6,22 @@ This script demonstrates that the complete infrastructure is working
 and provides a summary of what was accomplished.
 """
 
-import os
-import sys
 import json
 import logging
-from pathlib import Path
+import os
+import sys
 
 # Add src to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+
+from dbutils.gui.downloader_prefs import get_maven_repos
+from dbutils.gui.jdbc_auto_downloader import get_driver_directory, get_jdbc_driver_url
+from dbutils.gui.jdbc_provider_config import AutoDownloadProviderConfig
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from dbutils.gui.jdbc_provider_config import AutoDownloadProviderConfig
-from dbutils.gui.jdbc_auto_downloader import get_driver_directory, get_jdbc_driver_url
-from dbutils.gui.downloader_prefs import get_maven_repos
 
 def verify_infrastructure():
     """Verify the complete auto-download infrastructure."""
@@ -80,7 +80,7 @@ def verify_infrastructure():
         auto_providers = [p for p in providers if p.get('auto_download', False)]
         print(f"   ✅ Providers file: {len(providers)} total, {len(auto_providers)} auto-download")
     else:
-        print(f"   ❌ Providers file not found")
+        print("   ❌ Providers file not found")
 
     # 7. Summary of changes
     print("\n" + "=" * 60)
