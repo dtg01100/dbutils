@@ -1,8 +1,9 @@
 """Comprehensive tests for TableContentsModel functionality."""
-import pytest
-from PySide6.QtCore import Qt, QModelIndex
-from dbutils.gui.qt_app import TableContentsModel
+from PySide6.QtCore import Qt
+
 from dbutils.db_browser import ColumnInfo
+from dbutils.gui.qt_app import TableContentsModel
+
 
 class TestTableContentsModel:
     """Test the TableContentsModel class."""

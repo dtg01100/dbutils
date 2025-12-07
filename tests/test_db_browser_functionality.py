@@ -8,39 +8,35 @@ Tests for core functionality including:
 - Mock data generation
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, mock_open
-import json
-import pickle
-import gzip
-from pathlib import Path
 
 from dbutils.db_browser import (
-    TableInfo,
     ColumnInfo,
-    TrieNode,
     SearchIndex,
+    TableInfo,
+    TrieNode,
     get_all_tables_and_columns,
     get_all_tables_and_columns_async,
-    mock_get_tables,
-    mock_get_columns,
-    query_runner,
-    intern_string,
-    humanize_schema_name,
-    schema_exists,
-    schema_exists_async,
     get_available_schemas,
     get_available_schemas_async,
     get_cache_key,
+    humanize_schema_name,
+    intern_string,
     load_from_cache,
+    mock_get_columns,
+    mock_get_tables,
+    query_runner,
     save_to_cache,
-)
-from dbutils.utils import (
-    fuzzy_match,
-    edit_distance,
+    schema_exists,
 )
 from dbutils.gui.qt_app import (
     highlight_text_as_html,
+)
+from dbutils.utils import (
+    edit_distance,
+    fuzzy_match,
 )
 
 
@@ -50,8 +46,8 @@ class TestTableInfo:
     def test_table_info_creation(self):
         """Test basic TableInfo creation and initialization."""
         table = TableInfo(
-            schema="TEST", 
-            name="USERS", 
+            schema="TEST",
+            name="USERS",
             remarks="User information table"
         )
         assert table.schema == "TEST"
@@ -61,11 +57,11 @@ class TestTableInfo:
     def test_string_interning(self):
         """Test that strings are properly interned."""
         table = TableInfo(
-            schema="TEST", 
-            name="USERS", 
+            schema="TEST",
+            name="USERS",
             remarks="User information table"
         )
-        
+
         # Check that interned strings are the same object
         assert table.schema is intern_string("TEST")
         assert table.name is intern_string("USERS")
@@ -108,7 +104,7 @@ class TestColumnInfo:
             nulls="N",
             remarks="User identifier"
         )
-        
+
         # Check that interned strings are the same object
         assert column.schema is intern_string("TEST")
         assert column.table is intern_string("USERS")
@@ -126,30 +122,30 @@ class TestTrieNode:
         trie = TrieNode()
         trie.insert("test", "item1")
         trie.insert("testing", "item2")
-        
+
         matches = trie.search_prefix("test")
         assert "item1" in matches
         assert "item2" in matches
-        
+
         matches = trie.search_prefix("tes")
         assert len(matches) >= 1  # Should contain at least "test"
-    
+
     def test_case_insensitive_search(self):
         """Test that search is case insensitive."""
         trie = TrieNode()
         trie.insert("Test", "item1")
-        
+
         matches = trie.search_prefix("test")
         assert "item1" in matches
-        
+
         matches = trie.search_prefix("TEST")
         assert "item1" in matches
-    
+
     def test_no_matches(self):
         """Test search for non-existent prefix."""
         trie = TrieNode()
         trie.insert("test", "item1")
-        
+
         matches = trie.search_prefix("xyz")
         assert len(matches) == 0
 
@@ -159,8 +155,8 @@ class TestSearchIndex:
 
     def test_build_index(self):
         """Test building search index from tables and columns."""
-        from dbutils.db_browser import TableInfo, ColumnInfo
-        
+        from dbutils.db_browser import ColumnInfo, TableInfo
+
         tables = [
             TableInfo(schema="TEST", name="USERS", remarks="User table"),
             TableInfo(schema="TEST", name="ORDERS", remarks="Order table"),
@@ -187,24 +183,24 @@ class TestSearchIndex:
                 remarks="User name"
             ),
         ]
-        
+
         index = SearchIndex()
         index.build_index(tables, columns)
-        
+
         # Test table search
         table_results = index.search_tables("user")
         assert len(table_results) == 1
         assert table_results[0].name == "USERS"
-        
+
         # Test column search
         column_results = index.search_columns("name")
         assert len(column_results) == 1
         assert column_results[0].name == "NAME"
-    
+
     def test_search_empty_query(self):
         """Test searching with empty query returns all items."""
-        from dbutils.db_browser import TableInfo, ColumnInfo
-        
+        from dbutils.db_browser import ColumnInfo, TableInfo
+
         tables = [TableInfo(schema="TEST", name="USERS", remarks="User table")]
         columns = [
             ColumnInfo(
@@ -218,10 +214,10 @@ class TestSearchIndex:
                 remarks="User identifier"
             ),
         ]
-        
+
         index = SearchIndex()
         index.build_index(tables, columns)
-        
+
         assert len(index.search_tables("")) == 1
         assert len(index.search_columns("")) == 1
 
@@ -245,7 +241,7 @@ class TestQueryRunner:
             mock_connect.assert_called_once()
             mock_conn.query.assert_called_once_with("SELECT * FROM TEST")
             assert result == expected_result
-    
+
     def test_query_runner_no_provider(self):
         """Test query runner without provider raises error."""
         with patch.dict('os.environ', {}, clear=True):
@@ -391,7 +387,7 @@ class TestGetAvailableSchemas:
         """Test getting available schemas with mock."""
         from dbutils.db_browser import SchemaInfo
         schemas = get_available_schemas(use_mock=True)
-        
+
         assert len(schemas) > 0
         assert all(isinstance(s, SchemaInfo) for s in schemas)
         assert any(s.name == "DACDATA" for s in schemas)
@@ -399,6 +395,7 @@ class TestGetAvailableSchemas:
     def test_get_available_schemas_async_mock(self):
         """Test getting available schemas async with mock."""
         import asyncio
+
         from dbutils.db_browser import SchemaInfo
 
         async def run_async():
@@ -426,7 +423,7 @@ class TestCacheFunctions:
         cache_dir = tmp_path / ".cache" / "dbutils"
         cache_dir.mkdir(parents=True)
         cache_file = cache_dir / "schema_cache.pkl.gz"
-        
+
         # Mock data
         tables = [TableInfo(schema="TEST", name="USERS", remarks="Users")]
         columns = [
@@ -441,14 +438,14 @@ class TestCacheFunctions:
                 remarks="ID"
             )
         ]
-        
+
         with patch('dbutils.db_browser.CACHE_FILE', cache_file):
             # Save to cache
             save_to_cache("TEST", tables, columns)
-            
+
             # Load from cache
             loaded = load_from_cache("TEST")
-            
+
             if loaded:
                 loaded_tables, loaded_columns = loaded
                 assert len(loaded_tables) == 1
@@ -462,7 +459,7 @@ class TestGetAllTablesAndColumns:
     def test_get_all_tables_and_columns_mock(self):
         """Test getting all tables and columns with mock data."""
         tables, columns = get_all_tables_and_columns(use_mock=True)
-        
+
         assert len(tables) > 0
         assert len(columns) > 0
         assert all(isinstance(t, TableInfo) for t in tables)
@@ -471,7 +468,7 @@ class TestGetAllTablesAndColumns:
     def test_get_all_tables_and_columns_with_schema_filter(self):
         """Test filtering by schema."""
         tables, columns = get_all_tables_and_columns(use_mock=True, schema_filter="TEST")
-        
+
         assert all(t.schema == "TEST" for t in tables)
         assert all(c.schema == "TEST" for c in columns)
 

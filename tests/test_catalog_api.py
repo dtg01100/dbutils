@@ -1,11 +1,10 @@
-import pytest
 from dbutils.catalog import (
-    get_tables,
     get_columns,
-    get_primary_keys,
-    get_indexes,
-    get_table_sizes,
     get_foreign_keys,
+    get_indexes,
+    get_primary_keys,
+    get_table_sizes,
+    get_tables,
 )
 
 

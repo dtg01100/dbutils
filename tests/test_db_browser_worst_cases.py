@@ -1,15 +1,10 @@
 import os
-import json
-import pickle
-import gzip
-import tempfile
-import stat
 from pathlib import Path
 
 import pytest
 
 from dbutils import db_browser
-from dbutils.db_browser import SearchIndex, TrieNode, intern_string, get_all_tables_and_columns, query_runner
+from dbutils.db_browser import SearchIndex, TrieNode, get_all_tables_and_columns, intern_string, query_runner
 
 
 def test_trie_massive_insert_search():

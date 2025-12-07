@@ -5,34 +5,26 @@ Simplified test suite for enhanced automatic downloads functionality without pyt
 This test suite covers the core functionality without requiring pytest.
 """
 
+import json
 import os
 import sys
 import tempfile
 import urllib.error
-import time
-import json
-from unittest.mock import MagicMock, patch
-from pathlib import Path
 
 # Add src to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../src'))
 
-from dbutils.gui.jdbc_auto_downloader import (
-    get_latest_version_from_maven_metadata,
-    get_jdbc_driver_url,
-    download_jdbc_driver,
-    get_driver_directory,
-    list_installed_drivers,
-    find_existing_drivers,
-    get_jdbc_driver_download_info,
-    test_repository_connectivity,
-    get_repository_status,
-    MAX_RETRY_ATTEMPTS,
-    RETRY_DELAY_BASE,
-    MAVEN_REPOSITORIES
-)
 from dbutils.gui import license_store
-from dbutils.gui.jdbc_driver_manager import JDBCDriverDownloader, download_jdbc_driver as manager_download
+from dbutils.gui.jdbc_auto_downloader import (
+    MAVEN_REPOSITORIES,
+    download_jdbc_driver,
+    find_existing_drivers,
+    get_jdbc_driver_url,
+    get_latest_version_from_maven_metadata,
+    test_repository_connectivity,
+)
+from dbutils.gui.jdbc_driver_manager import download_jdbc_driver as manager_download
+
 
 # Test data and utilities
 class MockResponse:
@@ -89,7 +81,7 @@ class TestResults:
         print(f"  ✗ {test_name}: {error}")
 
     def summary(self):
-        print(f"\n=== Test Summary ===")
+        print("\n=== Test Summary ===")
         print(f"Passed: {self.passed}")
         print(f"Failed: {self.failed}")
         if self.failures:
@@ -606,7 +598,7 @@ def run_all_tests():
     total_passed = sum(r.passed for r in all_results)
     total_failed = sum(r.failed for r in all_results)
 
-    print(f"\n=== Overall Test Results ===")
+    print("\n=== Overall Test Results ===")
     print(f"Total Passed: {total_passed}")
     print(f"Total Failed: {total_failed}")
 
@@ -616,7 +608,7 @@ def run_all_tests():
         all_failures.extend(results.failures)
 
     if all_failures:
-        print(f"\nAll failed tests:")
+        print("\nAll failed tests:")
         for i, (test_name, error) in enumerate(all_failures, 1):
             print(f"  {i}. {test_name}: {error}")
 

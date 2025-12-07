@@ -10,34 +10,26 @@ This test suite covers:
 5. Integration Testing (complete workflows, background downloads, driver detection)
 """
 
-import os
-import tempfile
-import urllib.error
-import time
 import json
-from unittest.mock import MagicMock, patch, call
+import time
+import urllib.error
 from pathlib import Path
+
 import pytest
 
-from dbutils.gui.jdbc_auto_downloader import (
-    get_latest_version_from_maven_metadata,
-    get_jdbc_driver_url,
-    download_jdbc_driver,
-    get_driver_directory,
-    list_installed_drivers,
-    find_existing_drivers,
-    get_jdbc_driver_download_info,
-    test_repository_connectivity,
-    get_repository_status,
-    MAX_RETRY_ATTEMPTS,
-    RETRY_DELAY_BASE,
-    MAVEN_REPOSITORIES
-)
 from dbutils.gui import license_store
-from dbutils.gui.jdbc_driver_manager import JDBCDriverDownloader, download_jdbc_driver as manager_download
+from dbutils.gui.jdbc_auto_downloader import (
+    MAVEN_REPOSITORIES,
+    download_jdbc_driver,
+    find_existing_drivers,
+    get_jdbc_driver_url,
+    get_latest_version_from_maven_metadata,
+    get_repository_status,
+    test_repository_connectivity,
+)
+from dbutils.gui.jdbc_driver_manager import download_jdbc_driver as manager_download
 
 # Import test configuration
-from conftest import get_test_config_manager
 
 # Test data and utilities
 class MockResponse:
@@ -150,9 +142,9 @@ class TestErrorHandling:
             (403, "Forbidden")
         ]
 
-        for status_code, reason in test_cases:
+        for test_status_code, test_reason in test_cases:
             def mock_urlopen_error(req):
-                raise urllib.error.HTTPError(f"https://example.com", status_code, reason, {}, None)
+                raise urllib.error.HTTPError("https://example.com", test_status_code, test_reason, {}, None)
 
             monkeypatch.setattr('urllib.request.urlopen', mock_urlopen_error)
             monkeypatch.setenv('DBUTILS_DRIVER_DIR', str(tmp_path))
@@ -166,7 +158,7 @@ class TestErrorHandling:
             )
 
             assert result is None
-            assert any(str(status_code) in msg for msg in tracker.status_messages)
+            assert any(str(test_status_code) in msg for msg in tracker.status_messages)
 
 # ======================
 # 2. PROGRESS TRACKING TESTS
@@ -285,14 +277,14 @@ class TestLicenseManagement:
         # Mock the license store to return False for license acceptance
         def mock_is_license_accepted(key):
             return False
-
-        monkeypatch.setattr('license_store.is_license_accepted', mock_is_license_accepted)
+        # Monkeypatch the imported module object rather than a string path
+        monkeypatch.setattr(license_store, 'is_license_accepted', mock_is_license_accepted)
 
         tracker = ProgressTracker()
 
         # Test that download fails when license is not accepted
         result = download_jdbc_driver(
-            'postgresql',
+            'oracle',
             version='1.0.0',
             target_dir=str(tmp_path),
             on_status=tracker.status_callback

@@ -5,19 +5,18 @@ Tests for:
 - Query runner functionality
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
-import json
-import os
 
 from dbutils.utils import (
-    query_runner,
+    _has_exact_substring,
+    _sequential_char_match,
+    _word_prefix_or_edit,
     edit_distance,
     edit_distance_fast,
     fuzzy_match,
-    _has_exact_substring,
-    _word_prefix_or_edit,
-    _sequential_char_match
+    query_runner,
 )
 
 
@@ -40,7 +39,7 @@ class TestQueryRunner:
             mock_connect.assert_called_once()
             mock_conn.query.assert_called_once_with("SELECT * FROM TEST")
             assert result == expected_result
-    
+
     def test_query_runner_no_provider(self):
         """Test query runner without provider raises error."""
         with patch.dict('os.environ', {}, clear=True):
@@ -107,11 +106,11 @@ class TestEditDistanceFast:
             ("", "hello", 5),
             ("hello", "", 5),
         ]
-        
+
         for s1, s2, max_dist in test_cases:
             slow_result = edit_distance(s1, s2)
             fast_result = edit_distance_fast(s1, s2, max_dist)
-            
+
             # If slow result <= max_dist, they should be equal
             if slow_result <= max_dist:
                 assert slow_result == fast_result
@@ -176,7 +175,7 @@ class TestInternalFuzzyFunctions:
         assert _word_prefix_or_edit("hello_world", "hello") is True
         assert _word_prefix_or_edit("user_name", "nam") is True  # prefix of second word
         assert _word_prefix_or_edit("test_table_name", "tabl") is True  # prefix of middle word
-        
+
         # Test edit distance matching for similar words
         assert _word_prefix_or_edit("customer", "custer") is True  # edit distance 1
         assert _word_prefix_or_edit("hello", "xyz") is False   # no match

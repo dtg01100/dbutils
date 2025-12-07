@@ -8,11 +8,9 @@ Tests for:
 - Driver installation process
 """
 
-import pytest
-from unittest.mock import patch, MagicMock, mock_open
-import tempfile
 import os
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from dbutils.gui.jdbc_driver_downloader import (
     JDBCDriverInfo,
@@ -23,8 +21,8 @@ from dbutils.gui.jdbc_driver_downloader import (
 from dbutils.gui.jdbc_driver_manager import (
     JDBCDriverDownloader,
     download_jdbc_driver,
-    get_jdbc_driver_download_info,
     find_existing_jdbc_drivers,
+    get_jdbc_driver_download_info,
 )
 
 
@@ -279,7 +277,7 @@ class TestJDBCDriverDownloader:
     def test_suggest_jar_filename_method(self):
         """Test the suggest_jar_filename method."""
         downloader = JDBCDriverDownloader()
-        
+
         # Test different database types
         assert downloader._suggest_jar_filename('postgresql', '1.0') == 'postgresql-1.0.jar'
         assert downloader._suggest_jar_filename('mysql', '2.0') == 'mysql-connector-java-2.0.jar'
@@ -291,11 +289,11 @@ class TestJDBCDriverDownloader:
     def test_is_jar_url(self):
         """Test URL type detection."""
         downloader = JDBCDriverDownloader()
-        
+
         # Test JAR URLs
         assert downloader._is_jar_url("https://repo1.maven.org/maven2/org/postgresql/postgresql/42.6.0/postgresql-42.6.0.jar")
         assert downloader._is_jar_url("http://example.com/driver.jar")
-        
+
         # Test non-JAR URLs
         assert not downloader._is_jar_url("https://jdbc.postgresql.org/download.html")
         assert not downloader._is_jar_url("https://repo1.maven.org/maven2/org/postgresql/postgresql/")
@@ -304,10 +302,10 @@ class TestJDBCDriverDownloader:
     def test_download_driver_unknown_type(self, mock_registry):
         """Test downloading driver for unknown database type."""
         mock_registry.DRIVERS.get.return_value = None
-        
+
         downloader = JDBCDriverDownloader()
         result = downloader.download_driver("unknown_db")
-        
+
         assert result is None
 
     @patch('dbutils.gui.jdbc_driver_manager.JDBCDriverRegistry')
@@ -319,22 +317,22 @@ class TestJDBCDriverDownloader:
         mock_driver_info.recommended_version = "1.0.0"
         mock_driver_info.alternative_urls = []
         mock_registry.DRIVERS.get.return_value = mock_driver_info
-        
+
         # Set up environment
         driver_dir = tmp_path / "drivers"
         with patch.dict('os.environ', {'DBUTILS_DRIVER_DIR': str(driver_dir)}):
             downloader = JDBCDriverDownloader()
-            
+
             # Mock the download methods to avoid actual network calls
             with patch.object(downloader, '_is_jar_url', return_value=False):
                 with patch.object(downloader, '_handle_complex_download', return_value=None):
                     progress_called = []
-                    
+
                     def progress_callback(downloaded, total):
                         progress_called.append((downloaded, total))
-                    
+
                     result = downloader.download_driver("test_db", on_progress=progress_callback)
-                    
+
                     # The result will be None because _handle_complex_download returns None
                     assert result is None
 
@@ -343,9 +341,9 @@ class TestJDBCDriverDownloader:
         driver_dir = tmp_path / "drivers"
         with patch.dict('os.environ', {'DBUTILS_DRIVER_DIR': str(driver_dir)}):
             downloader = JDBCDriverDownloader()
-            
+
             instructions = downloader.get_download_instructions("postgresql")
-            
+
             # Check that instructions contain expected information
             assert instructions is not None
             assert "JDBC Driver:" in instructions
@@ -357,10 +355,10 @@ class TestJDBCDriverDownloader:
         """Test finding existing drivers when none exist."""
         driver_dir = tmp_path / "drivers"
         driver_dir.mkdir()
-        
+
         with patch.dict('os.environ', {'DBUTILS_DRIVER_DIR': str(driver_dir)}):
             downloader = JDBCDriverDownloader()
-            
+
             # Initially no drivers
             existing = downloader.find_existing_drivers("postgresql")
             assert len(existing) == 0
@@ -369,19 +367,19 @@ class TestJDBCDriverDownloader:
         """Test finding existing drivers when files exist."""
         driver_dir = tmp_path / "drivers"
         driver_dir.mkdir()
-        
+
         # Create some mock JAR files
         (driver_dir / "postgresql-42.6.0.jar").touch()
         (driver_dir / "mysql-connector-java-8.0.33.jar").touch()
         (driver_dir / "other-file.txt").touch()
-        
+
         with patch.dict('os.environ', {'DBUTILS_DRIVER_DIR': str(driver_dir)}):
             downloader = JDBCDriverDownloader()
-            
+
             pg_drivers = downloader.find_existing_drivers("postgresql")
             assert len(pg_drivers) == 1
             assert "postgresql-42.6.0.jar" in pg_drivers[0]
-            
+
             mysql_drivers = downloader.find_existing_drivers("mysql")
             assert len(mysql_drivers) == 1
             assert "mysql-connector-java-8.0.33.jar" in mysql_drivers[0]
@@ -390,14 +388,14 @@ class TestJDBCDriverDownloader:
         """Test listing all available drivers."""
         driver_dir = tmp_path / "drivers"
         driver_dir.mkdir()
-        
+
         # Create some mock JAR files
         (driver_dir / "postgresql-42.6.0.jar").touch()
         (driver_dir / "mysql-connector-java-8.0.33.jar").touch()
-        
+
         with patch.dict('os.environ', {'DBUTILS_DRIVER_DIR': str(driver_dir)}):
             downloader = JDBCDriverDownloader()
-            
+
             all_drivers = downloader.list_available_drivers()
             assert len(all_drivers) == 2
             assert "postgresql-42.6.0.jar" in all_drivers
@@ -493,9 +491,9 @@ class TestConvenienceFunctions:
             # Mock the actual download to avoid network calls
             with patch('dbutils.gui.jdbc_driver_manager.JDBCDriverDownloader.download_driver') as mock_download:
                 mock_download.return_value = str(driver_dir / "test-driver.jar")
-                
+
                 result = download_jdbc_driver("postgresql")
-                
+
                 assert result is not None
                 mock_download.assert_called_once_with("postgresql", None, "recommended")
 
@@ -504,7 +502,7 @@ class TestConvenienceFunctions:
         driver_dir = tmp_path / "drivers"
         with patch.dict('os.environ', {'DBUTILS_DRIVER_DIR': str(driver_dir)}):
             info = get_jdbc_driver_download_info("postgresql")
-            
+
             assert info is not None
             assert "JDBC Driver:" in info
             assert "PostgreSQL JDBC Driver" in info
@@ -513,16 +511,16 @@ class TestConvenienceFunctions:
         """Test finding existing JDBC drivers."""
         driver_dir = tmp_path / "drivers"
         driver_dir.mkdir()
-        
+
         # Create a mock driver file
         (driver_dir / "postgresql-42.6.0.jar").touch()
-        
+
         with patch.dict('os.environ', {'DBUTILS_DRIVER_DIR': str(driver_dir)}):
             # Mock the finder method
             with patch('dbutils.gui.jdbc_driver_manager.JDBCDriverDownloader.find_existing_drivers') as mock_find:
                 mock_find.return_value = [str(driver_dir / "postgresql-42.6.0.jar")]
-                
+
                 result = find_existing_jdbc_drivers("postgresql")
-                
+
                 assert len(result) == 1
                 mock_find.assert_called_once_with("postgresql")

@@ -12,21 +12,20 @@ The tests include cross-database comparisons, database-specific features, and co
 JDBC driver functionality verification.
 """
 
-import os
-import tempfile
-import sqlite3
-import pytest
 import logging
-from unittest.mock import patch, MagicMock
-from pathlib import Path
+import os
+import sqlite3
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Import dbutils modules
-from dbutils.jdbc_provider import JDBCProvider, JDBCConnection, ProviderRegistry
 from dbutils import catalog
+from dbutils.jdbc_provider import JDBCConnection, JDBCProvider, ProviderRegistry
 
 # Test configuration
 TEST_DB_NAMES = {
@@ -343,12 +342,14 @@ def test_multi_database_error_handling(test_database_connection):
     conn = test_database_connection
 
     # Test invalid SQL syntax
-    with pytest.raises(Exception):
+    with pytest.raises(Exception) as exc_info:
         conn.query("SELECT FROM users WHERE")  # Invalid SQL
+    assert str(exc_info.value)  # Verify some error message exists
 
     # Test non-existent table
-    with pytest.raises(Exception):
+    with pytest.raises(Exception) as exc_info:
         conn.query("SELECT * FROM non_existent_table")
+    assert str(exc_info.value)  # Verify some error message exists
 
 def test_multi_database_performance(test_database_connection):
     """Test performance characteristics across database types."""
@@ -718,8 +719,9 @@ def test_multi_database_advanced_features():
     assert isinstance(result, list)
 
     # Test constraint validation
-    with pytest.raises(Exception):
+    with pytest.raises(Exception) as exc_info:
         conn.query("INSERT INTO complex_table (name, price, quantity) VALUES ('Test', -10.0, 5)")  # Negative price
+    assert str(exc_info.value)  # Verify some error message exists
 
     conn.close()
 

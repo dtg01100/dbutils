@@ -1,12 +1,9 @@
 import os
-import json
-import stat
-from pathlib import Path
 
 import pytest
 
 from dbutils import db_browser
-from dbutils.db_browser import get_cache_key, get_all_tables_and_columns, query_runner
+from dbutils.db_browser import get_all_tables_and_columns, get_cache_key, query_runner
 from dbutils.jdbc_provider import ProviderRegistry
 
 

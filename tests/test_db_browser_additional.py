@@ -1,25 +1,19 @@
-import os
 import gzip
-import pickle
-import time
-from pathlib import Path
+
 import pytest
 
 from dbutils.db_browser import (
-    TrieNode,
-    SearchIndex,
-    intern_string,
-    load_from_cache,
-    save_to_cache,
-    get_cache_key,
-    get_all_tables_and_columns_async,
-    schema_exists,
-    mock_get_tables,
-    mock_get_columns,
-    CACHE_DIR,
-    CACHE_FILE,
-    TableInfo,
     ColumnInfo,
+    SearchIndex,
+    TableInfo,
+    TrieNode,
+    get_all_tables_and_columns_async,
+    get_cache_key,
+    load_from_cache,
+    mock_get_columns,
+    mock_get_tables,
+    save_to_cache,
+    schema_exists,
 )
 
 

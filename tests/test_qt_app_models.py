@@ -1,15 +1,14 @@
-import pytest
-from pathlib import Path
-import os
 
-from dbutils.gui.qt_app import (
-    highlight_text_as_html,
-    DatabaseModel,
-    ColumnModel,
-    SearchResult,
-)
-from dbutils.db_browser import TableInfo, ColumnInfo
+import pytest
 from PySide6.QtCore import Qt
+
+from dbutils.db_browser import ColumnInfo, TableInfo
+from dbutils.gui.qt_app import (
+    ColumnModel,
+    DatabaseModel,
+    SearchResult,
+    highlight_text_as_html,
+)
 
 
 def test_highlight_text_html_basic():

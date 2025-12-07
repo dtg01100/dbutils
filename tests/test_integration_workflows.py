@@ -6,27 +6,20 @@ Tests for:
 - Main application functionality
 """
 
-import pytest
 import asyncio
-from unittest.mock import patch, MagicMock, mock_open
-import json
-import os
-from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from dbutils.db_browser import (
+    SearchIndex,
     get_all_tables_and_columns,
     get_all_tables_and_columns_async,
-    query_runner,
-    SearchIndex,
+    mock_get_columns,
     mock_get_tables,
-    mock_get_columns
+    query_runner,
 )
-from dbutils.jdbc_provider import (
-    JDBCProvider,
-    ProviderRegistry,
-    JDBCConnection,
-    connect
-)
+from dbutils.jdbc_provider import JDBCProvider, ProviderRegistry
 
 
 class TestEndToEndWorkflows:
@@ -36,19 +29,19 @@ class TestEndToEndWorkflows:
         """Test the complete workflow of schema browsing."""
         # Get mock data
         tables, columns = get_all_tables_and_columns(use_mock=True)
-        
+
         # Verify we got data
         assert len(tables) > 0
         assert len(columns) > 0
-        
+
         # Build search index
         search_index = SearchIndex()
         search_index.build_index(tables, columns)
-        
+
         # Test search capabilities
         table_results = search_index.search_tables("USER")
         assert len(table_results) > 0
-        
+
         column_results = search_index.search_columns("ID")
         assert len(column_results) > 0
 
@@ -74,22 +67,22 @@ class TestEndToEndWorkflows:
         # Get mock data
         tables = mock_get_tables()
         columns = mock_get_columns()
-        
+
         # Create and build search index
         search_index = SearchIndex()
         search_index.build_index(tables, columns)
-        
+
         # Verify index was built properly
         all_tables = search_index.search_tables("")
         all_columns = search_index.search_columns("")
-        
+
         assert len(all_tables) == len(tables)
         assert len(all_columns) == len(columns)
-        
+
         # Test specific searches
         user_tables = search_index.search_tables("USER")
         id_columns = search_index.search_columns("ID")
-        
+
         assert len(user_tables) > 0
         assert len(id_columns) > 0
 
@@ -101,9 +94,9 @@ class TestComponentIntegration:
         """Test integration between provider registry and JDBC connections."""
         # Set up provider configuration
         config_path = temp_config_dir.parent / "providers.json"
-        
+
         registry = ProviderRegistry(config_path=str(config_path))
-        
+
         # Add a test provider
         test_provider = JDBCProvider(
             name="Integration Test Provider",
@@ -112,12 +105,12 @@ class TestComponentIntegration:
             url_template="jdbc:test://{host}:{port}/{database}"
         )
         registry.add_or_update(test_provider)
-        
+
         # Verify provider was added
         retrieved_provider = registry.get("Integration Test Provider")
         assert retrieved_provider is not None
         assert retrieved_provider.name == "Integration Test Provider"
-        
+
         # Verify in list of names
         names = registry.list_names()
         assert "Integration Test Provider" in names
@@ -167,21 +160,21 @@ class TestComponentIntegration:
         # Get mock data
         tables = mock_get_tables()
         columns = mock_get_columns()
-        
+
         # Build search index with the mock data
         search_index = SearchIndex()
         search_index.build_index(tables, columns)
-        
+
         # Test that specific searches return expected results
         user_tables = [t for t in tables if 'USER' in t.name.upper()]
         user_search_results = search_index.search_tables("USER")
-        
+
         # Should find at least the USERS table
         assert len(user_search_results) >= len(user_tables)
-        
+
         id_columns = [c for c in columns if c.name == 'ID']
         id_search_results = search_index.search_columns("ID")
-        
+
         # Should find at least the ID columns
         assert len(id_search_results) >= len(id_columns)
 
@@ -194,11 +187,11 @@ class TestAsyncIntegration:
         """Test async data loading integration."""
         mock_conn = mock_jdbc_connection['connection']
         mock_cursor = mock_jdbc_connection['cursor']
-        
+
         # Configure mock to return test data
         mock_cursor.fetchall.return_value = [('test_schema', 'test_table', 'test_remarks')]
         mock_cursor.description = [('TABLE_SCHEMA',), ('TABLE_NAME',), ('TABLE_TEXT',)]
-        
+
         # Mock the async query execution
         with patch('dbutils.jdbc_provider.connect') as mock_connect:
             mock_connect.return_value = mock_conn
@@ -217,17 +210,17 @@ class TestAsyncIntegration:
         """Test that async and sync functions return consistent results."""
         # Compare results from sync and async with mock data
         sync_tables, sync_columns = get_all_tables_and_columns(use_mock=True)
-        
+
         # For async, we'll call it directly since it's a different function
         import asyncio
-        
+
         async def get_async_data():
             return await get_all_tables_and_columns_async(use_mock=True)
-        
+
         # Run the async function
         try:
             async_tables, async_columns = asyncio.run(get_async_data())
-            
+
             # Both should return mock data with the same structure
             assert len(sync_tables) == len(async_tables)
             assert len(sync_columns) == len(async_columns)
@@ -245,25 +238,21 @@ class TestCachingIntegration:
         cache_dir = tmp_path / ".cache" / "dbutils"
         cache_dir.mkdir(parents=True)
         cache_file = cache_dir / "schema_cache.pkl.gz"
-        
-        from dbutils.db_browser import (
-            load_from_cache,
-            save_to_cache,
-            get_cache_key
-        )
-        
+
+        from dbutils.db_browser import load_from_cache, save_to_cache
+
         # Create test data
         tables = mock_get_tables()
         columns = mock_get_columns()
-        
+
         # Test saving to cache
         with patch('dbutils.db_browser.CACHE_FILE', cache_file):
             # Save to cache
             save_to_cache("TEST", tables, columns)
-            
+
             # Load from cache
             cached_data = load_from_cache("TEST")
-            
+
             if cached_data:
                 cached_tables, cached_columns = cached_data
                 # Verify we can load it back
@@ -273,7 +262,7 @@ class TestCachingIntegration:
     def test_cache_key_generation(self):
         """Test cache key generation with different parameters."""
         from dbutils.db_browser import get_cache_key
-        
+
         # Test different combinations
         assert get_cache_key("TEST") == "TEST"
         assert get_cache_key("TEST", limit=10) == "TEST_LIMIT10_OFFSET0"
@@ -290,7 +279,7 @@ class TestProviderConfiguration:
         # Create a registry with temp config
         config_path = temp_config_dir.parent / "providers.json"
         registry = ProviderRegistry(config_path=str(config_path))
-        
+
         # Add a provider
         provider = JDBCProvider(
             name="Test DB Provider",
@@ -301,16 +290,16 @@ class TestProviderConfiguration:
             default_password="testpass",
             extra_properties={"ssl": "true"}
         )
-        
+
         registry.add_or_update(provider)
-        
+
         # Verify it was saved to file
         assert config_path.exists()
-        
+
         # Create a new registry instance and verify it loads the provider
         new_registry = ProviderRegistry(config_path=str(config_path))
         loaded_provider = new_registry.get("Test DB Provider")
-        
+
         assert loaded_provider is not None
         assert loaded_provider.driver_class == "com.test.Driver"
         assert loaded_provider.default_user == "testuser"
@@ -321,7 +310,7 @@ class TestProviderConfiguration:
         # Set up a provider
         config_path = temp_config_dir.parent / "providers.json"
         registry = ProviderRegistry(config_path=str(config_path))
-        
+
         provider = JDBCProvider(
             name="Connection Test Provider",
             driver_class="com.test.Driver",
@@ -329,7 +318,7 @@ class TestProviderConfiguration:
             url_template="jdbc:test://{host}:{port}/{database}"
         )
         registry.add_or_update(provider)
-        
+
         # Now test connecting with the configured provider
         # (without actually connecting, just test the process)
         assert registry.get("Connection Test Provider") is not None
@@ -354,10 +343,10 @@ class TestErrorHandlingIntegration:
         # but we test the data structures can handle empty results
         search_index = SearchIndex()
         search_index.build_index([], [])  # Empty tables and columns
-        
+
         # These should return empty results without errors
         tables = search_index.search_tables("anything")
         columns = search_index.search_columns("anything")
-        
+
         assert tables == []
         assert columns == []

@@ -1,5 +1,3 @@
-import os
-import json
 import gzip
 import pickle
 import time
@@ -9,15 +7,15 @@ import pytest
 
 from dbutils import db_browser
 from dbutils.db_browser import (
-    get_cache_key,
-    load_from_cache,
-    save_to_cache,
-    mock_get_tables,
-    mock_get_columns,
     SearchIndex,
     TrieNode,
+    get_cache_key,
     intern_string,
+    load_from_cache,
+    mock_get_columns,
+    mock_get_tables,
     query_runner,
+    save_to_cache,
 )
 
 

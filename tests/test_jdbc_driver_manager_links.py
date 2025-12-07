@@ -1,15 +1,9 @@
-import os
 import io
-import json
 import urllib.error
 import urllib.request
-import ssl
 from pathlib import Path
 
-import pytest
-
 from dbutils.gui.jdbc_driver_manager import JDBCDriverDownloader
-from dbutils.gui.jdbc_driver_downloader import JDBCDriverRegistry
 
 
 class DummyResponse:

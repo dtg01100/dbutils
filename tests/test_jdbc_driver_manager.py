@@ -1,10 +1,7 @@
-import os
 import json
-import tempfile
-from unittest.mock import MagicMock
-import pytest
+import os
 
-from dbutils.gui.jdbc_driver_manager import JDBCDriverDownloader, download_jdbc_driver
+from dbutils.gui.jdbc_driver_manager import JDBCDriverDownloader
 
 
 def test_get_maven_repos_json(monkeypatch):

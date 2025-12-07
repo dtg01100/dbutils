@@ -1,10 +1,11 @@
 import pytest
+
+from dbutils.db_browser import TableInfo
 from dbutils.gui.widgets.enhanced_widgets import (
-    StatusIndicator,
     EnhancedTableItem,
     SearchHighlightWidget,
+    StatusIndicator,
 )
-from dbutils.db_browser import TableInfo
 
 
 @pytest.mark.qt

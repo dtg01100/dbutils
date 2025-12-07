@@ -1,10 +1,8 @@
-from pathlib import Path
 import json
-import os
 
 import pytest
 
-from dbutils.jdbc_provider import ProviderRegistry, JDBCProvider, get_registry, PROVIDERS_JSON
+from dbutils.jdbc_provider import JDBCProvider, ProviderRegistry, get_registry
 
 
 def test_provider_registry_load_and_save(tmp_path, monkeypatch):

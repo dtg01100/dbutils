@@ -1,17 +1,15 @@
-import os
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
+
 import pytest
-
-from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QMessageBox
 
-from dbutils.gui.provider_config_dialog import ProviderConfigDialog
 from dbutils.enhanced_jdbc_provider import EnhancedProviderRegistry, JDBCProvider
+from dbutils.gui.provider_config_dialog import ProviderConfigDialog
 
 # Import test configuration
-from conftest import get_test_config_manager
 
 @pytest.fixture
 def qapp():

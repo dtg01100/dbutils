@@ -9,14 +9,13 @@ This test suite validates:
 4. Configuration management functionality
 """
 
-import os
 import json
-import tempfile
-import pytest
-from unittest.mock import patch, MagicMock
-from pathlib import Path
+import os
+from unittest.mock import patch
 
-from test_config_manager import TestConfigManager, get_test_config_manager, reload_test_config
+import pytest
+from tests.test_config_manager import TestConfigManager, get_test_config_manager, reload_test_config
+
 
 class TestConfigManagerInitialization:
     """Test initialization and basic functionality of the config manager."""
@@ -278,7 +277,7 @@ class TestBackwardCompatibility:
     def test_existing_database_configs_still_work(self):
         """Test that existing database configurations still work."""
         # Import the updated database_test_utils
-        from tests.database_test_utils import get_database_configs
+        from database_test_utils import get_database_configs
 
         # Get the database configs using the function
         DATABASE_CONFIGS = get_database_configs()

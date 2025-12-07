@@ -1,7 +1,3 @@
-import os
-import json
-from pathlib import Path
-import pytest
 
 from dbutils.gui import license_store
 

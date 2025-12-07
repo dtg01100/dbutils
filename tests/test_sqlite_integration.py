@@ -7,15 +7,16 @@ database operations, schema management, and error handling using real SQLite dat
 """
 
 import os
-import tempfile
 import sqlite3
+import tempfile
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
-from pathlib import Path
+
+from dbutils import catalog
 
 # Import dbutils modules
-from dbutils.jdbc_provider import JDBCProvider, JDBCConnection, ProviderRegistry
-from dbutils import catalog
+from dbutils.jdbc_provider import JDBCProvider, ProviderRegistry
 
 # Test configuration
 TEST_DB_NAME = "test_integration.db"
@@ -280,7 +281,7 @@ def test_sqlite_schema_and_table_operations(mock_sqlite_connection):
         columns_result = conn.query("PRAGMA table_info(test_new_table)")
         column_names = [row['name'] for row in columns_result]
         assert 'new_column' in column_names
-    except Exception as e:
+    except Exception:
         # Some SQLite versions may not support ALTER TABLE ADD COLUMN
         pass
 
@@ -294,19 +295,19 @@ def test_sqlite_error_handling_and_edge_cases(mock_sqlite_connection):
     )
 
     # Test invalid SQL syntax
-    with pytest.raises(Exception):
+    with pytest.raises(sqlite3.DatabaseError):
         conn.query("SELECT FROM users WHERE")  # Invalid SQL
 
     # Test non-existent table
-    with pytest.raises(Exception):
+    with pytest.raises(sqlite3.OperationalError):
         conn.query("SELECT * FROM non_existent_table")
 
     # Test constraint violations
-    with pytest.raises(Exception):
+    with pytest.raises(sqlite3.IntegrityError):
         conn.query("INSERT INTO users (name, email) VALUES ('Test', 'john@example.com')")  # Duplicate email
 
     # Test NULL constraint violations
-    with pytest.raises(Exception):
+    with pytest.raises(sqlite3.IntegrityError):
         conn.query("INSERT INTO users (email) VALUES ('test@example.com')")  # Missing required name
 
 def test_sqlite_connection_pooling_and_resource_management(mock_sqlite_connection):
@@ -496,7 +497,7 @@ def test_sqlite_advanced_features(mock_sqlite_connection):
     assert isinstance(result, list)
 
     # Test constraint validation
-    with pytest.raises(Exception):
+    with pytest.raises(sqlite3.IntegrityError):
         conn.query("INSERT INTO complex_table (name, price, quantity) VALUES ('Test', -10.0, 5)")  # Negative price
 
     # Test trigger functionality

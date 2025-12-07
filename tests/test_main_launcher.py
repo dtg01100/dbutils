@@ -1,7 +1,4 @@
-import importlib
 import sys
-import io
-import contextlib
 
 import pytest
 
@@ -10,7 +7,6 @@ from dbutils import main_launcher
 
 def test_check_gui_availability(monkeypatch):
     # Force find_spec to return truthy
-    import importlib.util as util
 
     monkeypatch.setattr('importlib.util.find_spec', lambda name: True)
     assert main_launcher.check_gui_availability()

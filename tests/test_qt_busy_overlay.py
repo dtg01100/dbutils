@@ -1,11 +1,12 @@
 """Comprehensive tests for BusyOverlay widget functionality."""
-import pytest
-from unittest.mock import MagicMock, patch
-from PySide6.QtCore import Qt, QPoint, QRect
-from PySide6.QtGui import QPainter, QColor, QPen, QBrush
+from unittest.mock import MagicMock
+
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import QWidget
 
 from dbutils.gui.widgets.enhanced_widgets import BusyOverlay
+
 
 class TestBusyOverlay:
     """Test the BusyOverlay widget functionality."""
@@ -72,7 +73,7 @@ class TestBusyOverlay:
 
         # Test event filter
         result = overlay.eventFilter(parent, mock_event)
-        assert result == False  # Should return False to allow event to continue
+        assert not result  # Should return False to allow event to continue
 
     def test_busy_overlay_paint_event(self):
         """Test BusyOverlay paint event."""
@@ -80,8 +81,9 @@ class TestBusyOverlay:
         parent.resize(400, 300)
         overlay = BusyOverlay(parent, "Processing...")
 
-        # Create a mock painter
+        # Create a mock painter and inject via the overlay's painter factory
         mock_painter = MagicMock(spec=QPainter)
+        overlay._create_painter = lambda: mock_painter
 
         # Create a mock event
         mock_event = MagicMock()

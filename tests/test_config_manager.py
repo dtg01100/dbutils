@@ -7,13 +7,12 @@ with support for multiple sources (files, environment variables, defaults) and
 proper error handling.
 """
 
-import os
 import json
 import logging
-from pathlib import Path
-from typing import Dict, Any, Optional, List
+import os
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 # Configure logging
 logger = logging.getLogger(__name__)

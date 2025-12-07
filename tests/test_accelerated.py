@@ -1,8 +1,6 @@
 import importlib
 import sys
 
-import pytest
-
 
 def test_accelerated_fallback_functions():
     # Import accelerated module and verify fallback functions work

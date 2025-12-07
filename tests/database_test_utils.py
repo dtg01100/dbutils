@@ -5,11 +5,10 @@ This module provides utilities for database connection management,
 test data generation, schema management, and cross-database testing.
 """
 
-import os
-import tempfile
-import sqlite3
 import logging
-from typing import Dict, Any, List, Optional
+import os
+import sqlite3
+from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock
 
 # Configure logging
@@ -17,7 +16,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Import test configuration
-from conftest import get_test_config_manager
+from tests.test_config_manager import get_test_config_manager
+
 
 def get_database_configs() -> Dict[str, Dict[str, Any]]:
     """Get database configurations from centralized test configuration system."""
@@ -62,7 +62,7 @@ class DatabaseConnectionManager:
         import sys
         sys.path.insert(0, 'src')
 
-        from dbutils.jdbc_provider import JDBCProvider, JDBCConnection
+        from dbutils.jdbc_provider import JDBCConnection, JDBCProvider
 
         if db_type not in DATABASE_CONFIGS:
             raise ValueError(f"Unsupported database type: {db_type}")

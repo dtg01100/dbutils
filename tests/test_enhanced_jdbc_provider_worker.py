@@ -1,5 +1,4 @@
-import pytest
-from dbutils.enhanced_jdbc_provider import QueryWorker, JDBCProvider, JDBCConnection, QueryWorker
+from dbutils.enhanced_jdbc_provider import QueryWorker
 
 
 class FakeCursor:

@@ -1,16 +1,11 @@
-import os
-import tempfile
 import urllib.error
-from unittest.mock import MagicMock
-import pytest
 
 from dbutils.gui.jdbc_auto_downloader import (
-    get_latest_version_from_maven_metadata,
-    get_jdbc_driver_url,
     download_jdbc_driver,
-    get_driver_directory,
-    list_installed_drivers,
     find_existing_drivers,
+    get_jdbc_driver_url,
+    get_latest_version_from_maven_metadata,
+    list_installed_drivers,
 )
 
 
@@ -64,12 +59,7 @@ def test_list_and_find_existing_drivers(tmp_path, monkeypatch):
     assert 'sqlite-jdbc-latest.jar' in ld
     found = find_existing_drivers('sqlite')
     assert any('sqlite-jdbc' in p for p in found)
-import os
-import tempfile
-import urllib.error
 from pathlib import Path
-
-import pytest
 
 from dbutils.gui import jdbc_auto_downloader as jad
 
@@ -159,7 +149,7 @@ def test_download_jdbc_driver_success(monkeypatch, tmp_path):
     def fake_urlopen(req):
         return DummyResponse(test_data)
 
-    monkeypatch.setattr(jad, 'get_jdbc_driver_url', lambda db, v: 'https://example.com/sqlite-jdbc-3.42.0.0.jar')
+    monkeypatch.setattr(jad, 'get_jdbc_driver_url', lambda db, v, repo_index=0: 'https://example.com/sqlite-jdbc-3.42.0.0.jar')
     monkeypatch.setattr(jad.urllib.request, 'urlopen', fake_urlopen)
 
     # Use a custom driver dir
@@ -183,7 +173,7 @@ def test_download_jdbc_driver_skips_if_exists(monkeypatch, tmp_path):
 
     monkeypatch.setenv('DBUTILS_DRIVER_DIR', str(driver_dir))
     # Ensure URL generation returns the same filename
-    monkeypatch.setattr(jad, 'get_jdbc_driver_url', lambda db, v: str(existing))
+    monkeypatch.setattr(jad, 'get_jdbc_driver_url', lambda db, v, repo_index=0: str(existing))
 
     result = jad.download_jdbc_driver('sqlite', '3.42.0.0')
     assert result == str(existing)
@@ -194,7 +184,7 @@ def test_download_jdbc_driver_http_404(monkeypatch, tmp_path):
     def raise_404(req):
         raise urllib.error.HTTPError(url=req.get_full_url() if hasattr(req, 'get_full_url') else str(req), code=404, msg='Not Found', hdrs=None, fp=None)
 
-    monkeypatch.setattr(jad, 'get_jdbc_driver_url', lambda db, v: 'https://example.com/missing.jar')
+    monkeypatch.setattr(jad, 'get_jdbc_driver_url', lambda db, v, repo_index=0: 'https://example.com/missing.jar')
     monkeypatch.setattr(jad.urllib.request, 'urlopen', raise_404)
 
     monkeypatch.setenv('DBUTILS_DRIVER_DIR', str(tmp_path / 'drivers'))

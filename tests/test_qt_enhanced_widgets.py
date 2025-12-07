@@ -1,18 +1,17 @@
 """Comprehensive tests for enhanced widgets functionality."""
-import pytest
-from unittest.mock import MagicMock, patch
-from PySide6.QtCore import Qt, QPoint, QRect
-from PySide6.QtGui import QPainter, QColor, QPen, QBrush
+from unittest.mock import MagicMock
+
 from PySide6.QtWidgets import QWidget
 
-from dbutils.gui.widgets.enhanced_widgets import (
-    StatusIndicator,
-    EnhancedTableItem,
-    SearchHighlightWidget,
-    ProgressBar,
-    CollapsiblePanel
-)
 from dbutils.db_browser import TableInfo
+from dbutils.gui.widgets.enhanced_widgets import (
+    CollapsiblePanel,
+    EnhancedTableItem,
+    ProgressBar,
+    SearchHighlightWidget,
+    StatusIndicator,
+)
+
 
 class TestStatusIndicator:
     """Test the StatusIndicator widget."""

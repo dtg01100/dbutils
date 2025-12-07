@@ -1,15 +1,12 @@
-import os
 import json
-from pathlib import Path
-import pytest
 from unittest.mock import MagicMock
 
 from dbutils.enhanced_jdbc_provider import (
-    PredefinedProviderTemplates,
-    JDBCConnection,
-    QueryWorker,
     EnhancedProviderRegistry,
+    JDBCConnection,
     JDBCProvider,
+    PredefinedProviderTemplates,
+    QueryWorker,
 )
 
 
@@ -99,19 +96,9 @@ def test_enhanced_provider_registry_save_and_load(tmp_path):
     # Remove
     assert registry.remove_provider('TestProv') is True
     assert registry.remove_provider('TestProv') is False
-import os
-import json
-from pathlib import Path
-import importlib
-
-import pytest
 
 
-from dbutils.enhanced_jdbc_provider import (
-    JDBCProvider,
-    PredefinedProviderTemplates,
-    EnhancedProviderRegistry,
-)
+
 
 
 def test_predefined_templates_lookup():
@@ -168,7 +155,7 @@ def test_enhanced_provider_registry_save_load(tmp_path, monkeypatch):
 
 
 def test_jdbc_connection_connect_disconnect(monkeypatch):
-    from dbutils.enhanced_jdbc_provider import JDBCProvider, JDBCConnection
+    from dbutils.enhanced_jdbc_provider import JDBCConnection, JDBCProvider
 
     # Create a sample provider
     prov = JDBCProvider(name='P', category='Generic', driver_class='com.test.Driver', jar_path='/tmp/jar', url_template='jdbc:test://{host}')

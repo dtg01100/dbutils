@@ -1,15 +1,14 @@
-import pytest
 from PySide6.QtWidgets import QWidget
 
-from dbutils.gui.widgets.enhanced_widgets import (
-    StatusIndicator,
-    EnhancedTableItem,
-    SearchHighlightWidget,
-    ProgressBar,
-    CollapsiblePanel,
-    BusyOverlay,
-)
 from dbutils.db_browser import TableInfo
+from dbutils.gui.widgets.enhanced_widgets import (
+    BusyOverlay,
+    CollapsiblePanel,
+    EnhancedTableItem,
+    ProgressBar,
+    SearchHighlightWidget,
+    StatusIndicator,
+)
 
 
 def test_status_indicator_searching(qapp):
