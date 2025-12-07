@@ -6,46 +6,29 @@ This module provides functionality to configure JDBC providers using the
 auto-download system instead of manual JAR file references.
 """
 
-import os
 import json
 import logging
-from pathlib import Path
-from typing import Dict, Any, Optional, List
+import os
+from typing import Any, Dict, List, Optional
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Import the auto-download system
-from .jdbc_auto_downloader import (
-    get_jdbc_driver_url,
-    download_jdbc_driver,
-    get_driver_directory,
-    list_installed_drivers,
-    find_existing_drivers
-)
-from .jdbc_driver_manager import JDBCDriverDownloader
-from .license_store import is_license_accepted, accept_license
+from .jdbc_auto_downloader import download_jdbc_driver, find_existing_drivers, list_installed_drivers
+from .license_store import is_license_accepted
 
 # Import the new configuration system
 try:
-    from ...config.dbutils_config import (
-        get_driver_directory as config_get_driver_directory,
-        get_maven_repositories,
-        construct_maven_artifact_url,
-        construct_metadata_url
-    )
-    from ...config.url_config import URLConfig
+    from ...config.dbutils_config import construct_maven_artifact_url, construct_metadata_url, get_maven_repositories
+    from ...config.dbutils_config import get_driver_directory as config_get_driver_directory
     from ...config.path_config import PathConfig
+    from ...config.url_config import URLConfig
 except ImportError:
-    from dbutils.config.dbutils_config import (
-        get_driver_directory as config_get_driver_directory,
-        get_maven_repositories,
-        construct_maven_artifact_url,
-        construct_metadata_url
-    )
-    from dbutils.config.url_config import URLConfig
+    from dbutils.config.dbutils_config import get_driver_directory as config_get_driver_directory
     from dbutils.config.path_config import PathConfig
+    from dbutils.config.url_config import URLConfig
 
 class AutoDownloadProviderConfig:
     """Configure JDBC providers using auto-download system."""

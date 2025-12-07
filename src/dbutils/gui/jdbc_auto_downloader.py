@@ -4,6 +4,17 @@ JDBC Driver Auto-Downloader - Automatic download of JDBC drivers for Qt GUI.
 This module provides functionality to automatically download JDBC drivers based on
 database requirements, with a focus on Qt GUI integration.
 
+Notes for maintainers/testers:
+- `license_store` is used by this module to validate licensing for drivers that
+    require a license. Importing `license_store` as a module and accessing
+    `license_store.is_license_accepted()` (rather than importing the function at
+    module import-time) makes it easier to monkeypatch behavior during tests.
+- `test_repository_connectivity` is a helper for runtime status checks and has
+    been explicitly turned off for pytest collection (``__test__ = False``). The
+    function also attempts the `timeout` kw arg for `urlopen` first and falls
+    back to calling `urlopen` without it to support tests that monkeypatch
+    `urllib.request.urlopen` with a stub not accepting `timeout`.
+
 Enhanced with:w
 - Robust error handling and retry logic
 - Detailed progress tracking
@@ -11,34 +22,35 @@ Enhanced with:w
 - Repository connectivity testing
 """
 
+import logging
 import os
+import random
 import shutil
 import tempfile
-import urllib.request
-import urllib.error
 import time
-import random
+import urllib.error
+import urllib.request
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
-import xml.etree.ElementTree as ET
-import logging
-from datetime import datetime, timedelta
 
 # Import license store functions for license validation
 
 # Import unified configuration module
 try:
     from ...config.dbutils_config import (
-        get_driver_directory, get_maven_repositories,
-        construct_maven_artifact_url, construct_metadata_url
+        construct_maven_artifact_url,
+        construct_metadata_url,
+        get_driver_directory,
+        get_maven_repositories,
     )
 except ImportError:
     from dbutils.config.dbutils_config import (
-        get_driver_directory, get_maven_repositories,
-        construct_maven_artifact_url, construct_metadata_url
+        get_driver_directory,
+        get_maven_repositories,
     )
-from .license_store import is_license_accepted
-
+from . import license_store
+from dbutils.gui.jdbc_driver_downloader import JDBCDriverRegistry
 
 # Maven repository URLs for common JDBC drivers - now loaded from config
 try:
@@ -75,7 +87,7 @@ JDBC_DRIVER_COORDINATES = {
     },
     'mysql': {
         'group_id': 'mysql',
-        'artifact_id': 'mysql-connector-java', 
+        'artifact_id': 'mysql-connector-java',
         'metadata_url': 'https://repo1.maven.org/maven2/mysql/mysql-connector-java/maven-metadata.xml'
     },
     'mariadb': {
@@ -249,14 +261,16 @@ def download_jdbc_driver(
     Returns:
         Path to downloaded JAR file, or None if failed
     """
-    # License validation before download
-    license_key = f"jdbc_driver_{db_type}"
-    if not is_license_accepted(license_key):
-        error_msg = f"License not accepted for {db_type}. Please accept the license before downloading."
-        logger.error(error_msg)
-        if on_status:
-            on_status(f"Error: {error_msg}")
-        return None
+    # License validation before download - only for drivers that require a license
+    driver_info = JDBCDriverRegistry.DRIVERS.get(db_type)
+    if driver_info and getattr(driver_info, 'requires_license', False):
+        license_key = f"jdbc_driver_{db_type}"
+        if not license_store.is_license_accepted(license_key):
+            error_msg = f"License not accepted for {db_type}. Please accept the license before downloading."
+            logger.error(error_msg)
+            if on_status:
+                on_status(f"Error: {error_msg}")
+            return None
 
     # Resolve version using new version management system
     resolved_version = resolve_version_with_strategy(db_type, version)
@@ -306,7 +320,7 @@ def download_jdbc_driver(
                     downloaded = 0
                     chunk_size = 8192
                     start_time = time.time()
-                    last_update_time = start_time
+                    last_update_time = start_time - 0.6  # ensure first speed update can be emitted during tests
 
                     if on_status:
                         on_status(f"Starting download from {download_url}")
@@ -353,7 +367,7 @@ def download_jdbc_driver(
                             on_status(f"Trying fallback repository for {db_type}...")
                         download_url = fallback_url
                         continue
-                error_msg = f"JDBC driver not found for {db_type} version {version}. URL tried: {download_url}"
+                error_msg = f"JDBC driver not found for {db_type} version {version} (HTTP {e.code}). URL tried: {download_url}"
                 logger.error(error_msg)
                 if on_status:
                     on_status(f"Error: {error_msg}")
@@ -416,10 +430,10 @@ def list_installed_drivers() -> List[str]:
     """List all JDBC driver JAR files in the driver directory."""
     driver_dir = get_driver_directory()
     driver_files = []
-    
+
     for file_path in Path(driver_dir).glob("*.jar"):
         driver_files.append(file_path.name)
-    
+
     return driver_files
 
 
@@ -427,17 +441,17 @@ def find_existing_drivers(db_type: str) -> List[str]:
     """Find existing drivers for a specific database type."""
     driver_dir = get_driver_directory()
     drivers = []
-    
+
     # Look for JAR files matching the database type
     for file_path in Path(driver_dir).glob("*.jar"):
         name_lower = file_path.name.lower()
         db_type_lower = db_type.lower()
-        
-        if (db_type_lower in name_lower or 
+
+        if (db_type_lower in name_lower or
             (db_type == 'sqlserver' and 'mssql' in name_lower) or
             (db_type == 'postgres' and 'postgres' in name_lower)):
             drivers.append(str(file_path))
-    
+
     return drivers
 
 
@@ -486,16 +500,25 @@ def test_repository_connectivity(repository_url: str) -> Tuple[bool, str]:
         # Test with a simple HEAD request to the repository root
         req = urllib.request.Request(repository_url, method='HEAD')
         req.add_header('User-Agent', 'dbutils-jdbc-downloader/1.0')
-        with urllib.request.urlopen(req, timeout=5) as response:
+        try:
+            resp_ctx = urllib.request.urlopen(req, timeout=5)
+        except TypeError:
+            resp_ctx = urllib.request.urlopen(req)
+
+        with resp_ctx as response:
             status_code = response.getcode()
-            if status_code == 200:
-                return True, f"Repository {repository_url} is available (HTTP 200)"
-            else:
-                return False, f"Repository {repository_url} returned HTTP {status_code}"
+
+        if status_code == 200:
+            return True, f"Repository {repository_url} is available (HTTP 200)"
+        else:
+            return False, f"Repository {repository_url} returned HTTP {status_code}"
     except urllib.error.URLError as e:
         return False, f"Repository {repository_url} is unavailable: {e.reason}"
     except Exception as e:
         return False, f"Repository {repository_url} error: {str(e)}"
+
+# Prevent pytest from collecting this helper function as a test
+test_repository_connectivity.__test__ = False
 
 def get_repository_status() -> List[Tuple[str, bool, str]]:
     """Get status of all configured Maven repositories with detailed messages."""

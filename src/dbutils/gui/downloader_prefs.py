@@ -2,9 +2,9 @@
 import json
 import os
 import time
-from typing import List, Tuple
-import urllib.request
 import urllib.error
+import urllib.request
+from typing import List, Tuple
 
 # Import unified configuration module
 try:
@@ -35,6 +35,11 @@ def load_prefs() -> dict:
         with open(path, 'r', encoding='utf-8') as fh:
             data = json.load(fh)
             if 'maven_repos' in data and isinstance(data['maven_repos'], list):
+                # Sync old prefs to new URL config system
+                try:
+                    _sync_prefs_to_url_config()
+                except Exception:
+                    pass  # Don't fail if sync fails
                 return data
     except Exception:
         pass
@@ -50,16 +55,36 @@ def save_prefs(prefs: dict) -> None:
     except Exception:
         pass
 
+    # Sync to new URL config system
+    try:
+        _sync_prefs_to_url_config()
+    except Exception:
+        pass  # Don't fail if sync fails
+
 
 def get_maven_repos() -> List[str]:
     """Get Maven repositories from dynamic configuration system."""
     # Use dynamic URL configuration
     return get_maven_repositories()
 
+def _sync_prefs_to_url_config():
+    """Synchronize old-style preferences to the new URL configuration system."""
+    try:
+        from ...config.dbutils_config import add_maven_repository
+    except ImportError:
+        from dbutils.config.dbutils_config import add_maven_repository
+
+    # Load old-style preferences
+    old_prefs = load_prefs()
+    if 'maven_repos' in old_prefs:
+        for repo in old_prefs['maven_repos']:
+            add_maven_repository(repo)
+
 
 def set_maven_repos(repos: List[str]) -> None:
     prefs = load_prefs()
     prefs['maven_repos'] = repos
+    save_prefs(prefs)
 
 def validate_repository_url(url: str) -> Tuple[bool, str]:
     """Validate a repository URL and test connectivity."""

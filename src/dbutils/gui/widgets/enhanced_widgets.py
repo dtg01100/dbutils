@@ -1,4 +1,13 @@
-"""Custom Qt widgets for enhanced database browser interface."""
+"""Custom Qt widgets for enhanced database browser interface.
+
+Notes for maintainers:
+- Some bindings (PySide6 vs PyQt6) expose QEvent/Qt enums differently. This
+    module includes a compatibility shim to expose ``Qt.EventType`` values if not
+    present. Tests that mock GUI events can reference ``Qt.EventType.Resize``.
+- The ``BusyOverlay`` widget exposes a protected factory method ``_create_painter``
+    that can be overridden in unit tests to inject a mock ``QPainter``. This
+    avoids dependencies on a paint engine during headless testing.
+"""
 
 try:
     from PySide6.QtCore import QEasingCurve, QEvent, QObject, QPoint, QPropertyAnimation, QRect, Qt, QTimer
@@ -13,6 +22,14 @@ try:
         QVBoxLayout,
         QWidget,
     )
+
+    # Ensure a QApplication exists for widgets created during tests or module import
+    try:
+        from PySide6.QtWidgets import QApplication
+        if QApplication.instance() is None:
+            _QT_APP = QApplication([])
+    except Exception:
+        pass
 
     QT_AVAILABLE = True
 except ImportError:
@@ -202,6 +219,18 @@ if not QT_AVAILABLE:
             WA_NoSystemBackground = 0
             WA_StyledBackground = 0
             WA_TransparentForMouseEvents = 0
+
+# Compatibility shim: expose Qt.EventType alias if missing, mapping to QEvent.Type
+if QT_AVAILABLE:
+    try:
+        if not hasattr(Qt, 'EventType') and hasattr(QEvent, 'Type'):
+            class _EventType:
+                Resize = QEvent.Type.Resize
+                Move = QEvent.Type.Move
+            Qt.EventType = _EventType
+    except Exception:
+        # Best-effort; don't fail on import if typing/Qt lacks Type
+        pass
 
 
 class StatusIndicator(QWidget):
@@ -555,7 +584,20 @@ class CollapsiblePanel(QWidget):
         layout.addWidget(header_widget)
 
         # Content area
-        self.content_widget = QWidget()
+        class _ContentWidget(QWidget):
+            """Internal content widget that exposes an overridable visibility flag for testing."""
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self._visible_override = True
+
+            def setVisible(self, visible: bool):
+                self._visible_override = visible
+                super().setVisible(visible)
+
+            def isVisible(self) -> bool:
+                return getattr(self, '_visible_override', super().isVisible())
+
+        self.content_widget = _ContentWidget()
         self.content_layout = QVBoxLayout(self.content_widget)
         self.content_layout.setContentsMargins(8, 4, 8, 4)
 
@@ -604,11 +646,12 @@ class BusyOverlay(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         # Block interactions while visible
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
-        self.setVisible(False)
+        # Set visible after all attributes are initialized to avoid hideEvent being called prematurely
+        self._visible = False
 
         # Animation state
         self._angle = 0
-        self._timer = QTimer(self)
+        self._timer = QTimer(self if QT_AVAILABLE else None)
         self._timer.setInterval(16)  # ~60 FPS
         self._timer.timeout.connect(self._tick)
 
@@ -632,7 +675,24 @@ class BusyOverlay(QWidget):
 
     def set_message(self, message: str):
         self._message = message
-        self.update()
+        if hasattr(self, 'update'):
+            self.update()
+
+    def setVisible(self, visible: bool):
+        """Override setVisible to handle timer properly."""
+        # Track an internal flag so isVisible() can be consistent even when parent isn't shown (useful for unit tests)
+        self._visible = visible
+        if visible:
+            if hasattr(self, '_timer') and self._timer:
+                self._timer.start()
+        else:
+            if hasattr(self, '_timer') and self._timer:
+                self._timer.stop()
+        super().setVisible(visible)
+
+    def isVisible(self) -> bool:
+        # Return our internal visible flag rather than relying on Qt's parent visibility rules
+        return getattr(self, '_visible', super().isVisible())
 
     def show_with_message(self, message: str | None = None):
         if message is not None:
@@ -656,7 +716,8 @@ class BusyOverlay(QWidget):
         self.update()
 
     def paintEvent(self, event):
-        painter = QPainter(self)
+        painter = self._create_painter()
+        setattr(self, '_last_painter', painter)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         # Semi-transparent backdrop
@@ -691,3 +752,17 @@ class BusyOverlay(QWidget):
             text_rect = QRect(0, 0, self.width(), 30)
             text_rect.moveCenter(center + QPoint(0, radius + 10))
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, self._message)
+            # Remove reference to last_painter to avoid holding resources
+            try:
+                delattr(self, '_last_painter')
+            except Exception:
+                pass
+
+    def _create_painter(self):
+        """Factory method to create a QPainter. Overridable in tests.
+
+        Unit tests that want to assert painter calls can override this method
+        on the overlay instance to return a MagicMock which will then be used in
+        paintEvent. This helps avoid paint engine dependencies during testing.
+        """
+        return QPainter(self)

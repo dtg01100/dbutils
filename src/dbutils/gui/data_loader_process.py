@@ -26,8 +26,24 @@ from typing import Any, Dict, List, Optional, Tuple
 # Cache expiration time in seconds (24 hours)
 CACHE_EXPIRATION_SECONDS = 24 * 60 * 60
 
-# Use gzip compression for cache files
+# Use gzip compression for cache files by default. Tests may override behavior via
+# environment variable DBUTILS_TEST_MODE, however read/write logic uses the file
+# extension (.gz) to decide whether to use gzip. This provides explicit control
+# to tests that pass concrete paths while still supporting the test-mode flag.
 USE_COMPRESSION = True
+
+# Allow tests to override compression setting via environment variable
+import os
+def _get_compression_setting():
+    """Get compression setting, checking environment variable.
+
+    Historically this function could determine runtime behavior; we now prefer
+    to detect compression per-file by extension, but tests that rely on the
+    DBUTILS_TEST_MODE environment may still use this helper.
+    """
+    if os.environ.get('DBUTILS_TEST_MODE') == '1':
+        return False
+    return True
 
 # Dynamic chunk sizing configuration
 MIN_BATCH_SIZE = 100
@@ -49,7 +65,7 @@ def get_cache_dir() -> Path:
 
 def get_schema_cache_path() -> Path:
     """Get the path to the schema cache file."""
-    if USE_COMPRESSION:
+    if _get_compression_setting():
         return get_cache_dir() / "schemas.json.gz"
     return get_cache_dir() / "schemas.json"
 
@@ -60,9 +76,9 @@ def get_data_cache_path(schema_filter: Optional[str]) -> Path:
     if schema_filter:
         # Sanitize schema name for filename
         safe_name = "".join(c if c.isalnum() else "_" for c in schema_filter)
-        filename = f"data_{safe_name}.json.gz" if USE_COMPRESSION else f"data_{safe_name}.json"
+        filename = f"data_{safe_name}.json.gz" if _get_compression_setting() else f"data_{safe_name}.json"
     else:
-        filename = "data_all.json.gz" if USE_COMPRESSION else "data_all.json"
+        filename = "data_all.json.gz" if _get_compression_setting() else "data_all.json"
     return cache_dir / filename
 
 
@@ -88,8 +104,8 @@ def load_cached_data(schema_filter: Optional[str]) -> Optional[Tuple[List[Dict],
             sys.stderr.flush()
             return None
 
-        # Read and decompress
-        if USE_COMPRESSION:
+        # Read and decompress based on file extension (.gz) or content
+        if str(cache_path).endswith('.gz'):
             with gzip.open(cache_path, "rt", encoding="utf-8") as f:
                 data = json.load(f)
         else:
@@ -124,12 +140,12 @@ def save_data_to_cache(schema_filter: Optional[str], tables: List[Dict], columns
         data = {
             "tables": tables,
             "columns": columns,
-            "cached_at": time.time(),
+            "cached_at": int(time.time()),
             "schema_filter": schema_filter,
         }
 
-        # Write with compression
-        if USE_COMPRESSION:
+        # Write with compression when filename indicates compressed cache (.gz)
+        if str(cache_path).endswith('.gz'):
             with gzip.open(cache_path, "wt", encoding="utf-8", compresslevel=6) as f:
                 json.dump(data, f, separators=(",", ":"))  # Compact JSON
         else:
@@ -151,7 +167,7 @@ def load_cached_schemas() -> Optional[List[str]]:
     try:
         cache_path = get_schema_cache_path()
         if cache_path.exists():
-            if USE_COMPRESSION:
+            if str(cache_path).endswith('.gz'):
                 with gzip.open(cache_path, "rt", encoding="utf-8") as f:
                     data = json.load(f)
                     return data.get("schemas", [])
@@ -170,7 +186,7 @@ def save_schemas_to_cache(schemas: List[str]) -> None:
     try:
         cache_path = get_schema_cache_path()
 
-        if USE_COMPRESSION:
+        if str(cache_path).endswith('.gz'):
             with gzip.open(cache_path, "wt", encoding="utf-8", compresslevel=6) as f:
                 json.dump({"schemas": schemas}, f, separators=(",", ":"))
         else:

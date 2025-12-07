@@ -19,15 +19,16 @@ Features:
 """
 
 from __future__ import annotations
-import time
-import threading
-import weakref
-from typing import Callable, Any, Optional, Dict, List, Tuple
-from functools import wraps
+
 import asyncio
 import queue
+import threading
+import time
 from dataclasses import dataclass
 from enum import Enum, auto
+from functools import wraps
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
 
 class PerformanceMetric(Enum):
     """Types of performance metrics to track."""
@@ -587,7 +588,7 @@ def track_data_load_performance():
 
 # Try to import Qt components for Qt-specific optimizations
 try:
-    from PySide6.QtCore import Qt, QTimer, QThread
+    from PySide6.QtCore import Qt, QThread, QTimer
     from PySide6.QtWidgets import QApplication
 
     def defer_to_ui_thread(func: Callable) -> Callable:

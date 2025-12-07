@@ -13,17 +13,17 @@ This addresses the redundant search implementations found throughout the codebas
 """
 
 from __future__ import annotations
+
+import threading
 import time
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
 from enum import Enum, auto
-import threading
-import weakref
-from functools import lru_cache
+from typing import Any, Dict, List, Optional, Tuple
 
 # Local imports
-from dbutils.db_browser import TableInfo, ColumnInfo
+from dbutils.db_browser import ColumnInfo, TableInfo
 from dbutils.gui.qt_app import SearchResult
+
 
 class SearchMode(Enum):
     """Search modes supported by the application."""

@@ -19,12 +19,12 @@ Features:
 """
 
 from __future__ import annotations
+
 import json
-import os
-from typing import Dict, Any, Optional, List, Tuple
-from enum import Enum, auto
 from dataclasses import dataclass
+from enum import Enum, auto
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 # Try to import Qt components for theme detection
 try:
@@ -448,48 +448,48 @@ class UIStyling:
         if not theme:
             return ""
 
-        return f"""
+        return """
         /* Search Component Styles */
-        .search-container {{
+        .search-container {
             border: 1px solid var(--color-border);
             border-radius: var(--border-radius);
             background-color: var(--color-surface);
             padding: var(--spacing-base);
-        }}
+        }
 
-        .search-input {{
+        .search-input {
             border: 1px solid var(--color-border);
             border-radius: calc(var(--border-radius) * 2);
             padding: calc(var(--spacing-base) * 0.75);
             background-color: white;
             min-height: 36px;
-        }}
+        }
 
-        .search-icon {{
+        .search-icon {
             color: var(--color-text-secondary);
             padding: 0 calc(var(--spacing-base) * 0.5);
-        }}
+        }
 
-        .search-results {{
+        .search-results {
             background-color: var(--color-surface);
             border: 1px solid var(--color-border);
             border-radius: var(--border-radius);
-        }}
+        }
 
-        .search-result-item {{
+        .search-result-item {
             padding: calc(var(--spacing-base) * 0.75);
             border-bottom: 1px solid var(--color-border);
-        }}
+        }
 
-        .search-result-item:hover {{
+        .search-result-item:hover {
             background-color: rgba(0, 0, 0, 0.03);
-        }}
+        }
 
-        .search-highlight {{
+        .search-highlight {
             background-color: rgba(255, 215, 0, 0.3);
             border-radius: 2px;
             padding: 0 2px;
-        }}
+        }
         """
 
     def _generate_table_css(self) -> str:
@@ -498,44 +498,44 @@ class UIStyling:
         if not theme:
             return ""
 
-        return f"""
+        return """
         /* Table Component Styles */
-        .table-container {{
+        .table-container {
             border: 1px solid var(--color-border);
             border-radius: var(--border-radius);
             background-color: var(--color-surface);
-        }}
+        }
 
-        .table-header {{
+        .table-header {
             background-color: var(--color-surface);
             border-bottom: 1px solid var(--color-border);
             font-weight: 600;
             padding: calc(var(--spacing-base) * 0.75);
-        }}
+        }
 
-        .table-row {{
+        .table-row {
             border-bottom: 1px solid var(--color-border);
             padding: calc(var(--spacing-base) * 0.75);
-        }}
+        }
 
-        .table-row:hover {{
+        .table-row:hover {
             background-color: rgba(0, 0, 0, 0.03);
-        }}
+        }
 
-        .table-row.selected {{
+        .table-row.selected {
             background-color: rgba(var(--color-primary), 0.1);
             border-left: 3px solid var(--color-primary);
-        }}
+        }
 
-        .table-cell {{
+        .table-cell {
             padding: calc(var(--spacing-base) * 0.5);
-        }}
+        }
 
-        .table-pagination {{
+        .table-pagination {
             background-color: var(--color-surface);
             border-top: 1px solid var(--color-border);
             padding: calc(var(--spacing-base) * 0.75);
-        }}
+        }
         """
 
     def _generate_form_css(self) -> str:
@@ -544,58 +544,58 @@ class UIStyling:
         if not theme:
             return ""
 
-        return f"""
+        return """
         /* Form Component Styles */
-        .form-container {{
+        .form-container {
             background-color: var(--color-surface);
             border: 1px solid var(--color-border);
             border-radius: var(--border-radius);
             padding: var(--spacing-base);
-        }}
+        }
 
-        .form-group {{
+        .form-group {
             margin-bottom: calc(var(--spacing-base) * 1.5);
-        }}
+        }
 
-        .form-label {{
+        .form-label {
             display: block;
             margin-bottom: calc(var(--spacing-base) * 0.5);
             font-weight: 500;
             color: var(--color-text-primary);
-        }}
+        }
 
-        .form-control {{
+        .form-control {
             border: 1px solid var(--color-border);
             border-radius: var(--border-radius);
             padding: calc(var(--spacing-base) * 0.75);
             background-color: white;
             min-height: 32px;
-        }}
+        }
 
-        .form-control:focus {{
+        .form-control:focus {
             border-color: var(--color-primary);
             outline: none;
             box-shadow: 0 0 0 2px rgba(var(--color-primary), 0.1);
-        }}
+        }
 
-        .form-control.error {{
+        .form-control.error {
             border-color: var(--color-error);
-        }}
+        }
 
-        .form-help-text {{
+        .form-help-text {
             color: var(--color-text-secondary);
             font-size: 12px;
             margin-top: calc(var(--spacing-base) * 0.5);
-        }}
+        }
 
-        .form-actions {{
+        .form-actions {
             display: flex;
             justify-content: flex-end;
             gap: var(--spacing-base);
             margin-top: calc(var(--spacing-base) * 1.5);
             padding-top: calc(var(--spacing-base) * 1.5);
             border-top: 1px solid var(--color-border);
-        }}
+        }
         """
 
     def _generate_dialog_css(self) -> str:

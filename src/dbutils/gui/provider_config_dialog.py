@@ -96,18 +96,20 @@ if QT_BINDINGS:
             # Quick-add buttons
             quick_add_layout = QHBoxLayout()
             self.quick_add_combo = QComboBox()
+            # Create instance of PredefinedProviderTemplates to call instance method
+            templates = PredefinedProviderTemplates()
             self.quick_add_combo.addItems(["Select database type..."] +
-                                        PredefinedProviderTemplates.get_categories())
+                                        templates.get_categories())
             self.quick_add_btn = QPushButton("Add from Template")
             self.quick_add_btn.clicked.connect(self.add_from_template)
             quick_add_layout.addWidget(self.quick_add_combo)
             quick_add_layout.addWidget(self.quick_add_btn)
-    
+
             # Add custom provider button
             self.custom_provider_btn = QPushButton("Add Custom Provider")
             self.custom_provider_btn.clicked.connect(self.add_custom_provider)
             quick_add_layout.addWidget(self.custom_provider_btn)
-    
+
             left_layout.addLayout(quick_add_layout)
 
             # Buttons for provider management
@@ -172,7 +174,9 @@ if QT_BINDINGS:
 
             self.name_input = QLineEdit()
             self.category_input = QComboBox()
-            self.category_input.addItems(PredefinedProviderTemplates.get_categories())
+            # Create instance of PredefinedProviderTemplates to call instance method
+            templates = PredefinedProviderTemplates()
+            self.category_input.addItems(templates.get_categories())
             self.host_input = QLineEdit("localhost")
             self.port_input = QSpinBox()
             self.port_input.setRange(0, 65535)
@@ -279,10 +283,7 @@ if QT_BINDINGS:
                 item.setData(Qt.ItemDataRole.UserRole, provider.name)
                 self.provider_list.addItem(item)
 
-            # Auto-select the first provider to populate the right pane
-            if self.provider_list.count() > 0 and not self.provider_list.selectedItems():
-                self.provider_list.setCurrentRow(0)
-                self.provider_selected()
+            # Do not auto-select a provider here; allow explicit user selection to populate the form
 
         def filter_providers(self, text: str):
             """Filter provider list based on search text."""
@@ -427,14 +428,15 @@ if QT_BINDINGS:
                 return
 
             # Get a suggested name based on template
-            template = PredefinedProviderTemplates.get_template(category)
+            templates = PredefinedProviderTemplates()
+            template = templates.get_template(category)
             if not template:
                 QMessageBox.warning(self, "Error", f"No template found for {category}")
                 return
 
             # Create the provider with default name based on template
             default_name = f"My {category} Connection"
-            provider = PredefinedProviderTemplates.create_provider_from_template(
+            provider = templates.create_provider_from_template(
                 category=category,
                 name=default_name,
                 host="localhost",
@@ -454,7 +456,7 @@ if QT_BINDINGS:
                 "Template Added",
                 f"Added {category} provider template. Fill in the connection details."
             )
-    
+
         def add_custom_provider(self):
             """Add a custom JDBC provider with blank template."""
             # Create a custom provider with empty/blank values
@@ -471,15 +473,15 @@ if QT_BINDINGS:
                 default_password=None,
                 extra_properties={}
             )
-    
+
             # Add to registry and UI
             self.registry.add_provider(custom_provider)
-    
+
             item = QListWidgetItem("Custom: Custom JDBC Provider")
             item.setData(Qt.ItemDataRole.UserRole, "Custom JDBC Provider")
             self.provider_list.addItem(item)
             self.provider_list.setCurrentItem(item)
-    
+
             QMessageBox.information(
                 self,
                 "Custom Provider Added",
@@ -561,6 +563,38 @@ if QT_BINDINGS:
                 else:
                     self.registry.add_provider(self.current_provider)
 
+            else:
+                # No provider selected - treat as creating a new provider
+                if not self.name_input.text().strip():
+                    QMessageBox.warning(self, "Validation Error", "Provider name is required")
+                    return
+
+                # Collect advanced properties from table
+                props = {}
+                for row in range(self.properties_table.rowCount()):
+                    key_item = self.properties_table.item(row, 0)
+                    value_item = self.properties_table.item(row, 1)
+                    if key_item and value_item:
+                        key = key_item.text().strip()
+                        value = value_item.text().strip()
+                        if key:
+                            props[key] = value
+
+                new_provider = JDBCProvider(
+                    name=self.name_input.text().strip(),
+                    category=self.category_input.currentText(),
+                    driver_class=self.driver_class_input.text().strip(),
+                    jar_path=self.jar_path_input.text().strip(),
+                    url_template=self.url_template_input.toPlainText(),
+                    default_host=self.host_input.text().strip() or 'localhost',
+                    default_port=self.port_input.value() or 0,
+                    default_database=self.database_input.text().strip() or '',
+                    default_user=self.username_input.text().strip() or None,
+                    default_password=self.password_input.text().strip() or None,
+                    extra_properties=props
+                )
+                self.registry.add_provider(new_provider)
+
             super().accept()
 
         def reset_defaults(self):
@@ -576,6 +610,8 @@ if QT_BINDINGS:
                 # Clear all providers and re-initialize with defaults
                 self.registry.providers.clear()
                 self.registry._initialize_default_providers()
+                # Ensure changes are saved and other registry instances reload
+                self.registry.save_providers()
                 self.refresh_provider_list()
                 self.clear_form()
                 QMessageBox.information(
@@ -587,8 +623,6 @@ if QT_BINDINGS:
         def download_jdbc_driver_gui(self):
             """Download JDBC driver for the selected category with enhanced UI feedback."""
             from .jdbc_auto_downloader import find_existing_drivers
-            from .jdbc_auto_downloader import get_jdbc_driver_download_info as get_download_info
-            from .jdbc_driver_downloader import JDBCDriverRegistry
 
             category = self.category_input.currentText()
             if not category or category == "Generic":

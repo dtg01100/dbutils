@@ -14,28 +14,51 @@ Features:
 """
 
 from __future__ import annotations
-import os
-from typing import Optional, List, Dict, Any, Callable
-from enum import Enum, auto
+
+from typing import Callable, Optional
 
 # Try to import Qt components
 try:
-    from PySide6.QtCore import Qt, QSize, Signal, Slot
-    from PySide6.QtGui import QIcon, QFont, QPalette, QColor
+    from PySide6.QtCore import QSize, Qt, Signal, Slot
+    from PySide6.QtGui import QColor, QFont, QIcon, QPalette
     from PySide6.QtWidgets import (
-        QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-        QLineEdit, QComboBox, QCheckBox, QProgressBar, QFrame,
-        QSizePolicy, QSpacerItem, QToolButton, QAction, QMenu
+        QAction,
+        QCheckBox,
+        QComboBox,
+        QFrame,
+        QHBoxLayout,
+        QLabel,
+        QLineEdit,
+        QMenu,
+        QProgressBar,
+        QPushButton,
+        QSizePolicy,
+        QSpacerItem,
+        QToolButton,
+        QVBoxLayout,
+        QWidget,
     )
     QT_AVAILABLE = True
 except ImportError:
     try:
-        from PyQt6.QtCore import Qt, QSize, Signal, Slot
-        from PyQt6.QtGui import QIcon, QFont, QPalette, QColor
+        from PyQt6.QtCore import QSize, Qt, Signal, Slot
+        from PyQt6.QtGui import QColor, QFont, QIcon, QPalette
         from PyQt6.QtWidgets import (
-            QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-            QLineEdit, QComboBox, QCheckBox, QProgressBar, QFrame,
-            QSizePolicy, QSpacerItem, QToolButton, QAction, QMenu
+            QAction,
+            QCheckBox,
+            QComboBox,
+            QFrame,
+            QHBoxLayout,
+            QLabel,
+            QLineEdit,
+            QMenu,
+            QProgressBar,
+            QPushButton,
+            QSizePolicy,
+            QSpacerItem,
+            QToolButton,
+            QVBoxLayout,
+            QWidget,
         )
         QT_AVAILABLE = True
     except ImportError:

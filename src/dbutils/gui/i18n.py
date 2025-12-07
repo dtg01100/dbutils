@@ -19,16 +19,15 @@ Features:
 """
 
 from __future__ import annotations
+
 import json
-import os
-import gettext
 import locale
-from typing import Dict, Any, Optional, List, Callable, Tuple
-from enum import Enum, auto
-from dataclasses import dataclass
-from pathlib import Path
 import threading
-import warnings
+from dataclasses import dataclass
+from enum import Enum, auto
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
+
 
 class Language(Enum):
     """Supported languages."""
@@ -529,9 +528,7 @@ class I18nManager:
             if not english_trans:
                 return {}
 
-            return {
-                key: "" for key in english_trans.translations.keys()
-            }
+            return dict.fromkeys(english_trans.translations.keys(), "")
 
     def get_rtl_stylesheet(self) -> str:
         """Get RTL-specific stylesheet for current language."""

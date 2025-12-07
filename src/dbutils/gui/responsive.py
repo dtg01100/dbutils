@@ -19,23 +19,23 @@ Features:
 """
 
 from __future__ import annotations
-import sys
-from typing import Dict, Any, Optional, List, Callable, Tuple
-from enum import Enum, auto
-from dataclasses import dataclass
+
 import threading
+from dataclasses import dataclass
+from enum import Enum, auto
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # Try to import Qt components for responsive design
 try:
-    from PySide6.QtCore import Qt, QObject, Signal, QSize, QRect
-    from PySide6.QtGui import QScreen, QGuiApplication
-    from PySide6.QtWidgets import QWidget, QApplication, QDesktopWidget
+    from PySide6.QtCore import QObject, QRect, QSize, Qt, Signal
+    from PySide6.QtGui import QGuiApplication, QScreen
+    from PySide6.QtWidgets import QApplication, QDesktopWidget, QWidget
     QT_AVAILABLE = True
 except ImportError:
     try:
-        from PyQt6.QtCore import Qt, QObject, Signal, QSize, QRect
-        from PyQt6.QtGui import QScreen, QGuiApplication
-        from PyQt6.QtWidgets import QWidget, QApplication, QDesktopWidget
+        from PyQt6.QtCore import QObject, QRect, QSize, Qt, Signal
+        from PyQt6.QtGui import QGuiApplication, QScreen
+        from PyQt6.QtWidgets import QApplication, QDesktopWidget, QWidget
         QT_AVAILABLE = True
     except ImportError:
         QT_AVAILABLE = False

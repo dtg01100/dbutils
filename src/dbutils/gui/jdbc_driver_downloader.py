@@ -5,8 +5,8 @@ This module provides information about various JDBC drivers for different databa
 including their download locations, recommended versions, and installation instructions.
 """
 
-from typing import Dict, List, Optional, NamedTuple
 import os
+from typing import Dict, List, NamedTuple, Optional
 
 
 class JDBCDriverInfo(NamedTuple):
@@ -27,7 +27,7 @@ class JDBCDriverInfo(NamedTuple):
 
 class JDBCDriverRegistry:
     """Registry of JDBC drivers with download information."""
-    
+
     DRIVERS: Dict[str, JDBCDriverInfo] = {
         # PostgreSQL drivers
         "postgresql": JDBCDriverInfo(
@@ -44,7 +44,7 @@ class JDBCDriverRegistry:
             recommended_version="42.6.0",
             maven_artifacts=["org.postgresql:postgresql"]
         ),
-        
+
         # MySQL drivers
         "mysql": JDBCDriverInfo(
             name="MySQL Connector/J",
@@ -60,7 +60,7 @@ class JDBCDriverRegistry:
             recommended_version="8.0.33",
             maven_artifacts=["mysql:mysql-connector-java"]
         ),
-        
+
         # MariaDB drivers
         "mariadb": JDBCDriverInfo(
             name="MariaDB Connector/J",
@@ -76,7 +76,7 @@ class JDBCDriverRegistry:
             recommended_version="3.1.4",
             maven_artifacts=["org.mariadb.jdbc:mariadb-java-client"]
         ),
-        
+
         # Oracle drivers
         "oracle": JDBCDriverInfo(
             name="Oracle JDBC Driver",
@@ -113,7 +113,7 @@ class JDBCDriverRegistry:
                 maven_artifacts=["com.microsoft.sqlserver:mssql-jdbc"],
                 requires_license=False,
         ),
-        
+
         # IBM DB2 drivers
         "db2": JDBCDriverInfo(
             name="IBM DB2 JDBC Driver",
@@ -151,7 +151,7 @@ class JDBCDriverRegistry:
             recommended_version="10.5",
             maven_artifacts=["com.ibm:jtopen"]
         ),
-        
+
         # SQLite drivers
         "sqlite": JDBCDriverInfo(
             name="SQLite JDBC Driver",
@@ -167,7 +167,7 @@ class JDBCDriverRegistry:
             recommended_version="3.42.0.0",
             maven_artifacts=["org.xerial:sqlite-jdbc"]
         ),
-        
+
         # H2 Database drivers
         "h2": JDBCDriverInfo(
             name="H2 Database Engine",
@@ -178,12 +178,12 @@ class JDBCDriverRegistry:
                 "https://github.com/h2database/h2database/releases"
             ],
             license="MPL 2.0 / EPL 1.0",
-            min_java_version="8", 
+            min_java_version="8",
             description="H2 database JDBC driver",
             recommended_version="2.2.224",
             maven_artifacts=["com.h2database:h2"]
         ),
-        
+
         # Apache Derby drivers
         "derby": JDBCDriverInfo(
             name="Apache Derby Embedded Driver",
@@ -198,7 +198,7 @@ class JDBCDriverRegistry:
             description="Apache Derby JDBC driver",
             recommended_version="10.15.2.0"
         ),
-        
+
         # Generic template
         "generic": JDBCDriverInfo(
             name="Generic JDBC Driver",
@@ -211,13 +211,13 @@ class JDBCDriverRegistry:
             recommended_version="x.x.x"
         )
     }
-    
+
     @classmethod
     def get_driver_info(cls, database_type: str) -> Optional[JDBCDriverInfo]:
         """Get driver information for a specific database type."""
         # Normalize the input (case-insensitive)
         normalized_type = database_type.lower().strip().replace(' ', '')
-        
+
         # Handle aliases and variations
         if 'postgres' in normalized_type or 'pgsql' in normalized_type:
             return cls.DRIVERS.get('postgresql')
@@ -241,15 +241,15 @@ class JDBCDriverRegistry:
             return cls.DRIVERS.get('h2')
         elif 'derby' in normalized_type:
             return cls.DRIVERS.get('derby')
-        
+
         # Direct lookup
         return cls.DRIVERS.get(normalized_type)
-    
+
     @classmethod
     def get_all_database_types(cls) -> List[str]:
         """Get all supported database types."""
         return list(cls.DRIVERS.keys())
-    
+
     @classmethod
     def get_quick_download_links(cls) -> Dict[str, str]:
         """Get a mapping of database types to their primary download URLs."""

@@ -19,23 +19,22 @@ Features:
 """
 
 from __future__ import annotations
-import re
-from typing import Dict, List, Optional, Any, Callable, Set, Tuple
-from enum import Enum, auto
+
 from dataclasses import dataclass
-import warnings
+from enum import Enum, auto
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 # Try to import Qt components for accessibility features
 try:
-    from PySide6.QtCore import Qt, QObject, Signal
-    from PySide6.QtGui import QAccessible, QAccessibleInterface, QAccessibleEvent
-    from PySide6.QtWidgets import QWidget, QApplication
+    from PySide6.QtCore import QObject, Qt, Signal
+    from PySide6.QtGui import QAccessible, QAccessibleEvent, QAccessibleInterface
+    from PySide6.QtWidgets import QApplication, QWidget
     QT_AVAILABLE = True
 except ImportError:
     try:
-        from PyQt6.QtCore import Qt, QObject, Signal
-        from PyQt6.QtGui import QAccessible, QAccessibleInterface, QAccessibleEvent
-        from PyQt6.QtWidgets import QWidget, QApplication
+        from PyQt6.QtCore import QObject, Qt, Signal
+        from PyQt6.QtGui import QAccessible, QAccessibleEvent, QAccessibleInterface
+        from PyQt6.QtWidgets import QApplication, QWidget
         QT_AVAILABLE = True
     except ImportError:
         QT_AVAILABLE = False
@@ -298,7 +297,7 @@ class AccessibilityManager:
                 ))
 
         # Check for keyboard navigation issues
-        if not widget.focusPolicy() in [Qt.FocusPolicy.StrongFocus, Qt.FocusPolicy.WheelFocus]:
+        if widget.focusPolicy() not in [Qt.FocusPolicy.StrongFocus, Qt.FocusPolicy.WheelFocus]:
             results.append(AccessibilityAuditResult(
                 widget=widget,
                 issue_type=AccessibilityIssue.KEYBOARD_NAVIGATION,

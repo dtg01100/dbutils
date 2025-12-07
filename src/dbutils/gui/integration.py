@@ -16,21 +16,21 @@ Features:
 """
 
 from __future__ import annotations
-import sys
-from typing import Dict, Any, Optional, List, Callable, Tuple
-from dataclasses import dataclass
-import threading
+
 import logging
-from pathlib import Path
+import threading
+from dataclasses import dataclass
+from typing import Any, Dict, List
+
+from .accessibility import AccessibilityManager, get_accessibility_manager
+from .i18n import I18nManager, get_i18n_manager
+from .performance import PerformanceMonitor, get_performance_monitor
+from .responsive import ResponsiveManager, get_responsive_manager
 
 # Import all UI/UX modules
-from .search_manager import get_search_manager, SearchManager
-from .ui_state import get_ui_state_manager, UIStateManager
-from .ui_styling import get_ui_styling, UIStyling
-from .performance import get_performance_monitor, PerformanceMonitor
-from .accessibility import get_accessibility_manager, AccessibilityManager
-from .i18n import get_i18n_manager, I18nManager
-from .responsive import get_responsive_manager, ResponsiveManager
+from .search_manager import SearchManager, get_search_manager
+from .ui_state import UIStateManager, get_ui_state_manager
+from .ui_styling import UIStyling, get_ui_styling
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)

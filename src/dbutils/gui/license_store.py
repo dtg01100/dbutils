@@ -7,8 +7,8 @@ for commercial drivers. It stores a JSON file under DBUTILS_CONFIG_DIR
 """
 import json
 import os
-from typing import Set, Dict, Optional
 from datetime import datetime, timedelta
+from typing import Dict, Optional
 
 
 def _get_store_path() -> str:
