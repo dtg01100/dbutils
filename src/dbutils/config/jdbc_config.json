@@ -1,0 +1,28 @@
+{
+  "environment_overrides": {
+    "jar_search_paths": [
+      "${DBUTILS_JAR_SEARCH_PATHS}",
+      "~/.dbutils/jars",
+      "./jars",
+      "../jars"
+    ],
+    "default_jar_mapping": {
+      "h2": "h2.jar",
+      "sqlite-jdbc": "sqlite-jdbc.jar",
+      "postgresql": "postgresql.jar",
+      "mysql": "mysql-connector-java.jar"
+    }
+  },
+  "provider_overrides": {
+    "H2 (Embedded)": {
+      "jar_path": "${DBUTILS_H2_JAR}",
+      "driver_class": "${DBUTILS_H2_DRIVER_CLASS}",
+      "url_template": "${DBUTILS_H2_URL_TEMPLATE}"
+    },
+    "SQLite (Test Integration)": {
+      "jar_path": "${DBUTILS_SQLITE_JAR}",
+      "driver_class": "${DBUTILS_SQLITE_DRIVER_CLASS}",
+      "url_template": "${DBUTILS_SQLITE_URL_TEMPLATE}"
+    }
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "auto_download_providers": {
+    "sqlite": {
+      "name": "SQLite (Auto-Download)",
+      "driver_class": "org.sqlite.JDBC",
+      "database_type": "sqlite",
+      "url_template": "jdbc:sqlite:{database}",
+      "default_user": null,
+      "default_password": null,
+      "requires_license": false,
+      "maven_artifact": "org.xerial:sqlite-jdbc",
+      "recommended_version": "3.42.0.0",
+      "version_override_env": "DBUTILS_SQLITE_VERSION",
+      "repository_override_env": "DBUTILS_SQLITE_REPO"
+    },
+    "h2": {
+      "name": "H2 Database (Auto-Download)",
+      "driver_class": "org.h2.Driver",
+      "database_type": "h2",
+      "url_template": "jdbc:h2:mem:{database};DB_CLOSE_DELAY=-1",
+      "default_user": "sa",
+      "default_password": "",
+      "requires_license": false,
+      "maven_artifact": "com.h2database:h2",
+      "recommended_version": "2.2.224",
+      "version_override_env": "DBUTILS_H2_VERSION",
+      "repository_override_env": "DBUTILS_H2_REPO"
+    },
+    "derby": {
+      "name": "Apache Derby (Auto-Download)",
+      "driver_class": "org.apache.derby.jdbc.EmbeddedDriver",
+      "database_type": "derby",
+      "url_template": "jdbc:derby:{database};create=true",
+      "default_user": null,
+      "default_password": null,
+      "requires_license": false,
+      "maven_artifact": "org.apache.derby:derby",
+      "recommended_version": "10.15.2.0",
+      "version_override_env": "DBUTILS_DERBY_VERSION",
+      "repository_override_env": "DBUTILS_DERBY_REPO"
+    },
+    "hsqldb": {
+      "name": "HSQLDB (Auto-Download)",
+      "driver_class": "org.hsqldb.jdbc.JDBCDriver",
+      "database_type": "hsqldb",
+      "url_template": "jdbc:hsqldb:mem:{database}",
+      "default_user": "SA",
+      "default_password": "",
+      "requires_license": false,
+      "maven_artifact": "org.hsqldb:hsqldb",
+      "recommended_version": "2.7.2",
+      "version_override_env": "DBUTILS_HSQLDB_VERSION",
+      "repository_override_env": "DBUTILS_HSQLDB_REPO"
+    },
+    "duckdb": {
+      "name": "DuckDB (Auto-Download)",
+      "driver_class": "org.duckdb.DuckDBDriver",
+      "database_type": "duckdb",
+      "url_template": "jdbc:duckdb:{database}",
+      "default_user": null,
+      "default_password": null,
+      "requires_license": false,
+      "maven_artifact": "org.duckdb:duckdb_jdbc",
+      "recommended_version": "0.10.2",
+      "version_override_env": "DBUTILS_DUCKDB_VERSION",
+      "repository_override_env": "DBUTILS_DUCKDB_REPO"
+    }
+  },
+  "version_management": {
+    "default_repository_index": 0,
+    "version_resolution_strategy": "latest_first",
+    "fallback_versions": {
+      "sqlite": ["3.42.0.0", "3.41.2.2", "3.40.1.0"],
+      "h2": ["2.2.224", "2.2.220", "2.1.214"],
+      "derby": ["10.15.2.0", "10.14.2.0", "10.13.1.1"],
+      "hsqldb": ["2.7.2", "2.7.1", "2.7.0"],
+      "duckdb": ["0.10.2", "0.10.1", "0.10.0"]
+    }
+  },
+  "repository_management": {
+    "repository_priority": [
+      "https://repo1.maven.org/maven2/",
+      "https://repo.maven.apache.org/maven2/",
+      "https://maven.aliyun.com/repository/central/"
+    ],
+    "connectivity_testing": {
+      "enabled": true,
+      "timeout_seconds": 5,
+      "retry_attempts": 2
+    }
+  }
+}

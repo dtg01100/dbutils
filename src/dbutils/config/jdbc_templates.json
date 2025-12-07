@@ -1,0 +1,80 @@
+{
+  "provider_templates": {
+    "PostgreSQL": {
+      "driver_class": "org.postgresql.Driver",
+      "url_template": "jdbc:postgresql://{host}:{port}/{database}",
+      "default_port": 5432,
+      "description": "PostgreSQL database connection"
+    },
+    "MySQL": {
+      "driver_class": "com.mysql.cj.jdbc.Driver",
+      "url_template": "jdbc:mysql://{host}:{port}/{database}",
+      "default_port": 3306,
+      "description": "MySQL database connection"
+    },
+    "MariaDB": {
+      "driver_class": "org.mariadb.jdbc.Driver",
+      "url_template": "jdbc:mariadb://{host}:{port}/{database}",
+      "default_port": 3306,
+      "description": "MariaDB database connection"
+    },
+    "Oracle": {
+      "driver_class": "oracle.jdbc.OracleDriver",
+      "url_template": "jdbc:oracle:thin:@//{host}:{port}/{database}",
+      "default_port": 1521,
+      "description": "Oracle database connection"
+    },
+    "SQL Server": {
+      "driver_class": "com.microsoft.sqlserver.jdbc.SQLServerDriver",
+      "url_template": "jdbc:sqlserver://{host}:{port};databaseName={database}",
+      "default_port": 1433,
+      "description": "Microsoft SQL Server connection"
+    },
+    "DB2": {
+      "driver_class": "com.ibm.db2.jcc.DB2Driver",
+      "url_template": "jdbc:db2://{host}:{port}/{database}",
+      "default_port": 50000,
+      "description": "IBM DB2 database connection"
+    },
+    "SQLite": {
+      "driver_class": "org.sqlite.JDBC",
+      "url_template": "jdbc:sqlite:{database}",
+      "default_port": 0,
+      "description": "SQLite file-based database"
+    },
+    "H2": {
+      "driver_class": "org.h2.Driver",
+      "url_template": "jdbc:h2:tcp://{host}:{port}/{database}",
+      "default_port": 9092,
+      "description": "H2 database connection"
+    },
+    "Custom": {
+      "driver_class": "",
+      "url_template": "jdbc:{custom}://{host}:{port}/{database}",
+      "default_port": 0,
+      "description": "Custom JDBC provider - configure all parameters manually"
+    }
+  },
+  "default_providers": {
+    "SQLite Local": {
+      "category": "SQLite",
+      "driver_class": "org.sqlite.JDBC",
+      "jar_path": "",
+      "url_template": "jdbc:sqlite:{database}",
+      "default_database": "sample.db",
+      "extra_properties": {}
+    },
+    "Example DB2": {
+      "category": "DB2",
+      "driver_class": "com.ibm.db2.jcc.DB2Driver",
+      "jar_path": "/path/to/db2jcc.jar",
+      "url_template": "jdbc:db2://{host}:{port}/{database}",
+      "default_host": "localhost",
+      "default_port": 50000,
+      "default_database": "SAMPLE",
+      "extra_properties": {
+        "securityMechanism": "3"
+      }
+    }
+  }
+}
