@@ -1,0 +1,91 @@
+{
+  "metadata": {
+    "timestamp": "2025-12-06T21:43:11.550918",
+    "python_version": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "working_directory": "/workspaces/dbutils"
+  },
+  "structure_check": {
+    "dependencies": {
+      "jaydebeapi": true,
+      "jpype1": true,
+      "PySide6": false
+    },
+    "jar_files": {
+      "sqlite": true,
+      "h2": true,
+      "derby": true,
+      "hsqldb": true,
+      "duckdb": true
+    },
+    "test_files": {
+      "setup_multi_database_test.py": true,
+      "test_multi_database_integration.py": true,
+      "database_test_utils.py": true,
+      "conftest.py": true
+    },
+    "providers": {
+      "SQLite (Test Integration)": true,
+      "H2 (Test Integration)": true,
+      "Apache Derby (Test Integration)": true,
+      "HSQLDB (Test Integration)": true,
+      "DuckDB (Test Integration)": true
+    }
+  },
+  "configuration_verification": {
+    "sqlite": {
+      "found": true,
+      "driver_class_match": true,
+      "url_template_match": true,
+      "user_match": true,
+      "password_match": true
+    },
+    "h2": {
+      "found": true,
+      "driver_class_match": true,
+      "url_template_match": true,
+      "user_match": true,
+      "password_match": true
+    },
+    "derby": {
+      "found": true,
+      "driver_class_match": true,
+      "url_template_match": true,
+      "user_match": true,
+      "password_match": true
+    },
+    "hsqldb": {
+      "found": true,
+      "driver_class_match": true,
+      "url_template_match": true,
+      "user_match": true,
+      "password_match": true
+    },
+    "duckdb": {
+      "found": true,
+      "driver_class_match": true,
+      "url_template_match": true,
+      "user_match": true,
+      "password_match": true
+    }
+  },
+  "connection_tests": {
+    "sqlite": true,
+    "h2": true,
+    "derby": false,
+    "hsqldb": true,
+    "duckdb": true
+  },
+  "errors": [
+    "Missing dependencies: PySide6"
+  ],
+  "summary": {
+    "total_checks": 47,
+    "passed_checks": 45,
+    "pass_rate": 0.9574468085106383,
+    "status": "PARTIAL",
+    "error_count": 1,
+    "errors": [
+      "Missing dependencies: PySide6"
+    ]
+  }
+}

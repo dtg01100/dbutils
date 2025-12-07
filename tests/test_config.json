@@ -1,0 +1,78 @@
+{
+  "databases": {
+    "sqlite": {
+      "driver_class": "org.sqlite.JDBC",
+      "jar_path": "AUTO_DOWNLOAD_sqlite",
+      "url_template": "jdbc:sqlite:{database}",
+      "default_user": null,
+      "default_password": null,
+      "test_db": "test_sqlite.db"
+    },
+    "h2": {
+      "driver_class": "org.h2.Driver",
+      "jar_path": "AUTO_DOWNLOAD_h2",
+      "url_template": "jdbc:h2:mem:{database};DB_CLOSE_DELAY=-1",
+      "default_user": "sa",
+      "default_password": "",
+      "test_db": "test_h2_db"
+    },
+    "derby": {
+      "driver_class": "org.apache.derby.jdbc.EmbeddedDriver",
+      "jar_path": "AUTO_DOWNLOAD_derby",
+      "url_template": "jdbc:derby:{database};create=true",
+      "default_user": null,
+      "default_password": null,
+      "test_db": "test_derby_db"
+    },
+    "hsqldb": {
+      "driver_class": "org.hsqldb.jdbc.JDBCDriver",
+      "jar_path": "AUTO_DOWNLOAD_hsqldb",
+      "url_template": "jdbc:hsqldb:mem:{database}",
+      "default_user": "SA",
+      "default_password": "",
+      "test_db": "test_hsqldb_db"
+    },
+    "duckdb": {
+      "driver_class": "org.duckdb.DuckDBDriver",
+      "jar_path": "AUTO_DOWNLOAD_duckdb",
+      "url_template": "jdbc:duckdb:{database}",
+      "default_user": null,
+      "default_password": null,
+      "test_db": "test_duckdb.db"
+    }
+  },
+  "test_environment": {
+    "debug_mode": false,
+    "verbose_logging": false,
+    "skip_slow_tests": false,
+    "max_test_duration": 300,
+    "test_timeout": 60,
+    "retry_failed_tests": false
+  },
+  "network": {
+    "maven_repositories": [
+      "https://repo1.maven.org/maven2/",
+      "https://repo.maven.apache.org/maven2/"
+    ],
+    "timeout": 30,
+    "retry_attempts": 3,
+    "retry_delay": 1,
+    "user_agent": "dbutils-test-suite/1.0"
+  },
+  "paths": {
+    "driver_dir": "~/.config/dbutils/drivers",
+    "config_dir": "~/.config/dbutils",
+    "test_data_dir": "tests/test_data",
+    "log_dir": "tests/logs",
+    "temp_dir": "tests/temp",
+    "download_cache": "tests/cache"
+  },
+  "behavior": {
+    "auto_cleanup": true,
+    "parallel_tests": false,
+    "stop_on_failure": false,
+    "create_sample_data": true,
+    "validate_connections": true,
+    "mock_external_services": true
+  }
+}
