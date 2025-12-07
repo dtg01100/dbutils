@@ -4,7 +4,7 @@ JDBC Driver Auto-Downloader - Automatic download of JDBC drivers for Qt GUI.
 This module provides functionality to automatically download JDBC drivers based on
 database requirements, with a focus on Qt GUI integration.
 
-Enhanced with:
+Enhanced with:w
 - Robust error handling and retry logic
 - Detailed progress tracking
 - License management integration
@@ -24,12 +24,39 @@ import xml.etree.ElementTree as ET
 import logging
 from datetime import datetime, timedelta
 
+# Import license store functions for license validation
 
-# Maven repository URLs for common JDBC drivers
-MAVEN_REPOSITORIES = [
-    "https://repo1.maven.org/maven2/",
-    "https://repo.maven.apache.org/maven2/",
-]
+# Import unified configuration module
+try:
+    from ...config.dbutils_config import (
+        get_driver_directory, get_maven_repositories,
+        construct_maven_artifact_url, construct_metadata_url
+    )
+except ImportError:
+    from dbutils.config.dbutils_config import (
+        get_driver_directory, get_maven_repositories,
+        construct_maven_artifact_url, construct_metadata_url
+    )
+from .license_store import is_license_accepted
+
+
+# Maven repository URLs for common JDBC drivers - now loaded from config
+try:
+    MAVEN_REPOSITORIES = get_maven_repositories()
+    if not MAVEN_REPOSITORIES:
+        # Fallback to default repositories if none configured
+        MAVEN_REPOSITORIES = [
+            "https://repo1.maven.org/maven2/",
+            "https://repo.maven.apache.org/maven2/",
+            "https://maven.aliyun.com/repository/central/"
+        ]
+except Exception:
+    # Fallback to hardcoded defaults if config system fails
+    MAVEN_REPOSITORIES = [
+        "https://repo1.maven.org/maven2/",
+        "https://repo.maven.apache.org/maven2/",
+        "https://maven.aliyun.com/repository/central/"
+    ]
 
 # Maximum retry attempts for transient failures
 MAX_RETRY_ATTEMPTS = 3
@@ -119,6 +146,71 @@ def get_latest_version_from_maven_metadata(metadata_url: str) -> Optional[str]:
             return None
     return None
 
+def get_version_with_fallback(db_type: str, requested_version: str = "latest") -> str:
+    """Get version with fallback mechanism for a specific database type."""
+    if requested_version != "latest":
+        return requested_version
+
+    # Try to get latest version from metadata
+    coords = JDBC_DRIVER_COORDINATES.get(db_type)
+    if not coords or not coords.get('metadata_url'):
+        return requested_version
+
+    latest_version = get_latest_version_from_maven_metadata(coords['metadata_url'])
+    if latest_version:
+        return latest_version
+
+    # Fallback to hardcoded versions if metadata fetch fails
+    fallback_versions = {
+        "sqlite": "3.42.0.0",
+        "h2": "2.2.224",
+        "derby": "10.15.2.0",
+        "hsqldb": "2.7.2",
+        "duckdb": "0.10.2",
+        "postgresql": "42.6.0",
+        "mysql": "8.0.33",
+        "mariadb": "3.1.4",
+        "sqlserver": "12.4.2.jre11"
+    }
+
+    return fallback_versions.get(db_type, requested_version)
+
+def resolve_version_with_strategy(db_type: str, requested_version: str = "latest") -> str:
+    """Resolve version using configured strategy with fallback mechanisms."""
+    # Get version resolution strategy from config
+    try:
+        config_file = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config', 'auto_download_config.json')
+        if os.path.exists(config_file):
+            with open(config_file, 'r') as f:
+                config_data = json.load(f)
+            strategy = config_data.get('version_management', {}).get('version_resolution_strategy', 'latest_first')
+        else:
+            strategy = 'latest_first'
+    except Exception:
+        strategy = 'latest_first'
+
+    if strategy == 'latest_first':
+        # Try latest first, then fallback to specific versions
+        version = get_version_with_fallback(db_type, requested_version)
+        if version != "latest" and version is not None:
+            return version
+
+        # If still not resolved, try fallback versions
+        fallback_versions = {
+            "sqlite": ["3.42.0.0", "3.41.2.2", "3.40.1.0"],
+            "h2": ["2.2.224", "2.2.220", "2.1.214"],
+            "derby": ["10.15.2.0", "10.14.2.0", "10.13.1.1"],
+            "hsqldb": ["2.7.2", "2.7.1", "2.7.0"],
+            "duckdb": ["0.10.2", "0.10.1", "0.10.0"]
+        }
+
+        for fallback_version in fallback_versions.get(db_type, []):
+            if fallback_version:
+                return fallback_version
+
+    # Default fallback
+    return requested_version
+
 
 def get_jdbc_driver_url(db_type: str, version: str = "latest", repo_index: int = 0) -> Optional[str]:
     """Get the download URL for a specific JDBC driver and version with repository fallback."""
@@ -133,31 +225,8 @@ def get_jdbc_driver_url(db_type: str, version: str = "latest", repo_index: int =
         if latest_ver:
             version = latest_ver
 
-    # Try repositories in order until we find one that works
-    for i, maven_repo in enumerate(MAVEN_REPOSITORIES[repo_index:]):
-        group_path = coords['group_id'].replace('.', '/')
-        jar_filename = f"{coords['artifact_id']}-{version}.jar"
-        download_url = f"{maven_repo}{group_path}/{coords['artifact_id']}/{version}/{jar_filename}"
-
-        # Test if URL is accessible
-        try:
-            success, message = test_repository_connectivity(maven_repo)
-            if success:
-                logger.info(f"Using repository {maven_repo} for {db_type}")
-                return download_url
-            else:
-                logger.warning(f"Repository {maven_repo} unavailable: {message}")
-        except Exception as e:
-            logger.warning(f"Error testing repository {maven_repo}: {e}")
-
-    # If all repositories failed, return URL with primary repo anyway
-    # (user might have network issues that could be resolved)
-    maven_repo = MAVEN_REPOSITORIES[0]
-    group_path = coords['group_id'].replace('.', '/')
-    jar_filename = f"{coords['artifact_id']}-{version}.jar"
-    download_url = f"{maven_repo}{group_path}/{coords['artifact_id']}/{version}/{jar_filename}"
-
-    return download_url
+    # Use new repository prioritization system
+    return get_repository_with_fallback(db_type, version)
 
 
 def download_jdbc_driver(
@@ -182,15 +251,19 @@ def download_jdbc_driver(
     """
     # License validation before download
     license_key = f"jdbc_driver_{db_type}"
-    if not license_store.is_license_accepted(license_key):
+    if not is_license_accepted(license_key):
         error_msg = f"License not accepted for {db_type}. Please accept the license before downloading."
         logger.error(error_msg)
         if on_status:
             on_status(f"Error: {error_msg}")
         return None
 
-    # Get the download URL
-    download_url = get_jdbc_driver_url(db_type, version)
+    # Resolve version using new version management system
+    resolved_version = resolve_version_with_strategy(db_type, version)
+    logger.info(f"Resolved version for {db_type}: {resolved_version}")
+
+    # Get the download URL with new repository prioritization
+    download_url = get_jdbc_driver_url(db_type, resolved_version)
     if not download_url:
         error_msg = f"No download URL available for {db_type}"
         logger.error(error_msg)
@@ -334,9 +407,9 @@ def download_jdbc_driver(
 
 def get_driver_directory() -> str:
     """Get the standard directory for JDBC drivers."""
-    driver_dir = os.environ.get("DBUTILS_DRIVER_DIR", os.path.expanduser("~/.config/dbutils/drivers"))
-    os.makedirs(driver_dir, exist_ok=True)
-    return driver_dir
+    # Use dynamic path resolution from config
+    from dbutils.config.dbutils_config import get_driver_directory as config_get_driver_directory
+    return config_get_driver_directory()
 
 
 def list_installed_drivers() -> List[str]:
@@ -431,3 +504,69 @@ def get_repository_status() -> List[Tuple[str, bool, str]]:
         success, message = test_repository_connectivity(repo)
         results.append((repo, success, message))
     return results
+
+def get_prioritized_repositories() -> List[str]:
+    """Get repositories prioritized by connectivity and configuration."""
+    # Test all repositories and sort by connectivity
+    repo_status = get_repository_status()
+
+    # Sort repositories: connected first, then by response time
+    connected_repos = []
+    disconnected_repos = []
+
+    for repo, success, _ in repo_status:
+        if success:
+            connected_repos.append(repo)
+        else:
+            disconnected_repos.append(repo)
+
+    # Return connected repositories first, then disconnected (as fallback)
+    return connected_repos + disconnected_repos
+
+def get_repository_with_fallback(db_type: str, version: str = "latest") -> Optional[str]:
+    """Get repository URL with fallback mechanism for a specific database type."""
+    # Try prioritized repositories first
+    prioritized_repos = get_prioritized_repositories()
+
+    for repo_index, repo_url in enumerate(prioritized_repos):
+        # Try to construct URL with this repository
+        try:
+            from dbutils.config.dbutils_config import construct_maven_artifact_url
+
+            # Parse maven coordinates from db_type
+            coords = JDBC_DRIVER_COORDINATES.get(db_type)
+            if not coords:
+                return None
+
+            artifact_url = construct_maven_artifact_url(
+                coords['group_id'],
+                coords['artifact_id'],
+                version,
+                repo_index
+            )
+
+            if artifact_url:
+                return artifact_url
+
+        except Exception:
+            continue
+
+    # Fallback to direct URL construction if config system fails
+    for repo_url in prioritized_repos:
+        coords = JDBC_DRIVER_COORDINATES.get(db_type)
+        if not coords:
+            continue
+
+        group_path = coords['group_id'].replace('.', '/')
+        jar_filename = f"{coords['artifact_id']}-{version}.jar"
+        download_url = f"{repo_url.rstrip('/')}/{group_path}/{coords['artifact_id']}/{version}/{jar_filename}"
+
+        # Test if URL is accessible
+        try:
+            success, _ = test_repository_connectivity(repo_url)
+            if success:
+                return download_url
+        except Exception:
+            continue
+
+    return None

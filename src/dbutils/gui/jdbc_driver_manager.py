@@ -5,6 +5,8 @@ Provides functionality to download JDBC driver files based on database type
 and place them in the appropriate directory for the dbutils application.
 """
 
+import time
+
 import os
 import re
 import shutil
@@ -19,6 +21,18 @@ import logging
 
 # Import needed items from jdbc_driver_downloader
 from .jdbc_driver_downloader import JDBCDriverRegistry
+
+# Import unified configuration module
+try:
+    from ...config.dbutils_config import (
+        get_driver_directory, find_driver_jar, get_best_driver_path,
+        get_maven_repositories, construct_maven_artifact_url, construct_metadata_url
+    )
+except ImportError:
+    from dbutils.config.dbutils_config import (
+        get_driver_directory, find_driver_jar, get_best_driver_path,
+        get_maven_repositories, construct_maven_artifact_url, construct_metadata_url
+    )
 import json
 
 # Default Maven repositories (in descending priority)
@@ -85,9 +99,8 @@ class JDBCDriverDownloader:
 
     def _get_driver_directory(self) -> str:
         """Get the directory where JDBC drivers should be stored."""
-        driver_dir = os.environ.get("DBUTILS_DRIVER_DIR", os.path.expanduser("~/.config/dbutils/drivers"))
-        os.makedirs(driver_dir, exist_ok=True)
-        return driver_dir
+        # Use dynamic path resolution
+        return get_driver_directory()
 
     def _suggest_jar_filename(self, db_type: str, version: str = "latest") -> str:
         """Suggest a filename for a downloaded JAR based on database type."""
@@ -277,23 +290,9 @@ class JDBCDriverDownloader:
             return driver_info.download_url
 
     def _get_maven_repos(self) -> List[str]:
-        """Get list of Maven repos from environment variable DBUTILS_MAVEN_REPOS or defaults.
-
-        DBUTILS_MAVEN_REPOS supports a JSON array string or a comma-separated string.
-        """
-        raw = os.environ.get('DBUTILS_MAVEN_REPOS')
-        if not raw:
-            return DEFAULT_MAVEN_REPOS
-
-        try:
-            val = json.loads(raw)
-            if isinstance(val, list):
-                return val
-        except Exception:
-            # Fall back to comma-separated
-            return [p.strip() for p in raw.split(',') if p.strip()]
-
-        return DEFAULT_MAVEN_REPOS
+        """Get list of Maven repos from dynamic configuration system."""
+        # Use dynamic URL configuration
+        return get_maven_repositories()
 
     def _get_latest_version_from_maven(self, group: str, artifact: str, repos: List[str]) -> Optional[str]:
         """Query repositories for maven-metadata and return latest or release version.
@@ -467,21 +466,14 @@ class JDBCDriverDownloader:
     
     def find_existing_drivers(self, database_type: str) -> list:
         """Find existing driver JAR files that match the specified database type."""
-        driver_files = []
-        # Look for files containing the database type name
-        for file_path in Path(self.downloads_dir).glob(f"*.jar"):
-            filename_lower = file_path.name.lower()
-            if database_type.lower() in filename_lower or "jdbc" in filename_lower:
-                driver_files.append(str(file_path))
-        
-        return driver_files
+        # Use dynamic path discovery system
+        return find_driver_jar(database_type)
 
     def list_available_drivers(self) -> List[str]:
         """List all available driver JARs in the driver directory."""
-        driver_files = []
-        for file_path in Path(self.downloads_dir).glob("*.jar"):
-            driver_files.append(file_path.name)
-        return driver_files
+        # Use dynamic path discovery
+        all_jars = find_driver_jar("")
+        return [os.path.basename(jar) for jar in all_jars]
 
 
 # Convenience function for direct downloads

@@ -20,9 +20,9 @@ class JDBCDriverInfo(NamedTuple):
     description: str            # Brief description
     recommended_version: str    # Recommended version for stability
     maven_artifacts: Optional[List[str]] = None  # Optional maven artifact coordinates like 'group:artifact'
-        requires_license: bool = False
-        license_url: Optional[str] = None
-        license_text: Optional[str] = None
+    requires_license: bool = False
+    license_url: Optional[str] = None
+    license_text: Optional[str] = None
 
 
 class JDBCDriverRegistry:
@@ -89,12 +89,14 @@ class JDBCDriverRegistry:
             license="Commercial (with free distribution rights)",
             min_java_version="8",
             description="Oracle JDBC driver (ojdbc)",
-            recommended_version="21.13.0.0"
+            recommended_version="21.13.0.0",
+            requires_license=True,
+            license_url="https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html",
+            license_text=(
+                "Oracle JDBC drivers are distributed under Oracle terms. "
+                "You must accept Oracle's license before downloading and using their drivers."
+            ),
         ),
-        
-                    requires_license=True,
-                    license_url="https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html",
-                    license_text="Oracle JDBC drivers are distributed under Oracle terms. You must accept Oracle's license before downloading and using their drivers."
         # Microsoft SQL Server drivers
         "sqlserver": JDBCDriverInfo(
             name="Microsoft JDBC Driver for SQL Server",
@@ -108,10 +110,8 @@ class JDBCDriverRegistry:
             min_java_version="8",
             description="Microsoft JDBC driver for SQL Server",
             recommended_version="12.4.2.jre11",
-            maven_artifacts=["com.microsoft.sqlserver:mssql-jdbc"]
-                    requires_license=True,
-                    license_url="https://www.ibm.com/support/pages/db2-jdbc-driver-versions-and-downloads",
-                    license_text="IBM DB2 drivers may require acceptance of IBM download and redistribution terms before use."
+                maven_artifacts=["com.microsoft.sqlserver:mssql-jdbc"],
+                requires_license=False,
         ),
         
         # IBM DB2 drivers
@@ -126,10 +126,13 @@ class JDBCDriverRegistry:
             license="Commercial (with redistribution rights for clients)",
             min_java_version="8",
             description="IBM DB2 JDBC driver",
-            recommended_version="11.5.8.0"
-                    requires_license=True,
-                    license_url="https://github.com/IBM/JTOpen/releases",
-                    license_text="JT400 (JTOpen) releases are provided under the IBM Public License. Please ensure you accept the license terms where required."
+            recommended_version="11.5.8.0",
+            requires_license=True,
+            license_url="https://github.com/IBM/JTOpen/releases",
+            license_text=(
+                "JT400 (JTOpen) releases are provided under the IBM Public License. "
+                "Please ensure you accept the license terms where required."
+            ),
         ),
 
         # IBM AS400 / iSeries / IBM i drivers (JT400)

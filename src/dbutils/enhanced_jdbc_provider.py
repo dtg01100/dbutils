@@ -7,8 +7,11 @@ and DBeaver-like user experience features.
 
 import json
 import os
+import logging
 from dataclasses import dataclass
 from typing import Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 try:
     import jaydebeapi
@@ -28,7 +31,7 @@ STANDARD_CATEGORIES = [
     "Generic",
     "PostgreSQL",
     "MySQL",
-    "MariaDB", 
+    "MariaDB",
     "Oracle",
     "SQL Server",
     "DB2",
@@ -37,8 +40,13 @@ STANDARD_CATEGORIES = [
     "Apache Derby",
     "Firebird",
     "Informix",
-    "Sybase"
+    "Sybase",
+    "Custom"
 ]
+
+# Import configuration manager
+from dbutils.config_manager import ConfigManager, get_default_config_manager
+from dbutils.config.entrypoint_query_manager import EntrypointQueryManager, get_default_entrypoint_query_manager
 
 
 @dataclass
@@ -49,90 +57,111 @@ class JDBCProvider:
     driver_class: str = ""
     jar_path: str = ""
     url_template: str = ""  # e.g., "jdbc:db2://{host}:{port}/{database}"
-    
+
     # Simplified attributes for common usage
     default_host: str = "localhost"
     default_port: int = 0  # Use 0 for no default
     default_database: str = ""
     default_user: Optional[str] = None
     default_password: Optional[str] = None
-    
+
     # Advanced attributes for power users
     extra_properties: Optional[Dict[str, str]] = None
 
+    # Entrypoint query configuration
+    custom_entrypoint_query_set: Optional[str] = None
+
 
 class PredefinedProviderTemplates:
-    """Collection of templates for common database providers."""
-    
-    TEMPLATES = {
-        "PostgreSQL": {
-            "driver_class": "org.postgresql.Driver",
-            "url_template": "jdbc:postgresql://{host}:{port}/{database}",
-            "default_port": 5432,
-            "description": "PostgreSQL database connection"
-        },
-        "MySQL": {
-            "driver_class": "com.mysql.cj.jdbc.Driver",
-            "url_template": "jdbc:mysql://{host}:{port}/{database}",
-            "default_port": 3306,
-            "description": "MySQL database connection"
-        },
-        "MariaDB": {
-            "driver_class": "org.mariadb.jdbc.Driver",
-            "url_template": "jdbc:mariadb://{host}:{port}/{database}",
-            "default_port": 3306,
-            "description": "MariaDB database connection"
-        },
-        "Oracle": {
-            "driver_class": "oracle.jdbc.OracleDriver",
-            "url_template": "jdbc:oracle:thin:@//{host}:{port}/{database}",
-            "default_port": 1521,
-            "description": "Oracle database connection"
-        },
-        "SQL Server": {
-            "driver_class": "com.microsoft.sqlserver.jdbc.SQLServerDriver",
-            "url_template": "jdbc:sqlserver://{host}:{port};databaseName={database}",
-            "default_port": 1433,
-            "description": "Microsoft SQL Server connection"
-        },
-        "DB2": {
-            "driver_class": "com.ibm.db2.jcc.DB2Driver",
-            "url_template": "jdbc:db2://{host}:{port}/{database}",
-            "default_port": 50000,
-            "description": "IBM DB2 database connection"
-        },
-        "SQLite": {
-            "driver_class": "org.sqlite.JDBC",
-            "url_template": "jdbc:sqlite:{database}",
-            "default_port": 0,
-            "description": "SQLite file-based database"
-        },
-        "H2": {
-            "driver_class": "org.h2.Driver",
-            "url_template": "jdbc:h2:tcp://{host}:{port}/{database}",
-            "default_port": 9092,
-            "description": "H2 database connection"
-        }
-    }
+    """Collection of templates for common database providers loaded from configuration."""
 
-    @classmethod
-    def get_template(cls, category: str) -> Optional[Dict]:
+    def __init__(self, config_manager: Optional[ConfigManager] = None):
+        self.config_manager = config_manager or get_default_config_manager()
+        self._templates = self._load_templates()
+
+    def _load_templates(self) -> Dict[str, Dict]:
+        """Load templates from configuration with fallback to defaults."""
+        try:
+            config = self.config_manager.load_configuration()
+            templates = config.get("provider_templates", {})
+            if templates:
+                return templates
+        except Exception as e:
+            logger.warning(f"Failed to load provider templates from config: {e}")
+
+        # Fallback to hardcoded defaults if config loading fails
+        return {
+            "PostgreSQL": {
+                "driver_class": "org.postgresql.Driver",
+                "url_template": "jdbc:postgresql://{host}:{port}/{database}",
+                "default_port": 5432,
+                "description": "PostgreSQL database connection"
+            },
+            "MySQL": {
+                "driver_class": "com.mysql.cj.jdbc.Driver",
+                "url_template": "jdbc:mysql://{host}:{port}/{database}",
+                "default_port": 3306,
+                "description": "MySQL database connection"
+            },
+            "MariaDB": {
+                "driver_class": "org.mariadb.jdbc.Driver",
+                "url_template": "jdbc:mariadb://{host}:{port}/{database}",
+                "default_port": 3306,
+                "description": "MariaDB database connection"
+            },
+            "Oracle": {
+                "driver_class": "oracle.jdbc.OracleDriver",
+                "url_template": "jdbc:oracle:thin:@//{host}:{port}/{database}",
+                "default_port": 1521,
+                "description": "Oracle database connection"
+            },
+            "SQL Server": {
+                "driver_class": "com.microsoft.sqlserver.jdbc.SQLServerDriver",
+                "url_template": "jdbc:sqlserver://{host}:{port};databaseName={database}",
+                "default_port": 1433,
+                "description": "Microsoft SQL Server connection"
+            },
+            "DB2": {
+                "driver_class": "com.ibm.db2.jcc.DB2Driver",
+                "url_template": "jdbc:db2://{host}:{port}/{database}",
+                "default_port": 50000,
+                "description": "IBM DB2 database connection"
+            },
+            "SQLite": {
+                "driver_class": "org.sqlite.JDBC",
+                "url_template": "jdbc:sqlite:{database}",
+                "default_port": 0,
+                "description": "SQLite file-based database"
+            },
+            "H2": {
+                "driver_class": "org.h2.Driver",
+                "url_template": "jdbc:h2:tcp://{host}:{port}/{database}",
+                "default_port": 9092,
+                "description": "H2 database connection"
+            },
+            "Custom": {
+                "driver_class": "",
+                "url_template": "jdbc:{custom}://{host}:{port}/{database}",
+                "default_port": 0,
+                "description": "Custom JDBC provider - configure all parameters manually"
+            }
+        }
+
+    def get_template(self, category: str) -> Optional[Dict]:
         """Get a template for a specific category."""
-        return cls.TEMPLATES.get(category)
-    
-    @classmethod
-    def get_categories(cls) -> List[str]:
+        return self._templates.get(category)
+
+    def get_categories(self) -> List[str]:
         """Get all available category names."""
-        return list(cls.TEMPLATES.keys())
-    
-    @classmethod
-    def create_provider_from_template(cls, category: str, name: str, host: str = "localhost", 
-                                     database: str = "") -> Optional[JDBCProvider]:
+        return list(self._templates.keys())
+
+    def create_provider_from_template(self, category: str, name: str, host: str = "localhost",
+                                    database: str = "") -> Optional[JDBCProvider]:
         """Create a provider instance from a template."""
-        template = cls.get_template(category)
+        template = self.get_template(category)
         if not template:
             return None
-            
+
         return JDBCProvider(
             name=name,
             category=category,
@@ -303,22 +332,29 @@ class QueryWorker(QObject):
 
 class EnhancedProviderRegistry(QObject):
     """Enhanced registry with Qt integration and DBeaver-like features."""
-    
+
     # Signal emitted when providers are modified
     providers_changed = Signal()
-    
-    def __init__(self, config_path: str = None):
+
+    def __init__(self, config_path: str = None, config_manager: Optional[ConfigManager] = None,
+                 entrypoint_query_manager: Optional[EntrypointQueryManager] = None):
         super().__init__()
-        
+
+        # Initialize configuration manager
+        self.config_manager = config_manager or get_default_config_manager()
+
+        # Initialize entrypoint query manager
+        self.entrypoint_query_manager = entrypoint_query_manager or get_default_entrypoint_query_manager()
+
         # Default config path
         if config_path is None:
             config_dir = os.path.expanduser("~/.config/dbutils")
             os.makedirs(config_dir, exist_ok=True)
             config_path = os.path.join(config_dir, "jdbc_providers.json")
-        
+
         self.config_path = config_path
         self.providers: Dict[str, JDBCProvider] = {}
-        
+
         self._load_providers()
     
     def _load_providers(self):
@@ -343,7 +379,8 @@ class EnhancedProviderRegistry(QObject):
                             default_database=provider_data.get("default_database", ""),
                             default_user=provider_data.get("default_user"),
                             default_password=provider_data.get("default_password"),
-                            extra_properties=provider_data.get("extra_properties", {})
+                            extra_properties=provider_data.get("extra_properties", {}),
+                            custom_entrypoint_query_set=provider_data.get("custom_entrypoint_query_set")
                         )
                         self.providers[provider.name] = provider
                 else:
@@ -360,7 +397,8 @@ class EnhancedProviderRegistry(QObject):
                             default_database=provider_data.get("default_database", ""),
                             default_user=provider_data.get("default_user"),
                             default_password=provider_data.get("default_password"),
-                            extra_properties=provider_data.get("extra_properties", {})
+                            extra_properties=provider_data.get("extra_properties", {}),
+                            custom_entrypoint_query_set=provider_data.get("custom_entrypoint_query_set")
                         )
                         self.providers[name] = provider
         except Exception as e:
@@ -369,32 +407,87 @@ class EnhancedProviderRegistry(QObject):
             self._initialize_default_providers()
     
     def _initialize_default_providers(self):
-        """Initialize with sensible default providers."""
-        # Add a default SQLite provider for basic functionality
-        sqlite_provider = JDBCProvider(
-            name="SQLite Local",
-            category="SQLite",
-            driver_class="org.sqlite.JDBC",
-            jar_path="",  # Will need to be set by user
-            url_template="jdbc:sqlite:{database}",
-            default_database="sample.db",
-            extra_properties={}
-        )
-        self.providers[sqlite_provider.name] = sqlite_provider
-        
-        # Add example for user convenience
-        example_provider = JDBCProvider(
-            name="Example DB2",
-            category="DB2",
-            driver_class="com.ibm.db2.jcc.DB2Driver",
-            jar_path="/path/to/db2jcc.jar",
-            url_template="jdbc:db2://{host}:{port}/{database}",
-            default_host="localhost",
-            default_port=50000,
-            default_database="SAMPLE",
-            extra_properties={"securityMechanism": "3"}  # Example property
-        )
-        self.providers[example_provider.name] = example_provider
+        """Initialize with sensible default providers from configuration."""
+        try:
+            config = self.config_manager.load_configuration()
+            default_providers = config.get("default_providers", {})
+
+            if default_providers:
+                # Load from configuration
+                for name, provider_data in default_providers.items():
+                    provider = JDBCProvider(
+                        name=name,
+                        category=provider_data.get("category", "Generic"),
+                        driver_class=provider_data.get("driver_class", ""),
+                        jar_path=provider_data.get("jar_path", ""),
+                        url_template=provider_data.get("url_template", ""),
+                        default_host=provider_data.get("default_host", "localhost"),
+                        default_port=provider_data.get("default_port", 0),
+                        default_database=provider_data.get("default_database", ""),
+                        default_user=provider_data.get("default_user"),
+                        default_password=provider_data.get("default_password"),
+                        extra_properties=provider_data.get("extra_properties", {}),
+                        custom_entrypoint_query_set=provider_data.get("custom_entrypoint_query_set")
+                    )
+                    self.providers[provider.name] = provider
+            else:
+                # Fallback to hardcoded defaults if config loading fails
+                # Add a default SQLite provider for basic functionality
+                sqlite_provider = JDBCProvider(
+                    name="SQLite Local",
+                    category="SQLite",
+                    driver_class="org.sqlite.JDBC",
+                    jar_path="",  # Will need to be set by user
+                    url_template="jdbc:sqlite:{database}",
+                    default_database="sample.db",
+                    extra_properties={}
+                )
+                self.providers[sqlite_provider.name] = sqlite_provider
+
+                # Add example for user convenience
+                example_provider = JDBCProvider(
+                    name="Example DB2",
+                    category="DB2",
+                    driver_class="com.ibm.db2.jcc.DB2Driver",
+                    jar_path="/path/to/db2jcc.jar",
+                    url_template="jdbc:db2://{host}:{port}/{database}",
+                    default_host="localhost",
+                    default_port=50000,
+                    default_database="SAMPLE",
+                    extra_properties={"securityMechanism": "3"}  # Example property
+                )
+                self.providers[example_provider.name] = example_provider
+
+        except Exception as e:
+            logger.warning(f"Failed to load default providers from config: {e}")
+            # Fallback to hardcoded defaults if config loading fails
+            # Add a default SQLite provider for basic functionality
+            sqlite_provider = JDBCProvider(
+                name="SQLite Local",
+                category="SQLite",
+                driver_class="org.sqlite.JDBC",
+                jar_path="",  # Will need to be set by user
+                url_template="jdbc:sqlite:{database}",
+                default_database="sample.db",
+                extra_properties={},
+                custom_entrypoint_query_set=None
+            )
+            self.providers[sqlite_provider.name] = sqlite_provider
+
+            # Add example for user convenience
+            example_provider = JDBCProvider(
+                name="Example DB2",
+                category="DB2",
+                driver_class="com.ibm.db2.jcc.DB2Driver",
+                jar_path="/path/to/db2jcc.jar",
+                url_template="jdbc:db2://{host}:{port}/{database}",
+                default_host="localhost",
+                default_port=50000,
+                default_database="SAMPLE",
+                extra_properties={"securityMechanism": "3"},  # Example property
+                custom_entrypoint_query_set=None
+            )
+            self.providers[example_provider.name] = example_provider
     
     def save_providers(self):
         """Save providers to configuration file."""
@@ -415,7 +508,8 @@ class EnhancedProviderRegistry(QObject):
                     "default_database": provider.default_database,
                     "default_user": provider.default_user,
                     "default_password": provider.default_password,
-                    "extra_properties": provider.extra_properties or {}
+                    "extra_properties": provider.extra_properties or {},
+                    "custom_entrypoint_query_set": provider.custom_entrypoint_query_set
                 }
             
             with open(self.config_path, "w", encoding="utf-8") as f:
@@ -463,11 +557,96 @@ class EnhancedProviderRegistry(QObject):
         """Get all providers of a specific category."""
         return [p for p in self.providers.values() if p.category == category]
     
-    def create_connection(self, provider_name: str, username: str = None, 
+    def create_connection(self, provider_name: str, username: str = None,
                          password: str = None) -> Optional[JDBCConnection]:
         """Create a connection object for a provider."""
         provider = self.get_provider(provider_name)
         if not provider:
             return None
-            
+
         return JDBCConnection(provider, username, password)
+
+    def get_entrypoint_query_set(self, provider_name: str) -> Optional[Dict[str, str]]:
+        """
+        Get the entrypoint query set for a provider.
+
+        Args:
+            provider_name: Name of the provider
+
+        Returns:
+            Dictionary with entrypoint queries or None if provider not found
+        """
+        provider = self.get_provider(provider_name)
+        if not provider:
+            return None
+
+        # Get the appropriate query set based on provider category and custom settings
+        query_set = self.entrypoint_query_manager.get_query_set_or_default(
+            provider.category,
+            provider.custom_entrypoint_query_set
+        )
+
+        return query_set.to_dict()
+
+    def get_identity_query(self, provider_name: str) -> Optional[str]:
+        """Get the identity query for a provider."""
+        query_set = self.get_entrypoint_query_set(provider_name)
+        return query_set["identity_query"] if query_set else None
+
+    def get_schema_query(self, provider_name: str) -> Optional[str]:
+        """Get the schema query for a provider."""
+        query_set = self.get_entrypoint_query_set(provider_name)
+        return query_set["schema_query"] if query_set else None
+
+    def get_database_info_query(self, provider_name: str) -> Optional[str]:
+        """Get the database info query for a provider."""
+        query_set = self.get_entrypoint_query_set(provider_name)
+        return query_set["database_info_query"] if query_set else None
+
+    def list_available_entrypoint_query_sets(self) -> List[str]:
+        """List all available entrypoint query sets (default + custom)."""
+        default_sets = self.entrypoint_query_manager.list_supported_database_types()
+        custom_sets = self.entrypoint_query_manager.list_custom_query_sets()
+        return default_sets + custom_sets
+
+    def add_custom_entrypoint_query_set(self, name: str, query_set: Dict[str, str]) -> bool:
+        """
+        Add a custom entrypoint query set.
+
+        Args:
+            name: Name for the custom query set
+            query_set: Dictionary with identity_query, schema_query, database_info_query
+
+        Returns:
+            True if added successfully, False if name already exists
+        """
+        from dbutils.config.entrypoint_query_manager import EntrypointQuerySet
+        query_set_obj = EntrypointQuerySet.from_dict(query_set)
+        return self.entrypoint_query_manager.add_custom_query_set(name, query_set_obj)
+
+    def update_custom_entrypoint_query_set(self, name: str, query_set: Dict[str, str]) -> bool:
+        """
+        Update an existing custom entrypoint query set.
+
+        Args:
+            name: Name of the custom query set to update
+            query_set: New dictionary with query definitions
+
+        Returns:
+            True if updated successfully, False if name doesn't exist
+        """
+        from dbutils.config.entrypoint_query_manager import EntrypointQuerySet
+        query_set_obj = EntrypointQuerySet.from_dict(query_set)
+        return self.entrypoint_query_manager.update_custom_query_set(name, query_set_obj)
+
+    def remove_custom_entrypoint_query_set(self, name: str) -> bool:
+        """
+        Remove a custom entrypoint query set.
+
+        Args:
+            name: Name of the custom query set to remove
+
+        Returns:
+            True if removed successfully, False if name doesn't exist
+        """
+        return self.entrypoint_query_manager.remove_custom_query_set(name)

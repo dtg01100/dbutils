@@ -6,6 +6,13 @@ from typing import List, Tuple
 import urllib.request
 import urllib.error
 
+# Import unified configuration module
+try:
+    from ...config.dbutils_config import get_maven_repositories
+except ImportError:
+    from dbutils.config.dbutils_config import get_maven_repositories
+
+
 
 def _prefs_path() -> str:
     config_dir = os.environ.get('DBUTILS_CONFIG_DIR', os.path.expanduser('~/.config/dbutils'))
@@ -45,7 +52,9 @@ def save_prefs(prefs: dict) -> None:
 
 
 def get_maven_repos() -> List[str]:
-    return load_prefs().get('maven_repos', DEFAULT_REPOS)
+    """Get Maven repositories from dynamic configuration system."""
+    # Use dynamic URL configuration
+    return get_maven_repositories()
 
 
 def set_maven_repos(repos: List[str]) -> None:

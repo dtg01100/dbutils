@@ -102,6 +102,12 @@ if QT_BINDINGS:
             self.quick_add_btn.clicked.connect(self.add_from_template)
             quick_add_layout.addWidget(self.quick_add_combo)
             quick_add_layout.addWidget(self.quick_add_btn)
+    
+            # Add custom provider button
+            self.custom_provider_btn = QPushButton("Add Custom Provider")
+            self.custom_provider_btn.clicked.connect(self.add_custom_provider)
+            quick_add_layout.addWidget(self.custom_provider_btn)
+    
             left_layout.addLayout(quick_add_layout)
 
             # Buttons for provider management
@@ -447,6 +453,37 @@ if QT_BINDINGS:
                 self,
                 "Template Added",
                 f"Added {category} provider template. Fill in the connection details."
+            )
+    
+        def add_custom_provider(self):
+            """Add a custom JDBC provider with blank template."""
+            # Create a custom provider with empty/blank values
+            custom_provider = JDBCProvider(
+                name="Custom JDBC Provider",
+                category="Custom",
+                driver_class="",
+                jar_path="",
+                url_template="jdbc:{custom}://{host}:{port}/{database}",
+                default_host="localhost",
+                default_port=0,
+                default_database="",
+                default_user=None,
+                default_password=None,
+                extra_properties={}
+            )
+    
+            # Add to registry and UI
+            self.registry.add_provider(custom_provider)
+    
+            item = QListWidgetItem("Custom: Custom JDBC Provider")
+            item.setData(Qt.ItemDataRole.UserRole, "Custom JDBC Provider")
+            self.provider_list.addItem(item)
+            self.provider_list.setCurrentItem(item)
+    
+            QMessageBox.information(
+                self,
+                "Custom Provider Added",
+                "Added custom JDBC provider. Configure all connection parameters manually."
             )
 
         def browse_jar_file(self):

@@ -662,9 +662,11 @@ if QT_BINDINGS:
         from .jdbc_driver_downloader import JDBCDriverRegistry
 
         driver_info = JDBCDriverRegistry.get_driver_info(category)
-        if driver_info:
-            import webbrowser
-            webbrowser.open(driver_info.download_url)
+            if driver_info:
+                if os.environ.get('DBUTILS_TEST_MODE'):
+                    return driver_info.download_url
+                import webbrowser
+                webbrowser.open(driver_info.download_url)
         else:
             QMessageBox.information(
                 self,

@@ -61,6 +61,17 @@ def is_license_accepted(key: str) -> bool:
         return False
 
     # Check expiration if present
+    expiration_str = license_info.get('expiration')
+    if expiration_str:
+        try:
+            expiration_date = datetime.fromisoformat(expiration_str)
+            if datetime.now() > expiration_date:
+                return False
+        except (ValueError, TypeError):
+            # Invalid expiration format, treat as not expired
+            pass
+
+    return True
 
 def get_license_info(key: str) -> Optional[dict]:
     """Get detailed information about a license acceptance."""

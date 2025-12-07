@@ -35,8 +35,15 @@ except Exception as _exc:
     logger.warning("JDBC bridge libraries not available: %s", _exc)
 
 
-CONFIG_DIR = os.environ.get("DBUTILS_CONFIG_DIR", os.path.expanduser("~/.config/dbutils"))
-PROVIDERS_JSON = os.path.join(CONFIG_DIR, "providers.json")
+DEFAULT_CONFIG_DIR = os.environ.get("DBUTILS_CONFIG_DIR", os.path.expanduser("~/.config/dbutils"))
+DEFAULT_PROVIDERS_JSON = os.path.join(DEFAULT_CONFIG_DIR, "providers.json")
+# Backwards-compat: module level names for older imports
+CONFIG_DIR = DEFAULT_CONFIG_DIR
+PROVIDERS_JSON = DEFAULT_PROVIDERS_JSON
+PROVIDERS_JSON = DEFAULT_PROVIDERS_JSON
+
+# Import configuration manager
+from dbutils.config_manager import ConfigManager, get_default_config_manager
 
 
 @dataclass
@@ -64,9 +71,9 @@ class JDBCProvider:
     def from_dict(d: Dict[str, Any]) -> "JDBCProvider":
         return JDBCProvider(
             name=d.get("name") or "Unnamed",
-            driver_class=d["driver_class"],
-            jar_path=d["jar_path"],
-            url_template=d["url_template"],
+            driver_class=d.get("driver_class", ""),
+            jar_path=d.get("jar_path", ""),
+            url_template=d.get("url_template", ""),
             default_user=d.get("default_user"),
             default_password=d.get("default_password"),
             extra_properties=d.get("extra_properties", {}),
@@ -76,25 +83,43 @@ class JDBCProvider:
 class ProviderRegistry:
     """Manages JDBC providers persisted in a JSON config file."""
 
-    def __init__(self, config_path: str = PROVIDERS_JSON):
+    def __init__(self, config_path: Optional[str] = None):
+        # If no explicit config_path, compute it from current environment so tests can
+        # set DBUTILS_CONFIG_DIR after module import and still have Registry instances use it.
+        if config_path is None:
+            config_dir = os.environ.get("DBUTILS_CONFIG_DIR", DEFAULT_CONFIG_DIR)
+            config_path = os.path.join(config_dir, "providers.json")
+
         self.config_path = config_path
         self.providers: Dict[str, JDBCProvider] = {}
         self._load()
 
     def _load(self) -> None:
         try:
-            if not os.path.isdir(CONFIG_DIR):
-                os.makedirs(CONFIG_DIR, exist_ok=True)
+            config_dir = os.path.dirname(self.config_path)
+            if not os.path.isdir(config_dir):
+                os.makedirs(config_dir, exist_ok=True)
             if not os.path.isfile(self.config_path):
-                # Initialize with an example provider stub for DB2/H2
+                # Initialize with example providers including SQLite for testing
+                # Use dynamic JAR path resolution
+                config_manager = get_default_config_manager()
+
                 example = [
                     JDBCProvider(
                         name="H2 (Embedded)",
                         driver_class="org.h2.Driver",
-                        jar_path=os.path.join(os.path.dirname(__file__), "..", "..", "jars", "h2.jar"),
+                        jar_path=config_manager.get_jar_path("h2") or "",
                         url_template="jdbc:h2:mem:{database};DB_CLOSE_DELAY=-1",
                         default_user="sa",
                         default_password="",
+                    ).to_dict(),
+                    JDBCProvider(
+                        name="SQLite (Test Integration)",
+                        driver_class="org.sqlite.JDBC",
+                        jar_path=config_manager.get_jar_path("sqlite-jdbc") or "",
+                        url_template="jdbc:sqlite:{database}",
+                        default_user=None,
+                        default_password=None,
                     ).to_dict(),
                 ]
                 with open(self.config_path, "w", encoding="utf-8") as f:
@@ -177,6 +202,13 @@ class JDBCConnection:
                     # Support ':' separated paths (Unix) or ';' (Windows)
                     sep = ";" if ";" in extra_cp and os.name == "nt" else ":"
                     cp_entries.extend([p for p in extra_cp.split(sep) if p])
+                else:
+                    # Automatically include common dependency JARs from the same directory
+                    jar_dir = os.path.dirname(self.provider.jar_path)
+                    if os.path.isdir(jar_dir):
+                        for jar_file in os.listdir(jar_dir):
+                            if jar_file.endswith('.jar') and jar_file not in os.path.basename(self.provider.jar_path):
+                                cp_entries.append(os.path.join(jar_dir, jar_file))
                 classpath = os.pathsep.join(cp_entries)
 
                 jvm_args = [f"-Djava.class.path={classpath}"]
