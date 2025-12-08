@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 try:
     import jaydebeapi
     import jpype
+
     HAVE_JDBC = True
 except ImportError:
     HAVE_JDBC = False
@@ -40,7 +41,7 @@ STANDARD_CATEGORIES = [
     "Firebird",
     "Informix",
     "Sybase",
-    "Custom"
+    "Custom",
 ]
 
 # Import configuration manager
@@ -51,6 +52,7 @@ from dbutils.config_manager import ConfigManager, get_default_config_manager
 @dataclass
 class JDBCProvider:
     """Enhanced JDBC provider with Qt-friendly attributes."""
+
     name: str
     category: str = "Generic"
     driver_class: str = ""
@@ -73,6 +75,7 @@ class JDBCProvider:
 
 class PredefinedProviderTemplates:
     """Collection of templates for common database providers loaded from configuration."""
+
     # NOTE: The templates API provides convenience class methods (get_categories,
     # get_template, create_provider_from_template) so callers can use the class
     # directly (e.g., PredefinedProviderTemplates.get_categories()) for
@@ -98,56 +101,56 @@ class PredefinedProviderTemplates:
                 "driver_class": "org.postgresql.Driver",
                 "url_template": "jdbc:postgresql://{host}:{port}/{database}",
                 "default_port": 5432,
-                "description": "PostgreSQL database connection"
+                "description": "PostgreSQL database connection",
             },
             "MySQL": {
                 "driver_class": "com.mysql.cj.jdbc.Driver",
                 "url_template": "jdbc:mysql://{host}:{port}/{database}",
                 "default_port": 3306,
-                "description": "MySQL database connection"
+                "description": "MySQL database connection",
             },
             "MariaDB": {
                 "driver_class": "org.mariadb.jdbc.Driver",
                 "url_template": "jdbc:mariadb://{host}:{port}/{database}",
                 "default_port": 3306,
-                "description": "MariaDB database connection"
+                "description": "MariaDB database connection",
             },
             "Oracle": {
                 "driver_class": "oracle.jdbc.OracleDriver",
                 "url_template": "jdbc:oracle:thin:@//{host}:{port}/{database}",
                 "default_port": 1521,
-                "description": "Oracle database connection"
+                "description": "Oracle database connection",
             },
             "SQL Server": {
                 "driver_class": "com.microsoft.sqlserver.jdbc.SQLServerDriver",
                 "url_template": "jdbc:sqlserver://{host}:{port};databaseName={database}",
                 "default_port": 1433,
-                "description": "Microsoft SQL Server connection"
+                "description": "Microsoft SQL Server connection",
             },
             "DB2": {
                 "driver_class": "com.ibm.db2.jcc.DB2Driver",
                 "url_template": "jdbc:db2://{host}:{port}/{database}",
                 "default_port": 50000,
-                "description": "IBM DB2 database connection"
+                "description": "IBM DB2 database connection",
             },
             "SQLite": {
                 "driver_class": "org.sqlite.JDBC",
                 "url_template": "jdbc:sqlite:{database}",
                 "default_port": 0,
-                "description": "SQLite file-based database"
+                "description": "SQLite file-based database",
             },
             "H2": {
                 "driver_class": "org.h2.Driver",
                 "url_template": "jdbc:h2:tcp://{host}:{port}/{database}",
                 "default_port": 9092,
-                "description": "H2 database connection"
+                "description": "H2 database connection",
             },
             "Custom": {
                 "driver_class": "",
                 "url_template": "jdbc:{custom}://{host}:{port}/{database}",
                 "default_port": 0,
-                "description": "Custom JDBC provider - configure all parameters manually"
-            }
+                "description": "Custom JDBC provider - configure all parameters manually",
+            },
         }
 
     @classmethod
@@ -161,8 +164,9 @@ class PredefinedProviderTemplates:
         return list(cls()._templates.keys())
 
     @classmethod
-    def create_provider_from_template(cls, category: str, name: str, host: str = "localhost",
-                                    database: str = "") -> Optional[JDBCProvider]:
+    def create_provider_from_template(
+        cls, category: str, name: str, host: str = "localhost", database: str = ""
+    ) -> Optional[JDBCProvider]:
         """Create a provider instance from a template."""
         template = cls.get_template(category)
         if not template:
@@ -177,7 +181,7 @@ class PredefinedProviderTemplates:
             default_host=host,
             default_port=template["default_port"],
             default_database=database,
-            extra_properties={}
+            extra_properties={},
         )
 
 
@@ -190,8 +194,7 @@ class JDBCConnection(QObject):
     error_occurred = Signal(str)  # Error message
     query_finished = Signal(list)  # Query results
 
-    def __init__(self, provider: JDBCProvider, username: Optional[str] = None,
-                 password: Optional[str] = None):
+    def __init__(self, provider: JDBCProvider, username: Optional[str] = None, password: Optional[str] = None):
         super().__init__()
 
         self.provider = provider
@@ -214,9 +217,9 @@ class JDBCConnection(QObject):
 
             # Format connection URL
             url_params = {
-                'host': self.provider.default_host,
-                'port': self.provider.default_port,
-                'database': self.provider.default_database
+                "host": self.provider.default_host,
+                "port": self.provider.default_port,
+                "database": self.provider.default_database,
             }
             url = self.provider.url_template.format(**url_params)
 
@@ -225,11 +228,7 @@ class JDBCConnection(QObject):
             if self.provider.extra_properties:
                 props.update(self.provider.extra_properties)
 
-            self._connection = jaydebeapi.connect(
-                self.provider.driver_class,
-                url,
-                props
-            )
+            self._connection = jaydebeapi.connect(self.provider.driver_class, url, props)
 
             self.connected.emit()
             return True
@@ -272,7 +271,7 @@ class JDBCConnection(QObject):
         thread.start()
 
         # Store references to prevent garbage collection during operation
-        if not hasattr(self, '_active_threads'):
+        if not hasattr(self, "_active_threads"):
             self._active_threads = []
         self._active_threads.append((thread, worker))
 
@@ -345,8 +344,12 @@ class EnhancedProviderRegistry(QObject):
     # Signal emitted when providers are modified
     providers_changed = Signal()
 
-    def __init__(self, config_path: str = None, config_manager: Optional[ConfigManager] = None,
-                 entrypoint_query_manager: Optional[EntrypointQueryManager] = None):
+    def __init__(
+        self,
+        config_path: str = None,
+        config_manager: Optional[ConfigManager] = None,
+        entrypoint_query_manager: Optional[EntrypointQueryManager] = None,
+    ):
         super().__init__()
 
         # Initialize configuration manager
@@ -357,7 +360,7 @@ class EnhancedProviderRegistry(QObject):
 
         # Default config path (allow env override for testability)
         if config_path is None:
-            config_dir = os.environ.get('DBUTILS_CONFIG_DIR', os.path.expanduser("~/.config/dbutils"))
+            config_dir = os.environ.get("DBUTILS_CONFIG_DIR", os.path.expanduser("~/.config/dbutils"))
             os.makedirs(config_dir, exist_ok=True)
             config_path = os.path.join(config_dir, "jdbc_providers.json")
 
@@ -393,7 +396,7 @@ class EnhancedProviderRegistry(QObject):
                             default_user=provider_data.get("default_user"),
                             default_password=provider_data.get("default_password"),
                             extra_properties=provider_data.get("extra_properties", {}),
-                            custom_entrypoint_query_set=provider_data.get("custom_entrypoint_query_set")
+                            custom_entrypoint_query_set=provider_data.get("custom_entrypoint_query_set"),
                         )
                         self.providers[provider.name] = provider
                 else:
@@ -411,7 +414,7 @@ class EnhancedProviderRegistry(QObject):
                             default_user=provider_data.get("default_user"),
                             default_password=provider_data.get("default_password"),
                             extra_properties=provider_data.get("extra_properties", {}),
-                            custom_entrypoint_query_set=provider_data.get("custom_entrypoint_query_set")
+                            custom_entrypoint_query_set=provider_data.get("custom_entrypoint_query_set"),
                         )
                         self.providers[name] = provider
         except Exception as e:
@@ -440,7 +443,7 @@ class EnhancedProviderRegistry(QObject):
                         default_user=provider_data.get("default_user"),
                         default_password=provider_data.get("default_password"),
                         extra_properties=provider_data.get("extra_properties", {}),
-                        custom_entrypoint_query_set=provider_data.get("custom_entrypoint_query_set")
+                        custom_entrypoint_query_set=provider_data.get("custom_entrypoint_query_set"),
                     )
                     self.providers[provider.name] = provider
             else:
@@ -453,7 +456,7 @@ class EnhancedProviderRegistry(QObject):
                     jar_path="",  # Will need to be set by user
                     url_template="jdbc:sqlite:{database}",
                     default_database="sample.db",
-                    extra_properties={}
+                    extra_properties={},
                 )
                 self.providers[sqlite_provider.name] = sqlite_provider
 
@@ -467,7 +470,7 @@ class EnhancedProviderRegistry(QObject):
                     default_host="localhost",
                     default_port=50000,
                     default_database="SAMPLE",
-                    extra_properties={"securityMechanism": "3"}  # Example property
+                    extra_properties={"securityMechanism": "3"},  # Example property
                 )
                 self.providers[example_provider.name] = example_provider
 
@@ -483,7 +486,7 @@ class EnhancedProviderRegistry(QObject):
                 url_template="jdbc:sqlite:{database}",
                 default_database="sample.db",
                 extra_properties={},
-                custom_entrypoint_query_set=None
+                custom_entrypoint_query_set=None,
             )
             self.providers[sqlite_provider.name] = sqlite_provider
 
@@ -498,7 +501,7 @@ class EnhancedProviderRegistry(QObject):
                 default_port=50000,
                 default_database="SAMPLE",
                 extra_properties={"securityMechanism": "3"},  # Example property
-                custom_entrypoint_query_set=None
+                custom_entrypoint_query_set=None,
             )
             self.providers[example_provider.name] = example_provider
 
@@ -522,7 +525,7 @@ class EnhancedProviderRegistry(QObject):
                     "default_user": provider.default_user,
                     "default_password": provider.default_password,
                     "extra_properties": provider.extra_properties or {},
-                    "custom_entrypoint_query_set": provider.custom_entrypoint_query_set
+                    "custom_entrypoint_query_set": provider.custom_entrypoint_query_set,
                 }
 
             with open(self.config_path, "w", encoding="utf-8") as f:
@@ -581,8 +584,9 @@ class EnhancedProviderRegistry(QObject):
         """Get all providers of a specific category."""
         return [p for p in self.providers.values() if p.category == category]
 
-    def create_connection(self, provider_name: str, username: str = None,
-                         password: str = None) -> Optional[JDBCConnection]:
+    def create_connection(
+        self, provider_name: str, username: str = None, password: str = None
+    ) -> Optional[JDBCConnection]:
         """Create a connection object for a provider."""
         provider = self.get_provider(provider_name)
         if not provider:
@@ -606,8 +610,7 @@ class EnhancedProviderRegistry(QObject):
 
         # Get the appropriate query set based on provider category and custom settings
         query_set = self.entrypoint_query_manager.get_query_set_or_default(
-            provider.category,
-            provider.custom_entrypoint_query_set
+            provider.category, provider.custom_entrypoint_query_set
         )
 
         return query_set.to_dict()
@@ -645,6 +648,7 @@ class EnhancedProviderRegistry(QObject):
             True if added successfully, False if name already exists
         """
         from dbutils.config.entrypoint_query_manager import EntrypointQuerySet
+
         query_set_obj = EntrypointQuerySet.from_dict(query_set)
         return self.entrypoint_query_manager.add_custom_query_set(name, query_set_obj)
 
@@ -660,6 +664,7 @@ class EnhancedProviderRegistry(QObject):
             True if updated successfully, False if name doesn't exist
         """
         from dbutils.config.entrypoint_query_manager import EntrypointQuerySet
+
         query_set_obj = EntrypointQuerySet.from_dict(query_set)
         return self.entrypoint_query_manager.update_custom_query_set(name, query_set_obj)
 
