@@ -38,6 +38,7 @@ try:
         QVBoxLayout,
         QWidget,
     )
+
     QT_AVAILABLE = True
 except ImportError:
     try:
@@ -60,11 +61,13 @@ except ImportError:
             QVBoxLayout,
             QWidget,
         )
+
         QT_AVAILABLE = True
     except ImportError:
         QT_AVAILABLE = False
 
 if QT_AVAILABLE:
+
     class BaseUIComponent(QWidget):
         """Base class for all UI components with common functionality."""
 
@@ -79,10 +82,7 @@ if QT_AVAILABLE:
             self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
             # Set reasonable size policies
-            self.setSizePolicy(
-                QSizePolicy.Policy.Preferred,
-                QSizePolicy.Policy.Minimum
-            )
+            self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
 
         def set_accessible_name(self, name: str):
             """Set accessible name for screen readers."""
@@ -220,10 +220,7 @@ if QT_AVAILABLE:
             """)
 
             # Set reasonable size policy
-            self.setSizePolicy(
-                QSizePolicy.Policy.Minimum,
-                QSizePolicy.Policy.Fixed
-            )
+            self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
 
             # Enable proper accessibility
             self.setAccessibleName(f"Action: {self._text}")
@@ -364,11 +361,11 @@ if QT_AVAILABLE:
 
         def _hex_to_rgb(self, hex_color: str) -> str:
             """Convert hex color to RGB string."""
-            hex_color = hex_color.lstrip('#')
+            hex_color = hex_color.lstrip("#")
             if len(hex_color) == 3:
-                hex_color = ''.join([c * 2 for c in hex_color])
+                hex_color = "".join([c * 2 for c in hex_color])
             if len(hex_color) != 6:
-                return '0, 0, 0'
+                return "0, 0, 0"
             return f"{int(hex_color[0:2], 16)}, {int(hex_color[2:4], 16)}, {int(hex_color[4:6], 16)}"
 
     class SectionHeader(QWidget):
@@ -451,7 +448,7 @@ if QT_AVAILABLE:
             """Setup spinner animation."""
             self._animation_timer = None
             self._animation_frame = 0
-            self._spinner_chars = ['⏳', '⏴', '⏵', '⏶']
+            self._spinner_chars = ["⏳", "⏴", "⏵", "⏶"]
 
             # Start animation
             self._start_animation()
@@ -460,6 +457,7 @@ if QT_AVAILABLE:
             """Start the spinner animation."""
             if self._animation_timer is None:
                 from PySide6.QtCore import QTimer
+
                 self._animation_timer = QTimer(self)
                 self._animation_timer.timeout.connect(self._animate_spinner)
                 self._animation_timer.start(100)  # 100ms interval

@@ -98,8 +98,7 @@ if QT_BINDINGS:
             self.quick_add_combo = QComboBox()
             # Create instance of PredefinedProviderTemplates to call instance method
             templates = PredefinedProviderTemplates()
-            self.quick_add_combo.addItems(["Select database type..."] +
-                                        templates.get_categories())
+            self.quick_add_combo.addItems(["Select database type..."] + templates.get_categories())
             self.quick_add_btn = QPushButton("Add from Template")
             self.quick_add_btn.clicked.connect(self.add_from_template)
             quick_add_layout.addWidget(self.quick_add_combo)
@@ -274,8 +273,7 @@ if QT_BINDINGS:
             if filter_text:
                 filter_lower = filter_text.lower()
                 providers = [
-                    p for p in providers
-                    if filter_lower in p.name.lower() or filter_lower in p.category.lower()
+                    p for p in providers if filter_lower in p.name.lower() or filter_lower in p.category.lower()
                 ]
 
             for provider in sorted(providers, key=lambda p: (p.category, p.name)):
@@ -380,7 +378,7 @@ if QT_BINDINGS:
                 default_database="",
                 default_user=None,
                 default_password=None,
-                extra_properties={}
+                extra_properties={},
             )
             self.current_provider = new_provider
             self.load_provider_into_form(new_provider)
@@ -412,7 +410,7 @@ if QT_BINDINGS:
                     self,
                     "Confirm Delete",
                     f"Are you sure you want to delete provider '{provider_name}'?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 )
 
                 if reply == QMessageBox.StandardButton.Yes:
@@ -437,10 +435,7 @@ if QT_BINDINGS:
             # Create the provider with default name based on template
             default_name = f"My {category} Connection"
             provider = templates.create_provider_from_template(
-                category=category,
-                name=default_name,
-                host="localhost",
-                database=""
+                category=category, name=default_name, host="localhost", database=""
             )
 
             # Add to registry and UI
@@ -452,9 +447,7 @@ if QT_BINDINGS:
             self.provider_list.setCurrentItem(item)
 
             QMessageBox.information(
-                self,
-                "Template Added",
-                f"Added {category} provider template. Fill in the connection details."
+                self, "Template Added", f"Added {category} provider template. Fill in the connection details."
             )
 
         def add_custom_provider(self):
@@ -471,7 +464,7 @@ if QT_BINDINGS:
                 default_database="",
                 default_user=None,
                 default_password=None,
-                extra_properties={}
+                extra_properties={},
             )
 
             # Add to registry and UI
@@ -485,7 +478,7 @@ if QT_BINDINGS:
             QMessageBox.information(
                 self,
                 "Custom Provider Added",
-                "Added custom JDBC provider. Configure all connection parameters manually."
+                "Added custom JDBC provider. Configure all connection parameters manually.",
             )
 
         def browse_jar_file(self):
@@ -495,10 +488,7 @@ if QT_BINDINGS:
                 default_dir = os.path.expanduser("~")
 
             fname, _ = QFileDialog.getOpenFileName(
-                self,
-                "Select JDBC Driver JAR",
-                default_dir,
-                "JAR Files (*.jar);;All Files (*)"
+                self, "Select JDBC Driver JAR", default_dir, "JAR Files (*.jar);;All Files (*)"
             )
 
             if fname:
@@ -586,12 +576,12 @@ if QT_BINDINGS:
                     driver_class=self.driver_class_input.text().strip(),
                     jar_path=self.jar_path_input.text().strip(),
                     url_template=self.url_template_input.toPlainText(),
-                    default_host=self.host_input.text().strip() or 'localhost',
+                    default_host=self.host_input.text().strip() or "localhost",
                     default_port=self.port_input.value() or 0,
-                    default_database=self.database_input.text().strip() or '',
+                    default_database=self.database_input.text().strip() or "",
                     default_user=self.username_input.text().strip() or None,
                     default_password=self.password_input.text().strip() or None,
-                    extra_properties=props
+                    extra_properties=props,
                 )
                 self.registry.add_provider(new_provider)
 
@@ -603,7 +593,7 @@ if QT_BINDINGS:
                 self,
                 "Confirm Reset",
                 "This will reset all providers to default values and lose any custom providers. Continue?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
 
             if reply == QMessageBox.StandardButton.Yes:
@@ -614,11 +604,7 @@ if QT_BINDINGS:
                 self.registry.save_providers()
                 self.refresh_provider_list()
                 self.clear_form()
-                QMessageBox.information(
-                    self,
-                    "Reset Complete",
-                    "Providers have been reset to defaults."
-                )
+                QMessageBox.information(self, "Reset Complete", "Providers have been reset to defaults.")
 
         def download_jdbc_driver_gui(self):
             """Download JDBC driver for the selected category with enhanced UI feedback."""
@@ -635,14 +621,14 @@ if QT_BINDINGS:
 
                 # Check for common driver class patterns
                 driver_patterns = {
-                    'postgresql': ['postgres', 'pgjdbc'],
-                    'mysql': ['mysql', 'mariadb', 'cj.jdbc'],
-                    'oracle': ['oracle', 'ojdbc'],
-                    'sqlserver': ['sqlserver', 'microsoft', 'mssql'],
-                    'db2': ['db2', 'ibm'],
-                    'sqlite': ['sqlite', 'xerial'],
-                    'h2': ['h2'],
-                    'jt400': ['jt400', 'as400', 'ibm.i']
+                    "postgresql": ["postgres", "pgjdbc"],
+                    "mysql": ["mysql", "mariadb", "cj.jdbc"],
+                    "oracle": ["oracle", "ojdbc"],
+                    "sqlserver": ["sqlserver", "microsoft", "mssql"],
+                    "db2": ["db2", "ibm"],
+                    "sqlite": ["sqlite", "xerial"],
+                    "h2": ["h2"],
+                    "jt400": ["jt400", "as400", "ibm.i"],
                 }
 
                 for db_type, patterns in driver_patterns.items():
@@ -655,9 +641,7 @@ if QT_BINDINGS:
                 if detected_category:
                     category = detected_category
                     QMessageBox.information(
-                        self,
-                        "Driver Detected",
-                        f"Automatically detected {category} driver based on driver class."
+                        self, "Driver Detected", f"Automatically detected {category} driver based on driver class."
                     )
                 else:
                     # If no automatic detection, suggest common drivers
@@ -671,7 +655,7 @@ if QT_BINDINGS:
                     QMessageBox.information(
                         self,
                         "Select Category",
-                        suggestion_msg + "\nPlease select a database category or update the driver class field."
+                        suggestion_msg + "\nPlease select a database category or update the driver class field.",
                     )
                     return
 
@@ -681,9 +665,10 @@ if QT_BINDINGS:
                 reply = QMessageBox.question(
                     self,
                     "Driver Exists",
-                    f"Found existing {category} drivers:\n" + "\n".join([os.path.basename(path) for path in existing_drivers]) +
-                    "\n\nDo you want to download anyway?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                    f"Found existing {category} drivers:\n"
+                    + "\n".join([os.path.basename(path) for path in existing_drivers])
+                    + "\n\nDo you want to download anyway?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 )
                 if reply == QMessageBox.StandardButton.No:
                     # Use existing driver
@@ -693,7 +678,7 @@ if QT_BINDINGS:
                         "Choose an existing driver:",
                         [os.path.basename(path) for path in existing_drivers],
                         0,
-                        False
+                        False,
                     )
                     if ok and selected_driver:
                         for full_path in existing_drivers:
@@ -707,7 +692,7 @@ if QT_BINDINGS:
 
             # If running under test mode, avoid blocking GUI; return the dialog and controls so tests
             # can interact with the returned widgets directly without opening a native modal dialog.
-            if os.environ.get('DBUTILS_TEST_MODE'):
+            if os.environ.get("DBUTILS_TEST_MODE"):
                 # Return controls for inspection by tests
                 return dialog, download_btn, manual_btn, license_checkbox
 
@@ -716,8 +701,8 @@ if QT_BINDINGS:
                 # User chose to download automatically
                 # Read any pending options captured when Download/Manual was clicked
                 version = None
-                if hasattr(self, '_pending_download_options'):
-                    version = self._pending_download_options.get('version')
+                if hasattr(self, "_pending_download_options"):
+                    version = self._pending_download_options.get("version")
                 self.perform_jdbc_download(category, version=version)
 
         def create_download_dialog(self, category: str):
@@ -737,6 +722,7 @@ if QT_BINDINGS:
 
             # Show download information
             from .jdbc_auto_downloader import get_jdbc_driver_download_info as get_download_info
+
             info_text = get_download_info(category)
             if info_text:
                 info_label = QLabel(info_text)
@@ -755,9 +741,12 @@ if QT_BINDINGS:
             # License acceptance (if required)
             license_checkbox = None
             driver_info = JDBCDriverRegistry.get_driver_info(category)
-            if driver_info and getattr(driver_info, 'requires_license', False):
+            if driver_info and getattr(driver_info, "requires_license", False):
                 # Show license wording
-                license_label_text = driver_info.license_text or f"This driver requires acceptance of the vendor license: {driver_info.license_url}"
+                license_label_text = (
+                    driver_info.license_text
+                    or f"This driver requires acceptance of the vendor license: {driver_info.license_url}"
+                )
                 license_label = QLabel(license_label_text)
                 license_label.setWordWrap(True)
                 layout.addWidget(license_label)
@@ -770,11 +759,13 @@ if QT_BINDINGS:
             button_layout = QHBoxLayout()
 
             download_btn = QPushButton("Download Automatically")
+
             # When clicked, accept the dialog and persist any license acceptance
             def on_download_clicked():
                 # If license checkbox present and checked, persist acceptance
                 try:
                     from .license_store import accept_license
+
                     if license_checkbox is not None and license_checkbox.isChecked():
                         accept_license(category.lower())
                 except Exception:
@@ -784,22 +775,24 @@ if QT_BINDINGS:
                 sel_version = None
                 if version_choice is not None:
                     sel = version_choice.currentText()
-                    if sel == 'specific' and specific_version_input is not None:
+                    if sel == "specific" and specific_version_input is not None:
                         sel_version = specific_version_input.text().strip() or None
                     else:
                         sel_version = sel
 
-                self._pending_download_options = {'version': sel_version}
+                self._pending_download_options = {"version": sel_version}
 
                 dialog.accept()
 
             download_btn.clicked.connect(on_download_clicked)
 
             manual_btn = QPushButton("Open Download Page")
+
             # Handle manual button so we can persist license acceptance too
             def on_manual_clicked():
                 try:
                     from .license_store import accept_license
+
                     if license_checkbox is not None and license_checkbox.isChecked():
                         accept_license(category.lower())
                 except Exception:
@@ -809,12 +802,12 @@ if QT_BINDINGS:
                 sel_version = None
                 if version_choice is not None:
                     sel = version_choice.currentText()
-                    if sel == 'specific' and specific_version_input is not None:
+                    if sel == "specific" and specific_version_input is not None:
                         sel_version = specific_version_input.text().strip() or None
                     else:
                         sel_version = sel
 
-                self._pending_download_options = {'version': sel_version}
+                self._pending_download_options = {"version": sel_version}
 
                 # open download page but keep dialog open
                 self.open_download_page(category)
@@ -837,7 +830,7 @@ if QT_BINDINGS:
             repo_list_label = None
             repo_edit_btn = None
 
-            if driver_info and getattr(driver_info, 'maven_artifacts', None):
+            if driver_info and getattr(driver_info, "maven_artifacts", None):
                 artifact_group = QGroupBox("Artifact Options")
                 artifact_layout = QFormLayout(artifact_group)
 
@@ -850,7 +843,7 @@ if QT_BINDINGS:
                 specific_version_input.setEnabled(False)
 
                 def on_version_changed(idx):
-                    specific_version_input.setEnabled(version_choice.currentText() == 'specific')
+                    specific_version_input.setEnabled(version_choice.currentText() == "specific")
 
                 version_choice.currentIndexChanged.connect(on_version_changed)
 
@@ -869,7 +862,7 @@ if QT_BINDINGS:
                     status_icon = "✓" if valid else "✗"
                     repo_status_text.append(f"{status_icon} {repo} - {message}")
 
-                repo_list_label = QLabel('\n'.join(repo_status_text))
+                repo_list_label = QLabel("\n".join(repo_status_text))
                 repo_list_label.setWordWrap(True)
                 repo_edit_btn = QPushButton("Edit Repositories…")
 
@@ -877,7 +870,7 @@ if QT_BINDINGS:
                     edit_dialog = QDialog(self)
                     edit_dialog.setWindowTitle("Edit Maven Repositories")
                     edit_layout = QVBoxLayout(edit_dialog)
-                    repos_edit = QTextEdit('\n'.join(repos))
+                    repos_edit = QTextEdit("\n".join(repos))
                     edit_layout.addWidget(repos_edit)
 
                     btn_layout = QHBoxLayout()
@@ -890,7 +883,7 @@ if QT_BINDINGS:
                     def save_and_close():
                         new_repos = [r.strip() for r in repos_edit.toPlainText().splitlines() if r.strip()]
                         set_maven_repos(new_repos)
-                        repo_list_label.setText('\n'.join(new_repos))
+                        repo_list_label.setText("\n".join(new_repos))
                         edit_dialog.accept()
 
                     save_btn.clicked.connect(save_and_close)
@@ -922,13 +915,23 @@ if QT_BINDINGS:
 
                 # Check if license was previously accepted
                 from .license_store import is_license_accepted
+
                 if is_license_accepted(category.lower()):
                     license_checkbox.setChecked(True)
                     download_btn.setEnabled(True)
                     manual_btn.setEnabled(True)
 
             # Return controls so tests can interact and calling code can read selection
-            return dialog, download_btn, manual_btn, license_checkbox, version_choice, specific_version_input, repo_list_label, repo_edit_btn
+            return (
+                dialog,
+                download_btn,
+                manual_btn,
+                license_checkbox,
+                version_choice,
+                specific_version_input,
+                repo_list_label,
+                repo_edit_btn,
+            )
 
         def open_download_page(self, category):
             """Open the download page for the specified category."""
@@ -937,17 +940,14 @@ if QT_BINDINGS:
             driver_info = JDBCDriverRegistry.get_driver_info(category)
             if driver_info:
                 # Avoid launching a real browser when running tests
-                if os.environ.get('DBUTILS_TEST_MODE'):
+                if os.environ.get("DBUTILS_TEST_MODE"):
                     # In test mode, return the URL for assertions instead of opening a browser
                     return driver_info.download_url
                 import webbrowser
+
                 webbrowser.open(driver_info.download_url)
             else:
-                QMessageBox.information(
-                    self,
-                    "No Download Page",
-                    f"No specific download page available for {category}"
-                )
+                QMessageBox.information(self, "No Download Page", f"No specific download page available for {category}")
 
         def perform_jdbc_download(self, category, version: str | None = None):
             """Actually perform the JDBC driver download with enhanced feedback."""
@@ -957,13 +957,13 @@ if QT_BINDINGS:
             from .jdbc_driver_manager import download_jdbc_driver as download_auto
 
             # Ensure there is a progress widget available
-            if not hasattr(self, 'download_progress') or self.download_progress is None:
+            if not hasattr(self, "download_progress") or self.download_progress is None:
                 # Create a lightweight progress bar if it doesn't exist (tests may call this directly)
                 self.download_progress = QProgressBar(self)
                 self.download_progress.setVisible(False)
 
             # Create a status label for detailed feedback
-            if not hasattr(self, 'download_status_label') or self.download_status_label is None:
+            if not hasattr(self, "download_status_label") or self.download_status_label is None:
                 self.download_status_label = QLabel()
                 self.download_status_label.setWordWrap(True)
 
@@ -984,39 +984,35 @@ if QT_BINDINGS:
 
             try:
                 # Use requested version if provided, otherwise default to 'latest'
-                requested = version or 'latest'
-                result = download_auto(category, on_progress=progress_callback, on_status=status_callback, version=requested)
+                requested = version or "latest"
+                result = download_auto(
+                    category, on_progress=progress_callback, on_status=status_callback, version=requested
+                )
                 if result:
                     # Support single-path or list-of-paths
                     if isinstance(result, list):
                         # Set first jar path into the input so the provider can use it
-                        first = result[0] if result else ''
+                        first = result[0] if result else ""
                         self.jar_path_input.setText(first)
-                        names = ', '.join([os.path.basename(r) for r in result if r])
+                        names = ", ".join([os.path.basename(r) for r in result if r])
                         QMessageBox.information(
-                            self,
-                            "Download Complete",
-                            f"Successfully downloaded JDBC driver(s):\n{names}"
+                            self, "Download Complete", f"Successfully downloaded JDBC driver(s):\n{names}"
                         )
                     else:
                         self.jar_path_input.setText(result)
                         QMessageBox.information(
                             self,
                             "Download Complete",
-                            f"Successfully downloaded JDBC driver to:\n{os.path.basename(result)}"
+                            f"Successfully downloaded JDBC driver to:\n{os.path.basename(result)}",
                         )
                 else:
                     QMessageBox.warning(
                         self,
                         "Download Failed",
                         f"Could not automatically download JDBC driver for {category}.\n"
-                        f"Please download it manually from the official source."
+                        f"Please download it manually from the official source.",
                     )
             except Exception as e:
-                QMessageBox.critical(
-                    self,
-                    "Download Error",
-                    f"Error downloading JDBC driver: {e}"
-                )
+                QMessageBox.critical(self, "Download Error", f"Error downloading JDBC driver: {e}")
             finally:
                 self.download_progress.setVisible(False)

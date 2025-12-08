@@ -49,8 +49,9 @@ except ImportError:
         get_driver_directory,
         get_maven_repositories,
     )
-from . import license_store
 from dbutils.gui.jdbc_driver_downloader import JDBCDriverRegistry
+
+from . import license_store
 
 # Maven repository URLs for common JDBC drivers - now loaded from config
 try:
@@ -60,14 +61,14 @@ try:
         MAVEN_REPOSITORIES = [
             "https://repo1.maven.org/maven2/",
             "https://repo.maven.apache.org/maven2/",
-            "https://maven.aliyun.com/repository/central/"
+            "https://maven.aliyun.com/repository/central/",
         ]
 except Exception:
     # Fallback to hardcoded defaults if config system fails
     MAVEN_REPOSITORIES = [
         "https://repo1.maven.org/maven2/",
         "https://repo.maven.apache.org/maven2/",
-        "https://maven.aliyun.com/repository/central/"
+        "https://maven.aliyun.com/repository/central/",
     ]
 
 # Maximum retry attempts for transient failures
@@ -80,41 +81,41 @@ logger = logging.getLogger(__name__)
 
 # Database-specific JDBC driver coordinates
 JDBC_DRIVER_COORDINATES = {
-    'postgresql': {
-        'group_id': 'org.postgresql',
-        'artifact_id': 'postgresql',
-        'metadata_url': 'https://repo1.maven.org/maven2/org/postgresql/postgresql/maven-metadata.xml'
+    "postgresql": {
+        "group_id": "org.postgresql",
+        "artifact_id": "postgresql",
+        "metadata_url": "https://repo1.maven.org/maven2/org/postgresql/postgresql/maven-metadata.xml",
     },
-    'mysql': {
-        'group_id': 'mysql',
-        'artifact_id': 'mysql-connector-java',
-        'metadata_url': 'https://repo1.maven.org/maven2/mysql/mysql-connector-java/maven-metadata.xml'
+    "mysql": {
+        "group_id": "mysql",
+        "artifact_id": "mysql-connector-java",
+        "metadata_url": "https://repo1.maven.org/maven2/mysql/mysql-connector-java/maven-metadata.xml",
     },
-    'mariadb': {
-        'group_id': 'org.mariadb.jdbc',
-        'artifact_id': 'mariadb-java-client',
-        'metadata_url': 'https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/maven-metadata.xml'
+    "mariadb": {
+        "group_id": "org.mariadb.jdbc",
+        "artifact_id": "mariadb-java-client",
+        "metadata_url": "https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/maven-metadata.xml",
     },
-    'sqlserver': {
-        'group_id': 'com.microsoft.sqlserver',
-        'artifact_id': 'mssql-jdbc',
-        'metadata_url': 'https://repo1.maven.org/maven2/com/microsoft/sqlserver/mssql-jdbc/maven-metadata.xml'
+    "sqlserver": {
+        "group_id": "com.microsoft.sqlserver",
+        "artifact_id": "mssql-jdbc",
+        "metadata_url": "https://repo1.maven.org/maven2/com/microsoft/sqlserver/mssql-jdbc/maven-metadata.xml",
     },
-    'sqlite': {
-        'group_id': 'org.xerial',
-        'artifact_id': 'sqlite-jdbc',
-        'metadata_url': 'https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/maven-metadata.xml'
+    "sqlite": {
+        "group_id": "org.xerial",
+        "artifact_id": "sqlite-jdbc",
+        "metadata_url": "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/maven-metadata.xml",
     },
-    'h2': {
-        'group_id': 'com.h2database',
-        'artifact_id': 'h2',
-        'metadata_url': 'https://repo1.maven.org/maven2/com/h2database/h2/maven-metadata.xml'
+    "h2": {
+        "group_id": "com.h2database",
+        "artifact_id": "h2",
+        "metadata_url": "https://repo1.maven.org/maven2/com/h2database/h2/maven-metadata.xml",
     },
-    'derby': {
-        'group_id': 'org.apache.derby',
-        'artifact_id': 'derby',
-        'metadata_url': 'https://repo1.maven.org/maven2/org/apache/derby/derby/maven-metadata.xml'
-    }
+    "derby": {
+        "group_id": "org.apache.derby",
+        "artifact_id": "derby",
+        "metadata_url": "https://repo1.maven.org/maven2/org/apache/derby/derby/maven-metadata.xml",
+    },
 }
 
 
@@ -123,40 +124,45 @@ def get_latest_version_from_maven_metadata(metadata_url: str) -> Optional[str]:
     for attempt in range(MAX_RETRY_ATTEMPTS):
         try:
             response = urllib.request.urlopen(metadata_url)
-            metadata_xml = response.read().decode('utf-8')
+            metadata_xml = response.read().decode("utf-8")
             root = ET.fromstring(metadata_xml)
 
             # Find the latest release version
-            versioning = root.find('versioning')
+            versioning = root.find("versioning")
             if versioning is not None:
-                latest = versioning.find('latest')
+                latest = versioning.find("latest")
                 if latest is not None:
                     return latest.text
 
-                release = versioning.find('release')
+                release = versioning.find("release")
                 if release is not None:
                     return release.text
 
             # If no latest/release found, get the last version in the list
-            versions = root.find('versioning/versions')
+            versions = root.find("versioning/versions")
             if versions is not None:
-                version_elements = versions.findall('version')
+                version_elements = versions.findall("version")
                 if version_elements:
                     return version_elements[-1].text
 
             return None
         except urllib.error.URLError as e:
             if attempt < MAX_RETRY_ATTEMPTS - 1:
-                delay = RETRY_DELAY_BASE * (2 ** attempt) + random.uniform(0, 1)
-                logger.warning(f"Attempt {attempt + 1} failed to fetch metadata from {metadata_url}: {e}. Retrying in {delay:.1f}s...")
+                delay = RETRY_DELAY_BASE * (2**attempt) + random.uniform(0, 1)
+                logger.warning(
+                    f"Attempt {attempt + 1} failed to fetch metadata from {metadata_url}: {e}. Retrying in {delay:.1f}s..."
+                )
                 time.sleep(delay)
                 continue
-            logger.error(f"Could not fetch version metadata from {metadata_url} after {MAX_RETRY_ATTEMPTS} attempts: {e}")
+            logger.error(
+                f"Could not fetch version metadata from {metadata_url} after {MAX_RETRY_ATTEMPTS} attempts: {e}"
+            )
             return None
         except Exception as e:
             logger.error(f"Unexpected error fetching version metadata from {metadata_url}: {e}")
             return None
     return None
+
 
 def get_version_with_fallback(db_type: str, requested_version: str = "latest") -> str:
     """Get version with fallback mechanism for a specific database type."""
@@ -165,10 +171,10 @@ def get_version_with_fallback(db_type: str, requested_version: str = "latest") -
 
     # Try to get latest version from metadata
     coords = JDBC_DRIVER_COORDINATES.get(db_type)
-    if not coords or not coords.get('metadata_url'):
+    if not coords or not coords.get("metadata_url"):
         return requested_version
 
-    latest_version = get_latest_version_from_maven_metadata(coords['metadata_url'])
+    latest_version = get_latest_version_from_maven_metadata(coords["metadata_url"])
     if latest_version:
         return latest_version
 
@@ -182,26 +188,27 @@ def get_version_with_fallback(db_type: str, requested_version: str = "latest") -
         "postgresql": "42.6.0",
         "mysql": "8.0.33",
         "mariadb": "3.1.4",
-        "sqlserver": "12.4.2.jre11"
+        "sqlserver": "12.4.2.jre11",
     }
 
     return fallback_versions.get(db_type, requested_version)
+
 
 def resolve_version_with_strategy(db_type: str, requested_version: str = "latest") -> str:
     """Resolve version using configured strategy with fallback mechanisms."""
     # Get version resolution strategy from config
     try:
-        config_file = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config', 'auto_download_config.json')
+        config_file = os.path.join(os.path.dirname(__file__), "..", "..", "..", "config", "auto_download_config.json")
         if os.path.exists(config_file):
-            with open(config_file, 'r') as f:
+            with open(config_file, "r") as f:
                 config_data = json.load(f)
-            strategy = config_data.get('version_management', {}).get('version_resolution_strategy', 'latest_first')
+            strategy = config_data.get("version_management", {}).get("version_resolution_strategy", "latest_first")
         else:
-            strategy = 'latest_first'
+            strategy = "latest_first"
     except Exception:
-        strategy = 'latest_first'
+        strategy = "latest_first"
 
-    if strategy == 'latest_first':
+    if strategy == "latest_first":
         # Try latest first, then fallback to specific versions
         version = get_version_with_fallback(db_type, requested_version)
         if version != "latest" and version is not None:
@@ -213,7 +220,7 @@ def resolve_version_with_strategy(db_type: str, requested_version: str = "latest
             "h2": ["2.2.224", "2.2.220", "2.1.214"],
             "derby": ["10.15.2.0", "10.14.2.0", "10.13.1.1"],
             "hsqldb": ["2.7.2", "2.7.1", "2.7.0"],
-            "duckdb": ["0.10.2", "0.10.1", "0.10.0"]
+            "duckdb": ["0.10.2", "0.10.1", "0.10.0"],
         }
 
         for fallback_version in fallback_versions.get(db_type, []):
@@ -232,8 +239,8 @@ def get_jdbc_driver_url(db_type: str, version: str = "latest", repo_index: int =
     coords = JDBC_DRIVER_COORDINATES[db_type]
 
     # Get latest version if requested
-    if version == "latest" and coords.get('metadata_url'):
-        latest_ver = get_latest_version_from_maven_metadata(coords['metadata_url'])
+    if version == "latest" and coords.get("metadata_url"):
+        latest_ver = get_latest_version_from_maven_metadata(coords["metadata_url"])
         if latest_ver:
             version = latest_ver
 
@@ -246,7 +253,7 @@ def download_jdbc_driver(
     version: str = "latest",
     target_dir: Optional[str] = None,
     on_progress: Optional[Callable[[int, int], None]] = None,
-    on_status: Optional[Callable[[str], None]] = None
+    on_status: Optional[Callable[[str], None]] = None,
 ) -> Optional[str]:
     """
     Download a JDBC driver JAR file for the specified database type with enhanced error handling.
@@ -263,7 +270,7 @@ def download_jdbc_driver(
     """
     # License validation before download - only for drivers that require a license
     driver_info = JDBCDriverRegistry.DRIVERS.get(db_type)
-    if driver_info and getattr(driver_info, 'requires_license', False):
+    if driver_info and getattr(driver_info, "requires_license", False):
         license_key = f"jdbc_driver_{db_type}"
         if not license_store.is_license_accepted(license_key):
             error_msg = f"License not accepted for {db_type}. Please accept the license before downloading."
@@ -307,16 +314,16 @@ def download_jdbc_driver(
     for attempt in range(MAX_RETRY_ATTEMPTS):
         try:
             # Create temporary file for download
-            temp_fd, temp_path = tempfile.mkstemp(suffix='.jar', dir=target_dir)
+            temp_fd, temp_path = tempfile.mkstemp(suffix=".jar", dir=target_dir)
 
-            with os.fdopen(temp_fd, 'wb') as temp_file:
+            with os.fdopen(temp_fd, "wb") as temp_file:
                 # Create request with user agent
                 req = urllib.request.Request(download_url)
-                req.add_header('User-Agent', 'dbutils-jdbc-downloader/1.0')
+                req.add_header("User-Agent", "dbutils-jdbc-downloader/1.0")
 
                 # Open the URL and download
                 with urllib.request.urlopen(req) as response:
-                    total_size = int(response.headers.get('Content-Length', 0))
+                    total_size = int(response.headers.get("Content-Length", 0))
                     downloaded = 0
                     chunk_size = 8192
                     start_time = time.time()
@@ -341,7 +348,7 @@ def download_jdbc_driver(
                             if total_size > 0:
                                 remaining = (total_size - downloaded) / speed if speed > 0 else 0
                                 if current_time - last_update_time >= 0.5:  # Update every 0.5 seconds
-                                    status_msg = f"Downloading {filename}: {downloaded/1024/1024:.1f}MB of {total_size/1024/1024:.1f}MB ({speed/1024/1024:.1f}MB/s, {int(remaining)}s remaining)"
+                                    status_msg = f"Downloading {filename}: {downloaded / 1024 / 1024:.1f}MB of {total_size / 1024 / 1024:.1f}MB ({speed / 1024 / 1024:.1f}MB/s, {int(remaining)}s remaining)"
                                     if on_status:
                                         on_status(status_msg)
                                     last_update_time = current_time
@@ -367,14 +374,16 @@ def download_jdbc_driver(
                             on_status(f"Trying fallback repository for {db_type}...")
                         download_url = fallback_url
                         continue
-                error_msg = f"JDBC driver not found for {db_type} version {version} (HTTP {e.code}). URL tried: {download_url}"
+                error_msg = (
+                    f"JDBC driver not found for {db_type} version {version} (HTTP {e.code}). URL tried: {download_url}"
+                )
                 logger.error(error_msg)
                 if on_status:
                     on_status(f"Error: {error_msg}")
                 return None
             elif e.code in [500, 502, 503, 504]:  # Server errors, retry
                 if attempt < MAX_RETRY_ATTEMPTS - 1:
-                    delay = RETRY_DELAY_BASE * (2 ** attempt) + random.uniform(0, 1)
+                    delay = RETRY_DELAY_BASE * (2**attempt) + random.uniform(0, 1)
                     logger.warning(f"Server error {e.code} downloading {db_type}: {e}. Retrying in {delay:.1f}s...")
                     if on_status:
                         on_status(f"Server error {e.code}. Retrying in {delay:.1f}s...")
@@ -390,13 +399,12 @@ def download_jdbc_driver(
                 error_msg = f"HTTP error {e.code} downloading JDBC driver: {e}"
                 logger.error(error_msg)
                 if on_status:
-
                     on_status(f"Error: {error_msg}")
                 return None
 
         except urllib.error.URLError as e:
             if attempt < MAX_RETRY_ATTEMPTS - 1:
-                delay = RETRY_DELAY_BASE * (2 ** attempt) + random.uniform(0, 1)
+                delay = RETRY_DELAY_BASE * (2**attempt) + random.uniform(0, 1)
                 logger.warning(f"Network error downloading {db_type}: {e}. Retrying in {delay:.1f}s...")
                 if on_status:
                     on_status(f"Network error. Retrying in {delay:.1f}s...")
@@ -423,6 +431,7 @@ def get_driver_directory() -> str:
     """Get the standard directory for JDBC drivers."""
     # Use dynamic path resolution from config
     from dbutils.config.dbutils_config import get_driver_directory as config_get_driver_directory
+
     return config_get_driver_directory()
 
 
@@ -447,9 +456,11 @@ def find_existing_drivers(db_type: str) -> List[str]:
         name_lower = file_path.name.lower()
         db_type_lower = db_type.lower()
 
-        if (db_type_lower in name_lower or
-            (db_type == 'sqlserver' and 'mssql' in name_lower) or
-            (db_type == 'postgres' and 'postgres' in name_lower)):
+        if (
+            db_type_lower in name_lower
+            or (db_type == "sqlserver" and "mssql" in name_lower)
+            or (db_type == "postgres" and "postgres" in name_lower)
+        ):
             drivers.append(str(file_path))
 
     return drivers
@@ -463,14 +474,14 @@ def get_jdbc_driver_download_info(db_type: str) -> Optional[str]:
 
     # Get latest version
     latest_version = "Unknown"
-    if coords.get('metadata_url'):
-        latest_version = get_latest_version_from_maven_metadata(coords['metadata_url']) or "Unknown"
+    if coords.get("metadata_url"):
+        latest_version = get_latest_version_from_maven_metadata(coords["metadata_url"]) or "Unknown"
 
     # Test repository connectivity
     repo_status = "Unknown"
-    if coords.get('metadata_url'):
+    if coords.get("metadata_url"):
         try:
-            response = urllib.request.urlopen(coords['metadata_url'])
+            response = urllib.request.urlopen(coords["metadata_url"])
             response.close()
             repo_status = "Available"
         except Exception:
@@ -484,10 +495,11 @@ def get_jdbc_driver_download_info(db_type: str) -> Optional[str]:
         f"Repository Status: {repo_status}",
         f"Download Location: {get_driver_directory()}",
         "",
-        f"Will download from: {get_jdbc_driver_url(db_type, 'latest') or 'N/A'}"
+        f"Will download from: {get_jdbc_driver_url(db_type, 'latest') or 'N/A'}",
     ]
 
     return "\n".join(info)
+
 
 def test_repository_connectivity(repository_url: str) -> Tuple[bool, str]:
     """
@@ -498,8 +510,8 @@ def test_repository_connectivity(repository_url: str) -> Tuple[bool, str]:
     """
     try:
         # Test with a simple HEAD request to the repository root
-        req = urllib.request.Request(repository_url, method='HEAD')
-        req.add_header('User-Agent', 'dbutils-jdbc-downloader/1.0')
+        req = urllib.request.Request(repository_url, method="HEAD")
+        req.add_header("User-Agent", "dbutils-jdbc-downloader/1.0")
         try:
             resp_ctx = urllib.request.urlopen(req, timeout=5)
         except TypeError:
@@ -517,8 +529,10 @@ def test_repository_connectivity(repository_url: str) -> Tuple[bool, str]:
     except Exception as e:
         return False, f"Repository {repository_url} error: {str(e)}"
 
+
 # Prevent pytest from collecting this helper function as a test
 test_repository_connectivity.__test__ = False
+
 
 def get_repository_status() -> List[Tuple[str, bool, str]]:
     """Get status of all configured Maven repositories with detailed messages."""
@@ -527,6 +541,7 @@ def get_repository_status() -> List[Tuple[str, bool, str]]:
         success, message = test_repository_connectivity(repo)
         results.append((repo, success, message))
     return results
+
 
 def get_prioritized_repositories() -> List[str]:
     """Get repositories prioritized by connectivity and configuration."""
@@ -546,6 +561,7 @@ def get_prioritized_repositories() -> List[str]:
     # Return connected repositories first, then disconnected (as fallback)
     return connected_repos + disconnected_repos
 
+
 def get_repository_with_fallback(db_type: str, version: str = "latest") -> Optional[str]:
     """Get repository URL with fallback mechanism for a specific database type."""
     # Try prioritized repositories first
@@ -561,12 +577,7 @@ def get_repository_with_fallback(db_type: str, version: str = "latest") -> Optio
             if not coords:
                 return None
 
-            artifact_url = construct_maven_artifact_url(
-                coords['group_id'],
-                coords['artifact_id'],
-                version,
-                repo_index
-            )
+            artifact_url = construct_maven_artifact_url(coords["group_id"], coords["artifact_id"], version, repo_index)
 
             if artifact_url:
                 return artifact_url
@@ -580,7 +591,7 @@ def get_repository_with_fallback(db_type: str, version: str = "latest") -> Optio
         if not coords:
             continue
 
-        group_path = coords['group_id'].replace('.', '/')
+        group_path = coords["group_id"].replace(".", "/")
         jar_filename = f"{coords['artifact_id']}-{version}.jar"
         download_url = f"{repo_url.rstrip('/')}/{group_path}/{coords['artifact_id']}/{version}/{jar_filename}"
 

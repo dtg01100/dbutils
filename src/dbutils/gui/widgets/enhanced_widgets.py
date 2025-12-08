@@ -26,6 +26,7 @@ try:
     # Ensure a QApplication exists for widgets created during tests or module import
     try:
         from PySide6.QtWidgets import QApplication
+
         if QApplication.instance() is None:
             _QT_APP = QApplication([])
     except Exception:
@@ -220,13 +221,16 @@ if not QT_AVAILABLE:
             WA_StyledBackground = 0
             WA_TransparentForMouseEvents = 0
 
+
 # Compatibility shim: expose Qt.EventType alias if missing, mapping to QEvent.Type
 if QT_AVAILABLE:
     try:
-        if not hasattr(Qt, 'EventType') and hasattr(QEvent, 'Type'):
+        if not hasattr(Qt, "EventType") and hasattr(QEvent, "Type"):
+
             class _EventType:
                 Resize = QEvent.Type.Resize
                 Move = QEvent.Type.Move
+
             Qt.EventType = _EventType
     except Exception:
         # Best-effort; don't fail on import if typing/Qt lacks Type
@@ -586,6 +590,7 @@ class CollapsiblePanel(QWidget):
         # Content area
         class _ContentWidget(QWidget):
             """Internal content widget that exposes an overridable visibility flag for testing."""
+
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)
                 self._visible_override = True
@@ -595,7 +600,7 @@ class CollapsiblePanel(QWidget):
                 super().setVisible(visible)
 
             def isVisible(self) -> bool:
-                return getattr(self, '_visible_override', super().isVisible())
+                return getattr(self, "_visible_override", super().isVisible())
 
         self.content_widget = _ContentWidget()
         self.content_layout = QVBoxLayout(self.content_widget)
@@ -675,7 +680,7 @@ class BusyOverlay(QWidget):
 
     def set_message(self, message: str):
         self._message = message
-        if hasattr(self, 'update'):
+        if hasattr(self, "update"):
             self.update()
 
     def setVisible(self, visible: bool):
@@ -683,16 +688,16 @@ class BusyOverlay(QWidget):
         # Track an internal flag so isVisible() can be consistent even when parent isn't shown (useful for unit tests)
         self._visible = visible
         if visible:
-            if hasattr(self, '_timer') and self._timer:
+            if hasattr(self, "_timer") and self._timer:
                 self._timer.start()
         else:
-            if hasattr(self, '_timer') and self._timer:
+            if hasattr(self, "_timer") and self._timer:
                 self._timer.stop()
         super().setVisible(visible)
 
     def isVisible(self) -> bool:
         # Return our internal visible flag rather than relying on Qt's parent visibility rules
-        return getattr(self, '_visible', super().isVisible())
+        return getattr(self, "_visible", super().isVisible())
 
     def show_with_message(self, message: str | None = None):
         if message is not None:
@@ -717,7 +722,7 @@ class BusyOverlay(QWidget):
 
     def paintEvent(self, event):
         painter = self._create_painter()
-        setattr(self, '_last_painter', painter)
+        self._last_painter = painter
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         # Semi-transparent backdrop
@@ -754,7 +759,7 @@ class BusyOverlay(QWidget):
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, self._message)
             # Remove reference to last_painter to avoid holding resources
             try:
-                delattr(self, '_last_painter')
+                delattr(self, "_last_painter")
             except Exception:
                 pass
 

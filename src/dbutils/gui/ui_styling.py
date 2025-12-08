@@ -30,23 +30,29 @@ from typing import Any, Dict, List, Optional
 try:
     from PySide6.QtCore import QSettings
     from PySide6.QtGui import QColor, QPalette
+
     QT_AVAILABLE = True
 except ImportError:
     try:
         from PyQt6.QtCore import QSettings
         from PyQt6.QtGui import QColor, QPalette
+
         QT_AVAILABLE = True
     except ImportError:
         QT_AVAILABLE = False
 
+
 class ThemeMode(Enum):
     """Supported theme modes."""
+
     LIGHT = auto()
     DARK = auto()
     SYSTEM = auto()
 
+
 class ColorRole(Enum):
     """Color roles for theming."""
+
     PRIMARY = auto()
     SECONDARY = auto()
     SUCCESS = auto()
@@ -60,9 +66,11 @@ class ColorRole(Enum):
     BORDER = auto()
     ACCENT = auto()
 
+
 @dataclass
 class ColorPalette:
     """Color palette for a theme."""
+
     primary: str = "#3498db"
     secondary: str = "#2ecc71"
     success: str = "#27ae60"
@@ -76,9 +84,11 @@ class ColorPalette:
     border: str = "#e0e0e0"
     accent: str = "#9b59b6"
 
+
 @dataclass
 class Typography:
     """Typography settings."""
+
     font_family: str = "'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif"
     base_size: int = 13
     heading_sizes: Dict[str, int] = None
@@ -86,18 +96,13 @@ class Typography:
 
     def __post_init__(self):
         if self.heading_sizes is None:
-            self.heading_sizes = {
-                'h1': 24,
-                'h2': 20,
-                'h3': 18,
-                'h4': 16,
-                'h5': 14,
-                'h6': 12
-            }
+            self.heading_sizes = {"h1": 24, "h2": 20, "h3": 18, "h4": 16, "h5": 14, "h6": 12}
+
 
 @dataclass
 class Spacing:
     """Spacing system for consistent layouts."""
+
     base_unit: int = 8
     scale: List[int] = None
 
@@ -111,9 +116,11 @@ class Spacing:
             return self.scale[level - 1]
         return self.base_unit
 
+
 @dataclass
 class Theme:
     """Complete UI theme definition."""
+
     name: str = "Default"
     mode: ThemeMode = ThemeMode.LIGHT
     palette: ColorPalette = None
@@ -129,6 +136,7 @@ class Theme:
             self.typography = Typography()
         if self.spacing is None:
             self.spacing = Spacing()
+
 
 class UIStyling:
     """Centralized styling system for the database browser."""
@@ -152,8 +160,8 @@ class UIStyling:
                 surface="#f8f9fa",
                 text_primary="#333333",
                 text_secondary="#666666",
-                border="#e0e0e0"
-            )
+                border="#e0e0e0",
+            ),
         )
 
         # Dark theme
@@ -172,21 +180,16 @@ class UIStyling:
                 text_primary="#f0f0f0",
                 text_secondary="#b0b0b0",
                 border="#3a3a3a",
-                accent="#ff8c00"
+                accent="#ff8c00",
             ),
             typography=Typography(
                 font_family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif",
                 base_size=13,
-                heading_sizes={
-                    'h1': 24, 'h2': 20, 'h3': 18, 'h4': 16, 'h5': 14, 'h6': 12
-                }
-            )
+                heading_sizes={"h1": 24, "h2": 20, "h3": 18, "h4": 16, "h5": 14, "h6": 12},
+            ),
         )
 
-        self._themes = {
-            "light": light_theme,
-            "dark": dark_theme
-        }
+        self._themes = {"light": light_theme, "dark": dark_theme}
 
         self._current_theme_name = "light"
         self._initialized = True
@@ -621,7 +624,7 @@ class UIStyling:
         }}
 
         .dialog-title {{
-            font-size: {self.get_current_theme().typography.heading_sizes['h3']}px;
+            font-size: {self.get_current_theme().typography.heading_sizes["h3"]}px;
             font-weight: 600;
             color: var(--color-text-primary);
             margin: 0;
@@ -732,37 +735,34 @@ class UIStyling:
 
         try:
             theme_data = {
-                'name': theme.name,
-                'mode': theme.mode.name,
-                'palette': {
-                    'primary': theme.palette.primary,
-                    'secondary': theme.palette.secondary,
-                    'success': theme.palette.success,
-                    'warning': theme.palette.warning,
-                    'error': theme.palette.error,
-                    'info': theme.palette.info,
-                    'background': theme.palette.background,
-                    'surface': theme.palette.surface,
-                    'text_primary': theme.palette.text_primary,
-                    'text_secondary': theme.palette.text_secondary,
-                    'border': theme.palette.border,
-                    'accent': theme.palette.accent
+                "name": theme.name,
+                "mode": theme.mode.name,
+                "palette": {
+                    "primary": theme.palette.primary,
+                    "secondary": theme.palette.secondary,
+                    "success": theme.palette.success,
+                    "warning": theme.palette.warning,
+                    "error": theme.palette.error,
+                    "info": theme.palette.info,
+                    "background": theme.palette.background,
+                    "surface": theme.palette.surface,
+                    "text_primary": theme.palette.text_primary,
+                    "text_secondary": theme.palette.text_secondary,
+                    "border": theme.palette.border,
+                    "accent": theme.palette.accent,
                 },
-                'typography': {
-                    'font_family': theme.typography.font_family,
-                    'base_size': theme.typography.base_size,
-                    'heading_sizes': theme.typography.heading_sizes,
-                    'line_height': theme.typography.line_height
+                "typography": {
+                    "font_family": theme.typography.font_family,
+                    "base_size": theme.typography.base_size,
+                    "heading_sizes": theme.typography.heading_sizes,
+                    "line_height": theme.typography.line_height,
                 },
-                'spacing': {
-                    'base_unit': theme.spacing.base_unit,
-                    'scale': theme.spacing.scale
-                },
-                'border_radius': theme.border_radius,
-                'shadow_level': theme.shadow_level
+                "spacing": {"base_unit": theme.spacing.base_unit, "scale": theme.spacing.scale},
+                "border_radius": theme.border_radius,
+                "shadow_level": theme.shadow_level,
             }
 
-            with open(file_path, 'w', encoding='utf-8') as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(theme_data, f, indent=2, ensure_ascii=False)
 
             return True
@@ -780,48 +780,45 @@ class UIStyling:
             return None
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 theme_data = json.load(f)
 
             # Convert to Theme object
-            palette_data = theme_data['palette']
+            palette_data = theme_data["palette"]
             palette = ColorPalette(
-                primary=palette_data['primary'],
-                secondary=palette_data['secondary'],
-                success=palette_data['success'],
-                warning=palette_data['warning'],
-                error=palette_data['error'],
-                info=palette_data['info'],
-                background=palette_data['background'],
-                surface=palette_data['surface'],
-                text_primary=palette_data['text_primary'],
-                text_secondary=palette_data['text_secondary'],
-                border=palette_data['border'],
-                accent=palette_data['accent']
+                primary=palette_data["primary"],
+                secondary=palette_data["secondary"],
+                success=palette_data["success"],
+                warning=palette_data["warning"],
+                error=palette_data["error"],
+                info=palette_data["info"],
+                background=palette_data["background"],
+                surface=palette_data["surface"],
+                text_primary=palette_data["text_primary"],
+                text_secondary=palette_data["text_secondary"],
+                border=palette_data["border"],
+                accent=palette_data["accent"],
             )
 
-            typography_data = theme_data['typography']
+            typography_data = theme_data["typography"]
             typography = Typography(
-                font_family=typography_data['font_family'],
-                base_size=typography_data['base_size'],
-                heading_sizes=typography_data['heading_sizes'],
-                line_height=typography_data['line_height']
+                font_family=typography_data["font_family"],
+                base_size=typography_data["base_size"],
+                heading_sizes=typography_data["heading_sizes"],
+                line_height=typography_data["line_height"],
             )
 
-            spacing_data = theme_data['spacing']
-            spacing = Spacing(
-                base_unit=spacing_data['base_unit'],
-                scale=spacing_data['scale']
-            )
+            spacing_data = theme_data["spacing"]
+            spacing = Spacing(base_unit=spacing_data["base_unit"], scale=spacing_data["scale"])
 
             theme = Theme(
-                name=theme_data['name'],
-                mode=ThemeMode[theme_data['mode']],
+                name=theme_data["name"],
+                mode=ThemeMode[theme_data["mode"]],
                 palette=palette,
                 typography=typography,
                 spacing=spacing,
-                border_radius=theme_data['border_radius'],
-                shadow_level=theme_data['shadow_level']
+                border_radius=theme_data["border_radius"],
+                shadow_level=theme_data["shadow_level"],
             )
 
             return theme
@@ -835,20 +832,15 @@ class UIStyling:
             return {}
 
         return {
-            'name': theme.name,
-            'mode': theme.mode.name,
-            'colors': {
-                'primary': theme.palette.primary,
-                'background': theme.palette.background,
-                'text': theme.palette.text_primary
+            "name": theme.name,
+            "mode": theme.mode.name,
+            "colors": {
+                "primary": theme.palette.primary,
+                "background": theme.palette.background,
+                "text": theme.palette.text_primary,
             },
-            'typography': {
-                'font_family': theme.typography.font_family,
-                'base_size': theme.typography.base_size
-            },
-            'spacing': {
-                'base_unit': theme.spacing.base_unit
-            }
+            "typography": {"font_family": theme.typography.font_family, "base_size": theme.typography.base_size},
+            "spacing": {"base_unit": theme.spacing.base_unit},
         }
 
     def detect_system_theme(self) -> ThemeMode:
@@ -858,7 +850,10 @@ class UIStyling:
 
         try:
             # Try to detect system theme preference
-            settings = QSettings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", QSettings.Format.NativeFormat)
+            settings = QSettings(
+                "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                QSettings.Format.NativeFormat,
+            )
             if settings.contains("AppsUseLightTheme"):
                 light_theme = settings.value("AppsUseLightTheme") == 1
                 return ThemeMode.LIGHT if light_theme else ThemeMode.DARK
@@ -876,8 +871,10 @@ class UIStyling:
         else:
             self.set_theme("light")
 
+
 # Singleton instance for easy access
 _ui_styling_instance = None
+
 
 def get_ui_styling() -> UIStyling:
     """Get the singleton UI styling instance."""

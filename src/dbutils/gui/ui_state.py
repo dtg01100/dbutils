@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Optional, Set
 
 class UIStateSection(Enum):
     """Sections of UI state that can be managed independently."""
+
     SEARCH = auto()
     DISPLAY = auto()
     LAYOUT = auto()
@@ -37,14 +38,17 @@ class UIStateSection(Enum):
     NAVIGATION = auto()
     DATA = auto()
 
+
 @dataclass
 class StateChange:
     """Represents a change in application state."""
+
     section: UIStateSection
     key: str
     old_value: Any
     new_value: Any
     timestamp: float = field(default_factory=lambda: time.time())
+
 
 class StateObserver(ABC):
     """Abstract base class for state observers."""
@@ -53,6 +57,7 @@ class StateObserver(ABC):
     def on_state_changed(self, change: StateChange):
         """Called when state changes."""
         pass
+
 
 class UIStateManager:
     """Centralized state management for the database browser UI."""
@@ -72,43 +77,43 @@ class UIStateManager:
         """Initialize the application with default state values."""
         with self._lock:
             # Search state
-            self._state['search.mode'] = 'tables'
-            self._state['search.query'] = ''
-            self._state['search.show_non_matching'] = True
-            self._state['search.inline_highlight'] = True
-            self._state['search.streaming_enabled'] = True
-            self._state['search.debounce_delay'] = 150
+            self._state["search.mode"] = "tables"
+            self._state["search.query"] = ""
+            self._state["search.show_non_matching"] = True
+            self._state["search.inline_highlight"] = True
+            self._state["search.streaming_enabled"] = True
+            self._state["search.debounce_delay"] = 150
 
             # Display state
-            self._state['display.schema_filter'] = None
-            self._state['display.table_view_mode'] = 'list'
-            self._state['display.column_view_mode'] = 'list'
-            self._state['display.show_tooltips'] = True
-            self._state['display.row_height'] = 30
+            self._state["display.schema_filter"] = None
+            self._state["display.table_view_mode"] = "list"
+            self._state["display.column_view_mode"] = "list"
+            self._state["display.show_tooltips"] = True
+            self._state["display.row_height"] = 30
 
             # Layout state
-            self._state['layout.search_dock_visible'] = True
-            self._state['layout.tables_dock_visible'] = True
-            self._state['layout.columns_dock_visible'] = True
-            self._state['layout.contents_dock_visible'] = False
-            self._state['layout.details_dock_visible'] = False
+            self._state["layout.search_dock_visible"] = True
+            self._state["layout.tables_dock_visible"] = True
+            self._state["layout.columns_dock_visible"] = True
+            self._state["layout.contents_dock_visible"] = False
+            self._state["layout.details_dock_visible"] = False
 
             # Preferences
-            self._state['prefs.use_cache'] = True
-            self._state['prefs.cache_ttl'] = 3600
-            self._state['prefs.auto_refresh'] = False
-            self._state['prefs.theme'] = 'light'
+            self._state["prefs.use_cache"] = True
+            self._state["prefs.cache_ttl"] = 3600
+            self._state["prefs.auto_refresh"] = False
+            self._state["prefs.theme"] = "light"
 
             # Navigation
-            self._state['nav.selected_table'] = None
-            self._state['nav.selected_column'] = None
-            self._state['nav.last_search'] = None
+            self._state["nav.selected_table"] = None
+            self._state["nav.selected_column"] = None
+            self._state["nav.last_search"] = None
 
             # Data state
-            self._state['data.last_refresh'] = None
-            self._state['data.schema_count'] = 0
-            self._state['data.table_count'] = 0
-            self._state['data.column_count'] = 0
+            self._state["data.last_refresh"] = None
+            self._state["data.schema_count"] = 0
+            self._state["data.table_count"] = 0
+            self._state["data.column_count"] = 0
 
             self._initialized = True
 
@@ -169,12 +174,7 @@ class UIStateManager:
                 section = self._infer_section_from_key(key)
 
             # Create change record
-            change = StateChange(
-                section=section,
-                key=key,
-                old_value=old_value,
-                new_value=value
-            )
+            change = StateChange(section=section, key=key, old_value=old_value, new_value=value)
 
             # Update state
             self._state[key] = value
@@ -191,17 +191,17 @@ class UIStateManager:
 
     def _infer_section_from_key(self, key: str) -> UIStateSection:
         """Infer the state section from a key name."""
-        if key.startswith('search.'):
+        if key.startswith("search."):
             return UIStateSection.SEARCH
-        elif key.startswith('display.'):
+        elif key.startswith("display."):
             return UIStateSection.DISPLAY
-        elif key.startswith('layout.'):
+        elif key.startswith("layout."):
             return UIStateSection.LAYOUT
-        elif key.startswith('prefs.'):
+        elif key.startswith("prefs."):
             return UIStateSection.PREFERENCES
-        elif key.startswith('nav.'):
+        elif key.startswith("nav."):
             return UIStateSection.NAVIGATION
-        elif key.startswith('data.'):
+        elif key.startswith("data."):
             return UIStateSection.DATA
         else:
             return UIStateSection.PREFERENCES  # Default
@@ -221,12 +221,9 @@ class UIStateManager:
                 # Reset all state
                 self._state.clear()
                 self._initialize_default_state()
-                self._notify_observers(StateChange(
-                    section=UIStateSection.PREFERENCES,
-                    key='*',
-                    old_value=None,
-                    new_value='reset'
-                ))
+                self._notify_observers(
+                    StateChange(section=UIStateSection.PREFERENCES, key="*", old_value=None, new_value="reset")
+                )
             else:
                 # Reset specific section
                 for key in list(self._state.keys()):
@@ -247,57 +244,52 @@ class UIStateManager:
                 elif section == UIStateSection.DATA:
                     self._initialize_data_state()
 
-                self._notify_observers(StateChange(
-                    section=section,
-                    key='*',
-                    old_value=None,
-                    new_value='reset'
-                ))
+                self._notify_observers(StateChange(section=section, key="*", old_value=None, new_value="reset"))
 
     def _initialize_search_state(self):
         """Initialize search-related state."""
-        self._state['search.mode'] = 'tables'
-        self._state['search.query'] = ''
-        self._state['search.show_non_matching'] = True
-        self._state['search.inline_highlight'] = True
-        self._state['search.streaming_enabled'] = True
-        self._state['search.debounce_delay'] = 150
+        self._state["search.mode"] = "tables"
+        self._state["search.query"] = ""
+        self._state["search.show_non_matching"] = True
+        self._state["search.inline_highlight"] = True
+        self._state["search.streaming_enabled"] = True
+        self._state["search.debounce_delay"] = 150
 
     def _initialize_display_state(self):
         """Initialize display-related state."""
-        self._state['display.schema_filter'] = None
-        self._state['display.table_view_mode'] = 'list'
-        self._state['display.column_view_mode'] = 'list'
-        self._state['display.show_tooltips'] = True
-        self._state['display.row_height'] = 30
+        self._state["display.schema_filter"] = None
+        self._state["display.table_view_mode"] = "list"
+        self._state["display.column_view_mode"] = "list"
+        self._state["display.show_tooltips"] = True
+        self._state["display.row_height"] = 30
 
     def _initialize_layout_state(self):
         """Initialize layout-related state."""
-        self._state['layout.search_dock_visible'] = True
-        self._state['layout.tables_dock_visible'] = True
-        self._state['layout.columns_dock_visible'] = True
-        self._state['layout.contents_dock_visible'] = False
-        self._state['layout.details_dock_visible'] = False
+        self._state["layout.search_dock_visible"] = True
+        self._state["layout.tables_dock_visible"] = True
+        self._state["layout.columns_dock_visible"] = True
+        self._state["layout.contents_dock_visible"] = False
+        self._state["layout.details_dock_visible"] = False
 
     def _initialize_preferences_state(self):
         """Initialize preference-related state."""
-        self._state['prefs.use_cache'] = True
-        self._state['prefs.cache_ttl'] = 3600
-        self._state['prefs.auto_refresh'] = False
-        self._state['prefs.theme'] = 'light'
+        self._state["prefs.use_cache"] = True
+        self._state["prefs.cache_ttl"] = 3600
+        self._state["prefs.auto_refresh"] = False
+        self._state["prefs.theme"] = "light"
 
     def _initialize_navigation_state(self):
         """Initialize navigation-related state."""
-        self._state['nav.selected_table'] = None
-        self._state['nav.selected_column'] = None
-        self._state['nav.last_search'] = None
+        self._state["nav.selected_table"] = None
+        self._state["nav.selected_column"] = None
+        self._state["nav.last_search"] = None
 
     def _initialize_data_state(self):
         """Initialize data-related state."""
-        self._state['data.last_refresh'] = None
-        self._state['data.schema_count'] = 0
-        self._state['data.table_count'] = 0
-        self._state['data.column_count'] = 0
+        self._state["data.last_refresh"] = None
+        self._state["data.schema_count"] = 0
+        self._state["data.table_count"] = 0
+        self._state["data.column_count"] = 0
 
     def get_state_section(self, section: UIStateSection) -> Dict[str, Any]:
         """Get all state values for a specific section."""
@@ -321,12 +313,12 @@ class UIStateManager:
                 state_copy = copy.deepcopy(self._state)
 
                 # Remove sensitive or transient data
-                if 'nav.selected_table' in state_copy:
-                    del state_copy['nav.selected_table']
-                if 'nav.selected_column' in state_copy:
-                    del state_copy['nav.selected_column']
+                if "nav.selected_table" in state_copy:
+                    del state_copy["nav.selected_table"]
+                if "nav.selected_column" in state_copy:
+                    del state_copy["nav.selected_column"]
 
-                with open(file_path, 'w', encoding='utf-8') as f:
+                with open(file_path, "w", encoding="utf-8") as f:
                     json.dump(state_copy, f, indent=2, ensure_ascii=False)
 
             return True
@@ -344,7 +336,7 @@ class UIStateManager:
             return False
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 saved_state = json.load(f)
 
             with self._lock:
@@ -384,7 +376,7 @@ class UIStateManager:
                     section=last_change.section,
                     key=last_change.key,
                     old_value=last_change.new_value,
-                    new_value=last_change.old_value
+                    new_value=last_change.old_value,
                 )
                 self._notify_observers(undo_change)
 
@@ -396,14 +388,11 @@ class UIStateManager:
         """Get a summary of current state for debugging/diagnostics."""
         with self._lock:
             return {
-                'state_count': len(self._state),
-                'observer_count': len(self._observers),
-                'change_history_count': len(self._change_history),
-                'initialized': self._initialized,
-                'sections': {
-                    section.name: len(self.get_state_section(section))
-                    for section in UIStateSection
-                }
+                "state_count": len(self._state),
+                "observer_count": len(self._observers),
+                "change_history_count": len(self._change_history),
+                "initialized": self._initialized,
+                "sections": {section.name: len(self.get_state_section(section)) for section in UIStateSection},
             }
 
     def __del__(self):
@@ -411,8 +400,10 @@ class UIStateManager:
         self._observers.clear()
         self._change_history.clear()
 
+
 # Singleton instance for easy access
 _ui_state_manager_instance = None
+
 
 def get_ui_state_manager() -> UIStateManager:
     """Get the singleton UI state manager instance."""

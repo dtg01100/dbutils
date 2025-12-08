@@ -11,14 +11,15 @@ from typing import Dict, List, NamedTuple, Optional
 
 class JDBCDriverInfo(NamedTuple):
     """Information about a specific JDBC driver."""
-    name: str                    # Human-readable name
-    driver_class: str           # Fully qualified driver class name
-    download_url: str           # Primary download location
-    alternative_urls: List[str] # Alternative download locations
-    license: str                # License type (e.g., "Commercial", "Apache 2.0", "BSD")
-    min_java_version: str       # Minimum required Java version
-    description: str            # Brief description
-    recommended_version: str    # Recommended version for stability
+
+    name: str  # Human-readable name
+    driver_class: str  # Fully qualified driver class name
+    download_url: str  # Primary download location
+    alternative_urls: List[str]  # Alternative download locations
+    license: str  # License type (e.g., "Commercial", "Apache 2.0", "BSD")
+    min_java_version: str  # Minimum required Java version
+    description: str  # Brief description
+    recommended_version: str  # Recommended version for stability
     maven_artifacts: Optional[List[str]] = None  # Optional maven artifact coordinates like 'group:artifact'
     requires_license: bool = False
     license_url: Optional[str] = None
@@ -36,15 +37,14 @@ class JDBCDriverRegistry:
             download_url="https://jdbc.postgresql.org/download.html",
             alternative_urls=[
                 "https://repo1.maven.org/maven2/org/postgresql/postgresql/",
-                "https://github.com/pgjdbc/pgjdbc/releases"
+                "https://github.com/pgjdbc/pgjdbc/releases",
             ],
             license="BSD-2-Clause",
             min_java_version="8",
             description="Official PostgreSQL JDBC driver",
             recommended_version="42.6.0",
-            maven_artifacts=["org.postgresql:postgresql"]
+            maven_artifacts=["org.postgresql:postgresql"],
         ),
-
         # MySQL drivers
         "mysql": JDBCDriverInfo(
             name="MySQL Connector/J",
@@ -52,15 +52,14 @@ class JDBCDriverRegistry:
             download_url="https://dev.mysql.com/downloads/connector/j/",
             alternative_urls=[
                 "https://repo1.maven.org/maven2/mysql/mysql-connector-java/",
-                "https://github.com/mysql/mysql-connector-j/releases"
+                "https://github.com/mysql/mysql-connector-j/releases",
             ],
             license="GPL-2.0 or Commercial",
             min_java_version="8",
             description="MySQL JDBC Type 4 driver",
             recommended_version="8.0.33",
-            maven_artifacts=["mysql:mysql-connector-java"]
+            maven_artifacts=["mysql:mysql-connector-java"],
         ),
-
         # MariaDB drivers
         "mariadb": JDBCDriverInfo(
             name="MariaDB Connector/J",
@@ -68,15 +67,14 @@ class JDBCDriverRegistry:
             download_url="https://mariadb.com/downloads/connectors/connectors-data-access/jdbc/",
             alternative_urls=[
                 "https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/",
-                "https://github.com/mariadb-corporation/mariadb-connector-j/releases"
+                "https://github.com/mariadb-corporation/mariadb-connector-j/releases",
             ],
             license="LGPL-2.1",
             min_java_version="8",
             description="MariaDB JDBC driver",
             recommended_version="3.1.4",
-            maven_artifacts=["org.mariadb.jdbc:mariadb-java-client"]
+            maven_artifacts=["org.mariadb.jdbc:mariadb-java-client"],
         ),
-
         # Oracle drivers
         "oracle": JDBCDriverInfo(
             name="Oracle JDBC Driver",
@@ -84,7 +82,7 @@ class JDBCDriverRegistry:
             download_url="https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html",
             alternative_urls=[
                 "https://repo1.maven.org/maven2/com/oracle/database/jdbc/",
-                "https://www.oracle.com/technical-resources/articles/java/index-099297.html"
+                "https://www.oracle.com/technical-resources/articles/java/index-099297.html",
             ],
             license="Commercial (with free distribution rights)",
             min_java_version="8",
@@ -104,25 +102,21 @@ class JDBCDriverRegistry:
             download_url="https://docs.microsoft.com/en-us/sql/connect/jdbc/download-microsoft-jdbc-driver-for-sql-server",
             alternative_urls=[
                 "https://repo1.maven.org/maven2/com/microsoft/sqlserver/mssql-jdbc/",
-                "https://github.com/microsoft/mssql-jdbc/releases"
+                "https://github.com/microsoft/mssql-jdbc/releases",
             ],
             license="MIT",
             min_java_version="8",
             description="Microsoft JDBC driver for SQL Server",
             recommended_version="12.4.2.jre11",
-                maven_artifacts=["com.microsoft.sqlserver:mssql-jdbc"],
-                requires_license=False,
+            maven_artifacts=["com.microsoft.sqlserver:mssql-jdbc"],
+            requires_license=False,
         ),
-
         # IBM DB2 drivers
         "db2": JDBCDriverInfo(
             name="IBM DB2 JDBC Driver",
             driver_class="com.ibm.db2.jcc.DB2Driver",
             download_url="https://www.ibm.com/support/pages/db2-jdbc-driver-versions-and-downloads",
-            alternative_urls=[
-                "https://repo1.maven.org/maven2/com/ibm/db2/jcc/",
-                "https://www.ibm.com/products/db2"
-            ],
+            alternative_urls=["https://repo1.maven.org/maven2/com/ibm/db2/jcc/", "https://www.ibm.com/products/db2"],
             license="Commercial (with redistribution rights for clients)",
             min_java_version="8",
             description="IBM DB2 JDBC driver",
@@ -134,7 +128,6 @@ class JDBCDriverRegistry:
                 "Please ensure you accept the license terms where required."
             ),
         ),
-
         # IBM AS400 / iSeries / IBM i drivers (JT400)
         "jt400": JDBCDriverInfo(
             name="IBM Toolbox for Java (JT400) - AS400/IBM i",
@@ -143,15 +136,14 @@ class JDBCDriverRegistry:
             alternative_urls=[
                 "https://repo1.maven.org/maven2/com/ibm/jtopen/jtopen/",
                 "https://github.com/IBM/JTOpen/releases",
-                "https://sourceforge.net/projects/jt400/"
+                "https://sourceforge.net/projects/jt400/",
             ],
             license="IBM Public License",
             min_java_version="8",
             description="JDBC driver for IBM i (AS400) systems",
             recommended_version="10.5",
-            maven_artifacts=["com.ibm:jtopen"]
+            maven_artifacts=["com.ibm:jtopen"],
         ),
-
         # SQLite drivers
         "sqlite": JDBCDriverInfo(
             name="SQLite JDBC Driver",
@@ -159,15 +151,14 @@ class JDBCDriverRegistry:
             download_url="https://github.com/xerial/sqlite-jdbc/releases",
             alternative_urls=[
                 "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/",
-                "https://www.sqlite.org/download.html"
+                "https://www.sqlite.org/download.html",
             ],
             license="Apache 2.0 / GNU LGPL",
             min_java_version="8",
             description="SQLite JDBC driver",
             recommended_version="3.42.0.0",
-            maven_artifacts=["org.xerial:sqlite-jdbc"]
+            maven_artifacts=["org.xerial:sqlite-jdbc"],
         ),
-
         # H2 Database drivers
         "h2": JDBCDriverInfo(
             name="H2 Database Engine",
@@ -175,15 +166,14 @@ class JDBCDriverRegistry:
             download_url="https://www.h2database.com/html/download.html",
             alternative_urls=[
                 "https://repo1.maven.org/maven2/com/h2database/h2/",
-                "https://github.com/h2database/h2database/releases"
+                "https://github.com/h2database/h2database/releases",
             ],
             license="MPL 2.0 / EPL 1.0",
             min_java_version="8",
             description="H2 database JDBC driver",
             recommended_version="2.2.224",
-            maven_artifacts=["com.h2database:h2"]
+            maven_artifacts=["com.h2database:h2"],
         ),
-
         # Apache Derby drivers
         "derby": JDBCDriverInfo(
             name="Apache Derby Embedded Driver",
@@ -191,14 +181,13 @@ class JDBCDriverRegistry:
             download_url="https://db.apache.org/derby/derby_downloads.html",
             alternative_urls=[
                 "https://repo1.maven.org/maven2/org/apache/derby/derby/",
-                "https://archive.apache.org/dist/db-derby/"
+                "https://archive.apache.org/dist/db-derby/",
             ],
             license="Apache 2.0",
             min_java_version="8",
             description="Apache Derby JDBC driver",
-            recommended_version="10.15.2.0"
+            recommended_version="10.15.2.0",
         ),
-
         # Generic template
         "generic": JDBCDriverInfo(
             name="Generic JDBC Driver",
@@ -208,39 +197,47 @@ class JDBCDriverRegistry:
             license="N/A",
             min_java_version="8",
             description="Generic JDBC driver template",
-            recommended_version="x.x.x"
-        )
+            recommended_version="x.x.x",
+        ),
     }
 
     @classmethod
     def get_driver_info(cls, database_type: str) -> Optional[JDBCDriverInfo]:
         """Get driver information for a specific database type."""
         # Normalize the input (case-insensitive)
-        normalized_type = database_type.lower().strip().replace(' ', '')
+        normalized_type = database_type.lower().strip().replace(" ", "")
 
         # Handle aliases and variations
-        if 'postgres' in normalized_type or 'pgsql' in normalized_type:
-            return cls.DRIVERS.get('postgresql')
-        elif 'mysql' in normalized_type or 'maria' in normalized_type:
+        if "postgres" in normalized_type or "pgsql" in normalized_type:
+            return cls.DRIVERS.get("postgresql")
+        elif "mysql" in normalized_type or "maria" in normalized_type:
             # MariaDB is handled separately but both MySQL and MariaDB are common
-            if 'maria' in normalized_type:
-                return cls.DRIVERS.get('mariadb')
+            if "maria" in normalized_type:
+                return cls.DRIVERS.get("mariadb")
             else:
-                return cls.DRIVERS.get('mysql')
-        elif 'oracle' in normalized_type:
-            return cls.DRIVERS.get('oracle')
-        elif 'sqlserver' in normalized_type or 'mssql' in normalized_type or 'sql server' in normalized_type.replace('_', ' '):
-            return cls.DRIVERS.get('sqlserver')
-        elif 'db2' in normalized_type.lower():
-            return cls.DRIVERS.get('db2')
-        elif 'jt400' in normalized_type.lower() or 'as400' in normalized_type.lower() or 'ibm i' in normalized_type.replace('_', ' '):
-            return cls.DRIVERS.get('jt400')
-        elif 'sqlite' in normalized_type:
-            return cls.DRIVERS.get('sqlite')
-        elif 'h2' in normalized_type:
-            return cls.DRIVERS.get('h2')
-        elif 'derby' in normalized_type:
-            return cls.DRIVERS.get('derby')
+                return cls.DRIVERS.get("mysql")
+        elif "oracle" in normalized_type:
+            return cls.DRIVERS.get("oracle")
+        elif (
+            "sqlserver" in normalized_type
+            or "mssql" in normalized_type
+            or "sql server" in normalized_type.replace("_", " ")
+        ):
+            return cls.DRIVERS.get("sqlserver")
+        elif "db2" in normalized_type.lower():
+            return cls.DRIVERS.get("db2")
+        elif (
+            "jt400" in normalized_type.lower()
+            or "as400" in normalized_type.lower()
+            or "ibm i" in normalized_type.replace("_", " ")
+        ):
+            return cls.DRIVERS.get("jt400")
+        elif "sqlite" in normalized_type:
+            return cls.DRIVERS.get("sqlite")
+        elif "h2" in normalized_type:
+            return cls.DRIVERS.get("h2")
+        elif "derby" in normalized_type:
+            return cls.DRIVERS.get("derby")
 
         # Direct lookup
         return cls.DRIVERS.get(normalized_type)

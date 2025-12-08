@@ -36,9 +36,11 @@ from .ui_styling import UIStyling, get_ui_styling
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("dbutils.gui.integration")
 
+
 @dataclass
 class IntegrationStatus:
     """Status of the UI/UX integration."""
+
     initialized: bool = False
     modules_loaded: int = 0
     errors: List[str] = None
@@ -49,6 +51,7 @@ class IntegrationStatus:
             self.errors = []
         if self.performance_metrics is None:
             self.performance_metrics = {}
+
 
 class UIXIntegration:
     """Centralized integration of all UI/UX cleanup modules."""
@@ -110,6 +113,7 @@ class UIXIntegration:
 
             # Set reasonable accessibility level
             from .accessibility import AccessibilityLevel
+
             self._accessibility_manager.set_accessibility_level(AccessibilityLevel.INTERMEDIATE)
 
             # Apply system language
@@ -120,6 +124,7 @@ class UIXIntegration:
 
             # Set default theme based on system preference
             from .ui_styling import ThemeMode
+
             system_theme = self._ui_styling.detect_system_theme()
             if system_theme == ThemeMode.DARK:
                 self._ui_styling.set_theme("dark")
@@ -146,58 +151,58 @@ class UIXIntegration:
             return {}
 
         return {
-            'search_metrics': self._search_manager.get_cache_stats(),
-            'state_metrics': self._ui_state_manager.get_state_summary(),
-            'performance_metrics': self._performance_monitor.get_metrics_summary(),
-            'accessibility_metrics': self._accessibility_manager.get_accessibility_report(),
-            'i18n_metrics': self._i18n_manager.get_translation_stats(),
-            'responsive_metrics': {
-                'breakpoint': self._responsive_manager.get_current_breakpoint().name,
-                'screen_width': self._responsive_manager.get_screen_width(),
-                'screen_height': self._responsive_manager.get_screen_height(),
-                'device_type': self._responsive_manager.get_device_type()
-            }
+            "search_metrics": self._search_manager.get_cache_stats(),
+            "state_metrics": self._ui_state_manager.get_state_summary(),
+            "performance_metrics": self._performance_monitor.get_metrics_summary(),
+            "accessibility_metrics": self._accessibility_manager.get_accessibility_report(),
+            "i18n_metrics": self._i18n_manager.get_translation_stats(),
+            "responsive_metrics": {
+                "breakpoint": self._responsive_manager.get_current_breakpoint().name,
+                "screen_width": self._responsive_manager.get_screen_width(),
+                "screen_height": self._responsive_manager.get_screen_height(),
+                "device_type": self._responsive_manager.get_device_type(),
+            },
         }
 
     def get_accessibility_report(self) -> Dict[str, Any]:
         """Get comprehensive accessibility report."""
         if not self._initialized:
-            return {'compliance': 'not_initialized'}
+            return {"compliance": "not_initialized"}
 
         return self._accessibility_manager.get_accessibility_report()
 
     def get_performance_optimizations(self) -> Dict[str, Any]:
         """Get performance optimization recommendations."""
         if not self._initialized:
-            return {'recommendations': []}
+            return {"recommendations": []}
 
         return {
-            'memory_tips': self._performance_monitor.get_memory_optimization_tips(),
-            'bottleneck_analysis': self._performance_monitor.analyze_performance_bottlenecks(
+            "memory_tips": self._performance_monitor.get_memory_optimization_tips(),
+            "bottleneck_analysis": self._performance_monitor.analyze_performance_bottlenecks(
                 self._performance_monitor.get_metrics()
             ),
-            'responsive_settings': self._responsive_manager.get_responsive_performance_settings()
+            "responsive_settings": self._responsive_manager.get_responsive_performance_settings(),
         }
 
     def get_integration_dashboard(self) -> Dict[str, Any]:
         """Get comprehensive integration dashboard."""
         if not self._initialized:
-            return {'status': 'not_initialized'}
+            return {"status": "not_initialized"}
 
         return {
-            'status': self._status.__dict__,
-            'performance': self.get_performance_metrics(),
-            'accessibility': self.get_accessibility_report(),
-            'optimizations': self.get_performance_optimizations(),
-            'modules': {
-                'search': self._search_manager is not None,
-                'state': self._ui_state_manager is not None,
-                'styling': self._ui_styling is not None,
-                'performance': self._performance_monitor is not None,
-                'accessibility': self._accessibility_manager is not None,
-                'i18n': self._i18n_manager is not None,
-                'responsive': self._responsive_manager is not None
-            }
+            "status": self._status.__dict__,
+            "performance": self.get_performance_metrics(),
+            "accessibility": self.get_accessibility_report(),
+            "optimizations": self.get_performance_optimizations(),
+            "modules": {
+                "search": self._search_manager is not None,
+                "state": self._ui_state_manager is not None,
+                "styling": self._ui_styling is not None,
+                "performance": self._performance_monitor is not None,
+                "accessibility": self._accessibility_manager is not None,
+                "i18n": self._i18n_manager is not None,
+                "responsive": self._responsive_manager is not None,
+            },
         }
 
     def apply_optimizations(self):
@@ -226,45 +231,38 @@ class UIXIntegration:
     def run_diagnostics(self) -> Dict[str, Any]:
         """Run comprehensive diagnostics."""
         if not self._initialized:
-            return {'diagnostics': 'not_initialized'}
+            return {"diagnostics": "not_initialized"}
 
-        diagnostics = {
-            'modules': {},
-            'warnings': [],
-            'recommendations': []
-        }
+        diagnostics = {"modules": {}, "warnings": [], "recommendations": []}
 
         # Check each module
         modules_to_check = [
-            ('search', self._search_manager),
-            ('state', self._ui_state_manager),
-            ('styling', self._ui_styling),
-            ('performance', self._performance_monitor),
-            ('accessibility', self._accessibility_manager),
-            ('i18n', self._i18n_manager),
-            ('responsive', self._responsive_manager)
+            ("search", self._search_manager),
+            ("state", self._ui_state_manager),
+            ("styling", self._ui_styling),
+            ("performance", self._performance_monitor),
+            ("accessibility", self._accessibility_manager),
+            ("i18n", self._i18n_manager),
+            ("responsive", self._responsive_manager),
         ]
 
         for name, module in modules_to_check:
             if module is None:
-                diagnostics['warnings'].append(f"{name}_module_not_loaded")
+                diagnostics["warnings"].append(f"{name}_module_not_loaded")
                 continue
 
-            diagnostics['modules'][name] = {
-                'status': 'active',
-                'type': type(module).__name__
-            }
+            diagnostics["modules"][name] = {"status": "active", "type": type(module).__name__}
 
             # Module-specific checks
-            if name == 'search':
+            if name == "search":
                 stats = module.get_cache_stats()
-                diagnostics['modules'][name]['cache_efficiency'] = stats.get('cache_efficiency', 0)
-            elif name == 'performance':
+                diagnostics["modules"][name]["cache_efficiency"] = stats.get("cache_efficiency", 0)
+            elif name == "performance":
                 metrics = module.get_metrics_summary()
-                diagnostics['modules'][name]['metrics_count'] = metrics.get('total_metrics', 0)
-            elif name == 'accessibility':
+                diagnostics["modules"][name]["metrics_count"] = metrics.get("total_metrics", 0)
+            elif name == "accessibility":
                 report = module.get_accessibility_report()
-                diagnostics['modules'][name]['compliance_level'] = report.get('compliance_level', 'unknown')
+                diagnostics["modules"][name]["compliance_level"] = report.get("compliance_level", "unknown")
 
         return diagnostics
 
@@ -321,8 +319,10 @@ class UIXIntegration:
         except Exception:
             pass
 
+
 # Singleton instance for easy access
 _integration_instance = None
+
 
 def get_integration() -> UIXIntegration:
     """Get the singleton integration instance."""
@@ -331,26 +331,32 @@ def get_integration() -> UIXIntegration:
         _integration_instance = UIXIntegration()
     return _integration_instance
 
+
 def initialize_ui_ux_integration() -> UIXIntegration:
     """Initialize and return the UI/UX integration instance."""
     return get_integration()
+
 
 # Convenience functions for common integration tasks
 def get_integration_status() -> IntegrationStatus:
     """Get current integration status."""
     return get_integration().get_status()
 
+
 def get_integration_dashboard() -> Dict[str, Any]:
     """Get comprehensive integration dashboard."""
     return get_integration().get_integration_dashboard()
+
 
 def apply_ui_ux_optimizations() -> bool:
     """Apply UI/UX optimizations."""
     return get_integration().apply_optimizations()
 
+
 def run_ui_ux_diagnostics() -> Dict[str, Any]:
     """Run UI/UX diagnostics."""
     return get_integration().run_diagnostics()
+
 
 # Integration test function
 def test_integration() -> Dict[str, Any]:
@@ -358,12 +364,12 @@ def test_integration() -> Dict[str, Any]:
     integration = get_integration()
 
     test_results = {
-        'initialized': integration.is_initialized(),
-        'modules_loaded': integration.get_status().modules_loaded,
-        'errors': len(integration.get_status().errors),
-        'performance_metrics_available': len(integration.get_performance_metrics()) > 0,
-        'accessibility_report_available': len(integration.get_accessibility_report()) > 0,
-        'diagnostics_available': len(integration.run_diagnostics()) > 0
+        "initialized": integration.is_initialized(),
+        "modules_loaded": integration.get_status().modules_loaded,
+        "errors": len(integration.get_status().errors),
+        "performance_metrics_available": len(integration.get_performance_metrics()) > 0,
+        "accessibility_report_available": len(integration.get_accessibility_report()) > 0,
+        "diagnostics_available": len(integration.run_diagnostics()) > 0,
     }
 
     # Test individual module access
@@ -376,19 +382,22 @@ def test_integration() -> Dict[str, Any]:
         i18n = integration.get_i18n_manager()
         resp = integration.get_responsive_manager()
 
-        test_results['module_access'] = all([
-            search is not None,
-            state is not None,
-            styling is not None,
-            perf is not None,
-            access is not None,
-            i18n is not None,
-            resp is not None
-        ])
+        test_results["module_access"] = all(
+            [
+                search is not None,
+                state is not None,
+                styling is not None,
+                perf is not None,
+                access is not None,
+                i18n is not None,
+                resp is not None,
+            ]
+        )
     except Exception:
-        test_results['module_access'] = False
+        test_results["module_access"] = False
 
     return test_results
+
 
 # Auto-initialize on import
 if __name__ == "__main__":

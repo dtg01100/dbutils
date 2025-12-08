@@ -207,7 +207,7 @@ class JDBCConnection:
                     jar_dir = os.path.dirname(self.provider.jar_path)
                     if os.path.isdir(jar_dir):
                         for jar_file in os.listdir(jar_dir):
-                            if jar_file.endswith('.jar') and jar_file not in os.path.basename(self.provider.jar_path):
+                            if jar_file.endswith(".jar") and jar_file not in os.path.basename(self.provider.jar_path):
                                 cp_entries.append(os.path.join(jar_dir, jar_file))
                 classpath = os.pathsep.join(cp_entries)
 

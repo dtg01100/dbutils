@@ -32,15 +32,18 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class PerformanceMetric(Enum):
     """Types of performance metrics to track."""
+
     UI_RENDER = auto()
     SEARCH_OPERATION = auto()
     DATA_LOAD = auto()
     NETWORK_REQUEST = auto()
     MEMORY_USAGE = auto()
 
+
 @dataclass
 class PerformanceStats:
     """Performance statistics for a specific operation."""
+
     metric_type: PerformanceMetric
     start_time: float
     end_time: float
@@ -52,6 +55,7 @@ class PerformanceStats:
     def __post_init__(self):
         if self.duration <= 0 and self.end_time > self.start_time:
             self.duration = self.end_time - self.start_time
+
 
 class PerformanceMonitor:
     """Performance monitoring and optimization utilities."""
@@ -79,10 +83,7 @@ class PerformanceMonitor:
         """Start background worker thread for performance tasks."""
         if self._worker_thread is None or not self._worker_thread.is_alive():
             self._stop_event.clear()
-            self._worker_thread = threading.Thread(
-                target=self._background_worker,
-                daemon=True
-            )
+            self._worker_thread = threading.Thread(target=self._background_worker, daemon=True)
             self._worker_thread.start()
 
     def stop_background_worker(self):
@@ -105,6 +106,7 @@ class PerformanceMonitor:
 
     def track_operation(self, metric_type: PerformanceMetric) -> Callable:
         """Decorator to track performance of a function."""
+
         def decorator(func: Callable) -> Callable:
             @wraps(func)
             def wrapper(*args, **kwargs):
@@ -126,19 +128,22 @@ class PerformanceMonitor:
                         end_time=end_time,
                         duration=end_time - start_time,
                         memory_before=memory_before,
-                        memory_after=memory_after
+                        memory_after=memory_after,
                     )
 
                     self._record_metric(stats)
 
                 return result
+
             return wrapper
+
         return decorator
 
     def _get_memory_usage(self) -> Optional[int]:
         """Get current memory usage in bytes."""
         try:
             import psutil
+
             process = psutil.Process()
             return process.memory_info().rss
         except ImportError:
@@ -164,13 +169,7 @@ class PerformanceMonitor:
         """Get summary of performance metrics."""
         with self._lock:
             if not self._metrics:
-                return {
-                    'total_metrics': 0,
-                    'average_duration': 0,
-                    'max_duration': 0,
-                    'min_duration': 0,
-                    'by_type': {}
-                }
+                return {"total_metrics": 0, "average_duration": 0, "max_duration": 0, "min_duration": 0, "by_type": {}}
 
             total_duration = sum(m.duration for m in self._metrics)
             avg_duration = total_duration / len(self._metrics)
@@ -182,23 +181,19 @@ class PerformanceMonitor:
             for metric in self._metrics:
                 type_name = metric.metric_type.name
                 if type_name not in by_type:
-                    by_type[type_name] = {
-                        'count': 0,
-                        'total_duration': 0,
-                        'average_duration': 0
-                    }
-                by_type[type_name]['count'] += 1
-                by_type[type_name]['total_duration'] += metric.duration
+                    by_type[type_name] = {"count": 0, "total_duration": 0, "average_duration": 0}
+                by_type[type_name]["count"] += 1
+                by_type[type_name]["total_duration"] += metric.duration
 
             for type_name, data in by_type.items():
-                data['average_duration'] = data['total_duration'] / data['count']
+                data["average_duration"] = data["total_duration"] / data["count"]
 
             return {
-                'total_metrics': len(self._metrics),
-                'average_duration': avg_duration,
-                'max_duration': max_duration,
-                'min_duration': min_duration,
-                'by_type': by_type
+                "total_metrics": len(self._metrics),
+                "average_duration": avg_duration,
+                "max_duration": max_duration,
+                "min_duration": min_duration,
+                "by_type": by_type,
             }
 
     def clear_metrics(self):
@@ -212,6 +207,7 @@ class PerformanceMonitor:
         Ensures the function is only called after the specified wait time
         has elapsed since the last call.
         """
+
         def decorator(func: Callable) -> Callable:
             @wraps(func)
             def debounced(*args, **kwargs):
@@ -224,7 +220,9 @@ class PerformanceMonitor:
                 timer.start()
 
                 return timer
+
             return debounced
+
         return decorator
 
     def throttle(self, wait: float) -> Callable:
@@ -232,6 +230,7 @@ class PerformanceMonitor:
 
         Ensures the function is called at most once in the specified wait period.
         """
+
         def decorator(func: Callable) -> Callable:
             last_called = 0
             lock = threading.Lock()
@@ -248,13 +247,16 @@ class PerformanceMonitor:
                     else:
                         # Optionally queue for later execution
                         return None
+
             return throttled
+
         return decorator
 
     def lazy_load(self, load_func: Callable, *args, **kwargs) -> Callable:
         """Create a lazy loading wrapper for expensive operations."""
+
         def wrapper():
-            if not hasattr(wrapper, '_loaded'):
+            if not hasattr(wrapper, "_loaded"):
                 wrapper._loaded = False
                 wrapper._result = None
 
@@ -293,29 +295,31 @@ class PerformanceMonitor:
 
         return task_queue, start_worker, stop_worker
 
-    def batch_operations(self, items: List[Any], process_func: Callable[[Any], Any],
-                        batch_size: int = 50) -> List[Any]:
+    def batch_operations(self, items: List[Any], process_func: Callable[[Any], Any], batch_size: int = 50) -> List[Any]:
         """Process items in batches to avoid UI freezing."""
         results = []
         for i in range(0, len(items), batch_size):
-            batch = items[i:i + batch_size]
+            batch = items[i : i + batch_size]
             batch_results = [process_func(item) for item in batch]
             results.extend(batch_results)
 
             # Yield to allow UI updates
             if QT_AVAILABLE:
                 from PySide6.QtCore import QCoreApplication
+
                 QCoreApplication.processEvents()
 
         return results
 
-    def async_batch_operations(self, items: List[Any], process_func: Callable[[Any], Any],
-                              batch_size: int = 50) -> List[Any]:
+    def async_batch_operations(
+        self, items: List[Any], process_func: Callable[[Any], Any], batch_size: int = 50
+    ) -> List[Any]:
         """Process items in batches asynchronously."""
+
         async def process_batches():
             results = []
             for i in range(0, len(items), batch_size):
-                batch = items[i:i + batch_size]
+                batch = items[i : i + batch_size]
                 batch_results = [process_func(item) for item in batch]
                 results.extend(batch_results)
 
@@ -328,6 +332,7 @@ class PerformanceMonitor:
 
     def create_cache(self, max_size: int = 100) -> Callable:
         """Create a simple LRU cache decorator."""
+
         def decorator(func: Callable) -> Callable:
             cache = {}
             cache_order = []
@@ -359,6 +364,7 @@ class PerformanceMonitor:
                 return result
 
             return cached_func
+
         return decorator
 
     def _create_cache_key(self, args: tuple, kwargs: dict) -> str:
@@ -367,8 +373,9 @@ class PerformanceMonitor:
 
     def memory_optimized_list(self, items: List[Any]) -> List[Any]:
         """Create a memory-optimized list using __slots__."""
+
         class OptimizedList:
-            __slots__ = ['_items']
+            __slots__ = ["_items"]
 
             def __init__(self, items):
                 self._items = items
@@ -395,9 +402,11 @@ class PerformanceMonitor:
 
     def defer_execution(self, func: Callable, delay: float = 0.1) -> Callable:
         """Defer execution of a function to allow UI updates."""
+
         def deferred(*args, **kwargs):
             if QT_AVAILABLE:
                 from PySide6.QtCore import QTimer
+
                 timer = QTimer()
                 timer.setSingleShot(True)
                 timer.timeout.connect(lambda: func(*args, **kwargs))
@@ -410,6 +419,7 @@ class PerformanceMonitor:
 
     def create_performance_guard(self, max_duration: float = 1.0) -> Callable:
         """Create a performance guard that cancels long-running operations."""
+
         def decorator(func: Callable) -> Callable:
             @wraps(func)
             def guarded(*args, **kwargs):
@@ -431,42 +441,45 @@ class PerformanceMonitor:
                     timer.cancel()
 
                 return result
+
             return guarded
+
         return decorator
 
     def optimize_table_model(self, model) -> Callable:
         """Optimize a table model for better performance."""
+
         def decorator(func: Callable) -> Callable:
             @wraps(func)
             def optimized(*args, **kwargs):
                 # Check if we're in a UI thread
                 if QT_AVAILABLE:
                     from PySide6.QtCore import QThread
+
                     if QThread.currentThread() != model.thread():
                         # Not in model's thread, defer to model's thread
                         from PySide6.QtCore import QMetaObject
-                        QMetaObject.invokeMethod(
-                            model,
-                            func.__name__,
-                            Qt.ConnectionType.QueuedConnection,
-                            *args
-                        )
+
+                        QMetaObject.invokeMethod(model, func.__name__, Qt.ConnectionType.QueuedConnection, *args)
                         return
 
                 return func(*args, **kwargs)
+
             return optimized
+
         return decorator
 
     def create_background_task(self, func: Callable, *args, **kwargs) -> threading.Thread:
         """Create a background task that won't block the UI."""
+
         def task_wrapper():
             try:
                 result = func(*args, **kwargs)
-                if 'callback' in kwargs and kwargs['callback']:
-                    kwargs['callback'](result)
+                if "callback" in kwargs and kwargs["callback"]:
+                    kwargs["callback"](result)
             except Exception as e:
-                if 'error_callback' in kwargs and kwargs['error_callback']:
-                    kwargs['error_callback'](e)
+                if "error_callback" in kwargs and kwargs["error_callback"]:
+                    kwargs["error_callback"](e)
 
         thread = threading.Thread(target=task_wrapper, daemon=True)
         thread.start()
@@ -474,14 +487,15 @@ class PerformanceMonitor:
 
     def async_background_task(self, func: Callable, *args, **kwargs) -> asyncio.Task:
         """Create an async background task."""
+
         async def task_wrapper():
             try:
                 result = await func(*args, **kwargs)
-                if 'callback' in kwargs and kwargs['callback']:
-                    kwargs['callback'](result)
+                if "callback" in kwargs and kwargs["callback"]:
+                    kwargs["callback"](result)
             except Exception as e:
-                if 'error_callback' in kwargs and kwargs['error_callback']:
-                    kwargs['error_callback'](e)
+                if "error_callback" in kwargs and kwargs["error_callback"]:
+                    kwargs["error_callback"](e)
 
         return asyncio.create_task(task_wrapper())
 
@@ -494,24 +508,26 @@ class PerformanceMonitor:
             "Use __slots__ for memory-intensive classes",
             "Clear caches when they're no longer needed",
             "Use weak references for observer patterns",
-            "Implement proper resource cleanup"
+            "Implement proper resource cleanup",
         ]
 
         if QT_AVAILABLE:
-            tips.extend([
-                "Use model/view architecture properly",
-                "Avoid blocking the main UI thread",
-                "Use QThread for background operations",
-                "Implement proper widget cleanup",
-                "Use QTimer for deferred operations"
-            ])
+            tips.extend(
+                [
+                    "Use model/view architecture properly",
+                    "Avoid blocking the main UI thread",
+                    "Use QThread for background operations",
+                    "Implement proper widget cleanup",
+                    "Use QTimer for deferred operations",
+                ]
+            )
 
         return tips
 
     def analyze_performance_bottlenecks(self, metrics: List[PerformanceStats]) -> Dict[str, Any]:
         """Analyze performance metrics for bottlenecks."""
         if not metrics:
-            return {'bottlenecks': [], 'recommendations': []}
+            return {"bottlenecks": [], "recommendations": []}
 
         # Group by metric type
         by_type = {}
@@ -529,34 +545,35 @@ class PerformanceMonitor:
             max_duration = max(m.duration for m in type_metrics)
 
             if avg_duration > 0.5:  # More than 500ms average
-                bottlenecks.append({
-                    'type': type_name,
-                    'average_duration': avg_duration,
-                    'max_duration': max_duration,
-                    'count': len(type_metrics)
-                })
+                bottlenecks.append(
+                    {
+                        "type": type_name,
+                        "average_duration": avg_duration,
+                        "max_duration": max_duration,
+                        "count": len(type_metrics),
+                    }
+                )
 
-                if type_name == 'SEARCH_OPERATION':
+                if type_name == "SEARCH_OPERATION":
                     recommendations.append("Implement better search indexing")
                     recommendations.append("Add more aggressive caching for search results")
-                elif type_name == 'DATA_LOAD':
+                elif type_name == "DATA_LOAD":
                     recommendations.append("Implement lazy loading for data")
                     recommendations.append("Add pagination to large datasets")
-                elif type_name == 'UI_RENDER':
+                elif type_name == "UI_RENDER":
                     recommendations.append("Optimize widget rendering")
                     recommendations.append("Implement virtual scrolling for large lists")
 
-        return {
-            'bottlenecks': bottlenecks,
-            'recommendations': recommendations
-        }
+        return {"bottlenecks": bottlenecks, "recommendations": recommendations}
 
     def __del__(self):
         """Clean up resources."""
         self.stop_background_worker()
 
+
 # Singleton instance for easy access
 _performance_monitor_instance = None
+
 
 def get_performance_monitor() -> PerformanceMonitor:
     """Get the singleton performance monitor instance."""
@@ -565,26 +582,32 @@ def get_performance_monitor() -> PerformanceMonitor:
         _performance_monitor_instance = PerformanceMonitor()
     return _performance_monitor_instance
 
+
 # Convenience functions for common use cases
 def debounce_search(wait: float = 150):
     """Convenience decorator for debouncing search operations."""
     return get_performance_monitor().debounce(wait)
 
+
 def throttle_ui_updates(wait: float = 100):
     """Convenience decorator for throttling UI updates."""
     return get_performance_monitor().throttle(wait)
+
 
 def track_ui_performance():
     """Convenience decorator for tracking UI performance."""
     return get_performance_monitor().track_operation(PerformanceMetric.UI_RENDER)
 
+
 def track_search_performance():
     """Convenience decorator for tracking search performance."""
     return get_performance_monitor().track_operation(PerformanceMetric.SEARCH_OPERATION)
 
+
 def track_data_load_performance():
     """Convenience decorator for tracking data load performance."""
     return get_performance_monitor().track_operation(PerformanceMetric.DATA_LOAD)
+
 
 # Try to import Qt components for Qt-specific optimizations
 try:
@@ -593,6 +616,7 @@ try:
 
     def defer_to_ui_thread(func: Callable) -> Callable:
         """Decorator to defer execution to UI thread."""
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             if QThread.currentThread() != QApplication.instance().thread():
@@ -603,15 +627,17 @@ try:
                 timer.start(0)
                 return
             return func(*args, **kwargs)
+
         return wrapper
 
     def optimize_qt_model_updates(func: Callable) -> Callable:
         """Optimize Qt model updates to prevent UI freezing."""
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             # Check if we're updating a model
             model = args[0] if args else None
-            if hasattr(model, 'beginResetModel') and hasattr(model, 'endResetModel'):
+            if hasattr(model, "beginResetModel") and hasattr(model, "endResetModel"):
                 model.beginResetModel()
                 try:
                     result = func(*args, **kwargs)
@@ -619,6 +645,7 @@ try:
                     model.endResetModel()
                 return result
             return func(*args, **kwargs)
+
         return wrapper
 
 except ImportError:

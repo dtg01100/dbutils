@@ -30,13 +30,13 @@ except ImportError:
     from dbutils.config.path_config import PathConfig
     from dbutils.config.url_config import URLConfig
 
+
 class AutoDownloadProviderConfig:
     """Configure JDBC providers using auto-download system."""
 
     def __init__(self):
         self.driver_directory = config_get_driver_directory()
-        self.config_dir = os.environ.get("DBUTILS_CONFIG_DIR",
-                                      os.path.expanduser("~/.config/dbutils"))
+        self.config_dir = os.environ.get("DBUTILS_CONFIG_DIR", os.path.expanduser("~/.config/dbutils"))
         self.providers_file = os.path.join(self.config_dir, "providers.json")
 
         # Initialize configuration systems
@@ -49,24 +49,24 @@ class AutoDownloadProviderConfig:
 
     def _load_auto_download_config(self) -> Dict[str, Dict[str, Any]]:
         """Load auto-download configuration from JSON file with environment overrides."""
-        config_file = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'auto_download_config.json')
+        config_file = os.path.join(os.path.dirname(__file__), "..", "..", "config", "auto_download_config.json")
 
         try:
-            with open(config_file, 'r') as f:
+            with open(config_file, "r") as f:
                 config_data = json.load(f)
         except Exception as e:
             logger.warning(f"Could not load auto-download config from file: {e}")
             return {}
 
-        auto_download_providers = config_data.get('auto_download_providers', {})
+        auto_download_providers = config_data.get("auto_download_providers", {})
 
         # Apply environment variable overrides
         for db_type, provider_config in auto_download_providers.items():
-            version_env_var = provider_config.get('version_override_env')
+            version_env_var = provider_config.get("version_override_env")
             if version_env_var and version_env_var in os.environ:
-                provider_config['recommended_version'] = os.environ[version_env_var]
+                provider_config["recommended_version"] = os.environ[version_env_var]
 
-            repo_env_var = provider_config.get('repository_override_env')
+            repo_env_var = provider_config.get("repository_override_env")
             if repo_env_var and repo_env_var in os.environ:
                 # This would override the repository for this specific provider
                 pass  # Repository override handled in URL construction
@@ -92,7 +92,7 @@ class AutoDownloadProviderConfig:
                 "default_password": None,
                 "requires_license": False,
                 "maven_artifact": "org.xerial:sqlite-jdbc",
-                "recommended_version": "3.42.0.0"
+                "recommended_version": "3.42.0.0",
             },
             "h2": {
                 "name": "H2 Database (Auto-Download)",
@@ -103,7 +103,7 @@ class AutoDownloadProviderConfig:
                 "default_password": "",
                 "requires_license": False,
                 "maven_artifact": "com.h2database:h2",
-                "recommended_version": "2.2.224"
+                "recommended_version": "2.2.224",
             },
             "derby": {
                 "name": "Apache Derby (Auto-Download)",
@@ -114,7 +114,7 @@ class AutoDownloadProviderConfig:
                 "default_password": None,
                 "requires_license": False,
                 "maven_artifact": "org.apache.derby:derby",
-                "recommended_version": "10.15.2.0"
+                "recommended_version": "10.15.2.0",
             },
             "hsqldb": {
                 "name": "HSQLDB (Auto-Download)",
@@ -125,7 +125,7 @@ class AutoDownloadProviderConfig:
                 "default_password": "",
                 "requires_license": False,
                 "maven_artifact": "org.hsqldb:hsqldb",
-                "recommended_version": "2.7.2"
+                "recommended_version": "2.7.2",
             },
             "duckdb": {
                 "name": "DuckDB (Auto-Download)",
@@ -136,8 +136,8 @@ class AutoDownloadProviderConfig:
                 "default_password": None,
                 "requires_license": False,
                 "maven_artifact": "org.duckdb:duckdb_jdbc",
-                "recommended_version": "0.10.2"
-            }
+                "recommended_version": "0.10.2",
+            },
         }
 
     def setup_auto_download_providers(self) -> Dict[str, Any]:
@@ -148,13 +148,13 @@ class AutoDownloadProviderConfig:
         # Load existing providers if they exist
         if os.path.exists(self.providers_file):
             try:
-                with open(self.providers_file, 'r') as f:
+                with open(self.providers_file, "r") as f:
                     existing_providers = json.load(f)
                     # Remove existing auto-download providers to avoid duplicates
                     existing_providers = [
-                        p for p in existing_providers
-                        if not any(p.get("name", "") == auto_config["name"]
-                                 for auto_config in auto_configs.values())
+                        p
+                        for p in existing_providers
+                        if not any(p.get("name", "") == auto_config["name"] for auto_config in auto_configs.values())
                     ]
                     providers.extend(existing_providers)
             except Exception as e:
@@ -172,12 +172,12 @@ class AutoDownloadProviderConfig:
                 "auto_download": True,
                 "maven_artifact": config["maven_artifact"],
                 "recommended_version": config["recommended_version"],
-                "requires_license": config["requires_license"]
+                "requires_license": config["requires_license"],
             }
             providers.append(provider_config)
 
         # Save the updated providers
-        with open(self.providers_file, 'w') as f:
+        with open(self.providers_file, "w") as f:
             json.dump(providers, f, indent=2)
 
         logger.info(f"Configured {len(auto_configs)} auto-download providers")
@@ -207,11 +207,7 @@ class AutoDownloadProviderConfig:
             version = self._get_version_for_type(db_type)
 
             # Use the auto-downloader to get the driver with new configuration
-            result = download_jdbc_driver(
-                db_type=db_type,
-                version=version,
-                target_dir=self.driver_directory
-            )
+            result = download_jdbc_driver(db_type=db_type, version=version, target_dir=self.driver_directory)
 
             if result:
                 logger.info(f"Successfully downloaded {db_type} driver to: {result}")
@@ -233,12 +229,12 @@ class AutoDownloadProviderConfig:
         config = auto_configs[db_type]
 
         # Check for environment variable override
-        version_env_var = config.get('version_override_env')
+        version_env_var = config.get("version_override_env")
         if version_env_var and version_env_var in os.environ:
             return os.environ[version_env_var]
 
         # Return recommended version from config
-        return config.get('recommended_version', 'recommended')
+        return config.get("recommended_version", "recommended")
 
     def _get_repository_for_type(self, db_type: str) -> Optional[str]:
         """Get the appropriate repository URL for a database type with environment variable override support."""
@@ -249,7 +245,7 @@ class AutoDownloadProviderConfig:
         config = auto_configs[db_type]
 
         # Check for environment variable override
-        repo_env_var = config.get('repository_override_env')
+        repo_env_var = config.get("repository_override_env")
         if repo_env_var and repo_env_var in os.environ:
             return os.environ[repo_env_var]
 
@@ -257,34 +253,34 @@ class AutoDownloadProviderConfig:
 
     def get_version_resolution_strategy(self) -> str:
         """Get the version resolution strategy from configuration."""
-        config_file = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'auto_download_config.json')
+        config_file = os.path.join(os.path.dirname(__file__), "..", "..", "config", "auto_download_config.json")
 
         try:
-            with open(config_file, 'r') as f:
+            with open(config_file, "r") as f:
                 config_data = json.load(f)
-            return config_data.get('version_management', {}).get('version_resolution_strategy', 'latest_first')
+            return config_data.get("version_management", {}).get("version_resolution_strategy", "latest_first")
         except Exception:
-            return 'latest_first'
+            return "latest_first"
 
     def get_fallback_versions(self, db_type: str) -> List[str]:
         """Get fallback versions for a database type from configuration."""
-        config_file = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'auto_download_config.json')
+        config_file = os.path.join(os.path.dirname(__file__), "..", "..", "config", "auto_download_config.json")
 
         try:
-            with open(config_file, 'r') as f:
+            with open(config_file, "r") as f:
                 config_data = json.load(f)
-            return config_data.get('version_management', {}).get('fallback_versions', {}).get(db_type, [])
+            return config_data.get("version_management", {}).get("fallback_versions", {}).get(db_type, [])
         except Exception:
             return []
 
     def get_repository_priority(self) -> List[str]:
         """Get repository priority list from configuration."""
-        config_file = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'auto_download_config.json')
+        config_file = os.path.join(os.path.dirname(__file__), "..", "..", "config", "auto_download_config.json")
 
         try:
-            with open(config_file, 'r') as f:
+            with open(config_file, "r") as f:
                 config_data = json.load(f)
-            return config_data.get('repository_management', {}).get('repository_priority', [])
+            return config_data.get("repository_management", {}).get("repository_priority", [])
         except Exception:
             return []
 
@@ -331,11 +327,12 @@ class AutoDownloadProviderConfig:
                 "default_user": config["default_user"],
                 "default_password": config["default_password"],
                 "auto_download": True,
-                "database_type": db_type
+                "database_type": db_type,
             }
         else:
             logger.warning(f"No auto-download configuration found for {db_type}")
             return None
+
 
 def setup_auto_download_infrastructure():
     """Setup the complete auto-download infrastructure."""
@@ -352,10 +349,12 @@ def setup_auto_download_infrastructure():
     logger.info("Auto-download infrastructure setup complete")
     return setup_result
 
+
 def get_auto_download_provider_config(db_type: str) -> Optional[Dict[str, Any]]:
     """Get auto-download provider configuration for a specific database type."""
     config = AutoDownloadProviderConfig()
     return config.get_provider_config_for_auto_download(db_type)
+
 
 def ensure_all_drivers_available() -> Dict[str, bool]:
     """Ensure all common JDBC drivers are available."""
@@ -368,10 +367,12 @@ def ensure_all_drivers_available() -> Dict[str, bool]:
 
     return results
 
+
 # Convenience function for direct use
 def get_configured_provider(db_type: str) -> Optional[Dict[str, Any]]:
     """Get a fully configured provider with auto-download support."""
     return get_auto_download_provider_config(db_type)
+
 
 if __name__ == "__main__":
     # Example usage

@@ -30,27 +30,33 @@ try:
     from PySide6.QtCore import QObject, QRect, QSize, Qt, Signal
     from PySide6.QtGui import QGuiApplication, QScreen
     from PySide6.QtWidgets import QApplication, QDesktopWidget, QWidget
+
     QT_AVAILABLE = True
 except ImportError:
     try:
         from PyQt6.QtCore import QObject, QRect, QSize, Qt, Signal
         from PyQt6.QtGui import QGuiApplication, QScreen
         from PyQt6.QtWidgets import QApplication, QDesktopWidget, QWidget
+
         QT_AVAILABLE = True
     except ImportError:
         QT_AVAILABLE = False
 
+
 class Breakpoint(Enum):
     """Standard breakpoints for responsive design."""
+
     XS = auto()  # Extra small (mobile)
     SM = auto()  # Small (tablet)
     MD = auto()  # Medium (small desktop)
     LG = auto()  # Large (desktop)
     XL = auto()  # Extra large (large desktop)
 
+
 @dataclass
 class ScreenInfo:
     """Information about screen size and capabilities."""
+
     width: int
     height: int
     dpi: int
@@ -58,14 +64,17 @@ class ScreenInfo:
     orientation: str  # "portrait" or "landscape"
     breakpoint: Breakpoint
 
+
 @dataclass
 class ResponsiveSettings:
     """Responsive design settings."""
+
     breakpoints: Dict[Breakpoint, int]
     mobile_breakpoint: int
     tablet_breakpoint: int
     desktop_breakpoint: int
     large_desktop_breakpoint: int
+
 
 class ResponsiveManager:
     """Responsive design management for the database browser."""
@@ -88,12 +97,12 @@ class ResponsiveManager:
                 Breakpoint.SM: 768,
                 Breakpoint.MD: 992,
                 Breakpoint.LG: 1200,
-                Breakpoint.XL: 1400
+                Breakpoint.XL: 1400,
             },
             mobile_breakpoint=576,
             tablet_breakpoint=768,
             desktop_breakpoint=992,
-            large_desktop_breakpoint=1200
+            large_desktop_breakpoint=1200,
         )
 
     def _setup_screen_monitoring(self):
@@ -105,11 +114,12 @@ class ResponsiveManager:
         self._detect_screen_info()
 
         # Connect to screen change signals if available
-        if hasattr(QApplication, 'primaryScreenChanged'):
+        if hasattr(QApplication, "primaryScreenChanged"):
             QApplication.primaryScreenChanged.connect(self._on_screen_changed)
 
         # Setup timer for periodic checks
         from PySide6.QtCore import QTimer
+
         self._screen_timer = QTimer()
         self._screen_timer.timeout.connect(self._check_screen_changes)
         self._screen_timer.start(1000)  # Check every second
@@ -123,10 +133,11 @@ class ResponsiveManager:
         """Periodically check for screen changes."""
         if QT_AVAILABLE:
             current_info = self._get_current_screen_info()
-            if (not self._current_screen_info or
-                current_info.width != self._current_screen_info.width or
-                current_info.height != self._current_screen_info.height):
-
+            if (
+                not self._current_screen_info
+                or current_info.width != self._current_screen_info.width
+                or current_info.height != self._current_screen_info.height
+            ):
                 self._current_screen_info = current_info
                 self._notify_listeners()
 
@@ -161,7 +172,7 @@ class ResponsiveManager:
                 dpi=dpi,
                 device_pixel_ratio=device_pixel_ratio,
                 orientation=orientation,
-                breakpoint=breakpoint
+                breakpoint=breakpoint,
             )
 
         except Exception:
@@ -172,7 +183,7 @@ class ResponsiveManager:
                 dpi=96,
                 device_pixel_ratio=1.0,
                 orientation="landscape",
-                breakpoint=Breakpoint.MD
+                breakpoint=Breakpoint.MD,
             )
 
     def _get_current_screen_info(self) -> ScreenInfo:
@@ -195,19 +206,14 @@ class ResponsiveManager:
                         dpi=dpi,
                         device_pixel_ratio=ratio,
                         orientation=orientation,
-                        breakpoint=breakpoint
+                        breakpoint=breakpoint,
                     )
             except Exception:
                 pass
 
         # Fallback
         return ScreenInfo(
-            width=1024,
-            height=768,
-            dpi=96,
-            device_pixel_ratio=1.0,
-            orientation="landscape",
-            breakpoint=Breakpoint.MD
+            width=1024, height=768, dpi=96, device_pixel_ratio=1.0, orientation="landscape", breakpoint=Breakpoint.MD
         )
 
     def _determine_breakpoint(self, width: int) -> Breakpoint:
@@ -341,76 +347,86 @@ class ResponsiveManager:
         screen_info = self.get_screen_info()
 
         recommendations = {
-            'breakpoint': breakpoint.name,
-            'orientation': screen_info.orientation,
-            'dock_layout': 'stacked',
-            'panel_sizes': {},
-            'font_scaling': 1.0,
-            'spacing': 'normal'
+            "breakpoint": breakpoint.name,
+            "orientation": screen_info.orientation,
+            "dock_layout": "stacked",
+            "panel_sizes": {},
+            "font_scaling": 1.0,
+            "spacing": "normal",
         }
 
         if breakpoint == Breakpoint.XS:  # Mobile
-            recommendations.update({
-                'dock_layout': 'single_column',
-                'panel_sizes': {
-                    'search': 'full_width',
-                    'tables': 'full_width',
-                    'columns': 'full_width',
-                    'contents': 'full_width'
-                },
-                'font_scaling': 0.9,
-                'spacing': 'compact'
-            })
+            recommendations.update(
+                {
+                    "dock_layout": "single_column",
+                    "panel_sizes": {
+                        "search": "full_width",
+                        "tables": "full_width",
+                        "columns": "full_width",
+                        "contents": "full_width",
+                    },
+                    "font_scaling": 0.9,
+                    "spacing": "compact",
+                }
+            )
         elif breakpoint == Breakpoint.SM:  # Tablet
-            recommendations.update({
-                'dock_layout': 'two_column',
-                'panel_sizes': {
-                    'search': 'full_width',
-                    'tables': 'left_60',
-                    'columns': 'right_40',
-                    'contents': 'full_width'
-                },
-                'font_scaling': 0.95,
-                'spacing': 'normal'
-            })
+            recommendations.update(
+                {
+                    "dock_layout": "two_column",
+                    "panel_sizes": {
+                        "search": "full_width",
+                        "tables": "left_60",
+                        "columns": "right_40",
+                        "contents": "full_width",
+                    },
+                    "font_scaling": 0.95,
+                    "spacing": "normal",
+                }
+            )
         elif breakpoint == Breakpoint.MD:  # Small desktop
-            recommendations.update({
-                'dock_layout': 'three_column',
-                'panel_sizes': {
-                    'search': 'top_100',
-                    'tables': 'left_40',
-                    'columns': 'middle_30',
-                    'contents': 'right_30'
-                },
-                'font_scaling': 1.0,
-                'spacing': 'normal'
-            })
+            recommendations.update(
+                {
+                    "dock_layout": "three_column",
+                    "panel_sizes": {
+                        "search": "top_100",
+                        "tables": "left_40",
+                        "columns": "middle_30",
+                        "contents": "right_30",
+                    },
+                    "font_scaling": 1.0,
+                    "spacing": "normal",
+                }
+            )
         elif breakpoint == Breakpoint.LG:  # Desktop
-            recommendations.update({
-                'dock_layout': 'four_column',
-                'panel_sizes': {
-                    'search': 'top_100',
-                    'tables': 'left_30',
-                    'columns': 'middle_left_25',
-                    'contents': 'middle_right_25',
-                    'details': 'right_20'
-                },
-                'font_scaling': 1.0,
-                'spacing': 'expanded'
-            })
+            recommendations.update(
+                {
+                    "dock_layout": "four_column",
+                    "panel_sizes": {
+                        "search": "top_100",
+                        "tables": "left_30",
+                        "columns": "middle_left_25",
+                        "contents": "middle_right_25",
+                        "details": "right_20",
+                    },
+                    "font_scaling": 1.0,
+                    "spacing": "expanded",
+                }
+            )
         else:  # XL - Large desktop
-            recommendations.update({
-                'dock_layout': 'five_column',
-                'panel_sizes': {
-                    'search': 'top_100',
-                    'tables': 'left_25',
-                    'columns': 'middle_left_20',
-                    'contents': 'middle_right_30',
-                    'details': 'right_25'
-                },
-                'font_scaling': 1.05,
-                'spacing': 'expanded'
-            })
+            recommendations.update(
+                {
+                    "dock_layout": "five_column",
+                    "panel_sizes": {
+                        "search": "top_100",
+                        "tables": "left_25",
+                        "columns": "middle_left_20",
+                        "contents": "middle_right_30",
+                        "details": "right_25",
+                    },
+                    "font_scaling": 1.05,
+                    "spacing": "expanded",
+                }
+            )
 
         return recommendations
 
@@ -530,12 +546,17 @@ class ResponsiveManager:
 
         if layout_type == "auto" or layout_type == "stacked":
             from PySide6.QtWidgets import QVBoxLayout
+
             layout = QVBoxLayout(widget)
-        elif layout_type == "grid" or (breakpoint in [Breakpoint.MD, Breakpoint.LG, Breakpoint.XL] and layout_type == "auto"):
+        elif layout_type == "grid" or (
+            breakpoint in [Breakpoint.MD, Breakpoint.LG, Breakpoint.XL] and layout_type == "auto"
+        ):
             from PySide6.QtWidgets import QGridLayout
+
             layout = QGridLayout(widget)
         else:  # Default to vertical for mobile/tablet
             from PySide6.QtWidgets import QVBoxLayout
+
             layout = QVBoxLayout(widget)
 
         if layout:
@@ -775,51 +796,46 @@ class ResponsiveManager:
         breakpoint = self.get_current_breakpoint()
 
         settings = {
-            'animation_enabled': True,
-            'transition_speed': 0.3,
-            'cache_size': self.get_responsive_cache_size(),
-            'batch_size': self.get_responsive_batch_size(),
-            'debounce_delay': self.get_responsive_debounce_delay(),
-            'prefetch_enabled': True,
-            'image_quality': 'high'
+            "animation_enabled": True,
+            "transition_speed": 0.3,
+            "cache_size": self.get_responsive_cache_size(),
+            "batch_size": self.get_responsive_batch_size(),
+            "debounce_delay": self.get_responsive_debounce_delay(),
+            "prefetch_enabled": True,
+            "image_quality": "high",
         }
 
         if breakpoint == Breakpoint.XS:  # Mobile optimization
-            settings.update({
-                'animation_enabled': False,
-                'transition_speed': 0.2,
-                'prefetch_enabled': False,
-                'image_quality': 'medium'
-            })
+            settings.update(
+                {
+                    "animation_enabled": False,
+                    "transition_speed": 0.2,
+                    "prefetch_enabled": False,
+                    "image_quality": "medium",
+                }
+            )
         elif breakpoint == Breakpoint.SM:  # Tablet optimization
-            settings.update({
-                'animation_enabled': True,
-                'transition_speed': 0.25,
-                'prefetch_enabled': True,
-                'image_quality': 'high'
-            })
+            settings.update(
+                {"animation_enabled": True, "transition_speed": 0.25, "prefetch_enabled": True, "image_quality": "high"}
+            )
         elif breakpoint == Breakpoint.MD:  # Small desktop
-            settings.update({
-                'animation_enabled': True,
-                'transition_speed': 0.3,
-                'prefetch_enabled': True,
-                'image_quality': 'high'
-            })
+            settings.update(
+                {"animation_enabled": True, "transition_speed": 0.3, "prefetch_enabled": True, "image_quality": "high"}
+            )
         elif breakpoint == Breakpoint.LG:  # Desktop
-            settings.update({
-                'animation_enabled': True,
-                'transition_speed': 0.35,
-                'prefetch_enabled': True,
-                'image_quality': 'high'
-            })
+            settings.update(
+                {"animation_enabled": True, "transition_speed": 0.35, "prefetch_enabled": True, "image_quality": "high"}
+            )
         else:  # XL - Large desktop
-            settings.update({
-                'animation_enabled': True,
-                'transition_speed': 0.4,
-                'prefetch_enabled': True,
-                'image_quality': 'high',
-                'cache_size': settings['cache_size'] * 2
-            })
+            settings.update(
+                {
+                    "animation_enabled": True,
+                    "transition_speed": 0.4,
+                    "prefetch_enabled": True,
+                    "image_quality": "high",
+                    "cache_size": settings["cache_size"] * 2,
+                }
+            )
 
         return settings
 
@@ -827,8 +843,10 @@ class ResponsiveManager:
         """Clean up responsive design resources."""
         self._listeners.clear()
 
+
 # Singleton instance for easy access
 _responsive_manager_instance = None
+
 
 def get_responsive_manager() -> ResponsiveManager:
     """Get the singleton responsive manager instance."""
@@ -837,59 +855,72 @@ def get_responsive_manager() -> ResponsiveManager:
         _responsive_manager_instance = ResponsiveManager()
     return _responsive_manager_instance
 
+
 # Convenience functions for common responsive tasks
 def get_current_breakpoint() -> Breakpoint:
     """Get current breakpoint."""
     return get_responsive_manager().get_current_breakpoint()
 
+
 def is_mobile() -> bool:
     """Check if current device is mobile-sized."""
     return get_responsive_manager().is_mobile()
+
 
 def is_tablet() -> bool:
     """Check if current device is tablet-sized."""
     return get_responsive_manager().is_tablet()
 
+
 def is_desktop() -> bool:
     """Check if current device is desktop-sized."""
     return get_responsive_manager().is_desktop()
+
 
 def get_screen_width() -> int:
     """Get current screen width."""
     return get_responsive_manager().get_screen_width()
 
+
 def get_screen_height() -> int:
     """Get current screen height."""
     return get_responsive_manager().get_screen_height()
+
 
 def get_responsive_font_size(base_size: int = 14) -> int:
     """Get responsive font size."""
     return get_responsive_manager().get_responsive_font_size(base_size)
 
+
 def get_responsive_spacing(base_spacing: int = 8) -> int:
     """Get responsive spacing."""
     return get_responsive_manager().get_responsive_spacing(base_spacing)
+
 
 def get_responsive_layout_recommendations() -> Dict[str, Any]:
     """Get responsive layout recommendations."""
     return get_responsive_manager().get_responsive_layout_recommendations()
 
+
 # Responsive decorator for functions
 def responsive(func: Callable) -> Callable:
     """Decorator to make a function responsive-aware."""
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         manager = get_responsive_manager()
         screen_info = manager.get_screen_info()
 
         # Add screen info to kwargs if not already present
-        if 'screen_info' not in kwargs:
-            kwargs['screen_info'] = screen_info
-        if 'breakpoint' not in kwargs:
-            kwargs['breakpoint'] = screen_info.breakpoint
+        if "screen_info" not in kwargs:
+            kwargs["screen_info"] = screen_info
+        if "breakpoint" not in kwargs:
+            kwargs["breakpoint"] = screen_info.breakpoint
 
         return func(*args, **kwargs)
+
     return wrapper
+
 
 # Responsive context manager
 class ResponsiveContext:

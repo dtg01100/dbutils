@@ -96,8 +96,7 @@ if QT_BINDINGS:
             # Quick-add buttons
             quick_add_layout = QHBoxLayout()
             self.quick_add_combo = QComboBox()
-            self.quick_add_combo.addItems(["Select database type..."] +
-                                        PredefinedProviderTemplates.get_categories())
+            self.quick_add_combo.addItems(["Select database type..."] + PredefinedProviderTemplates.get_categories())
             self.quick_add_btn = QPushButton("Add from Template")
             self.quick_add_btn.clicked.connect(self.add_from_template)
             quick_add_layout.addWidget(self.quick_add_combo)
@@ -266,8 +265,7 @@ if QT_BINDINGS:
             if filter_text:
                 filter_lower = filter_text.lower()
                 providers = [
-                    p for p in providers
-                    if filter_lower in p.name.lower() or filter_lower in p.category.lower()
+                    p for p in providers if filter_lower in p.name.lower() or filter_lower in p.category.lower()
                 ]
 
             for provider in sorted(providers, key=lambda p: (p.category, p.name)):
@@ -375,7 +373,7 @@ if QT_BINDINGS:
                 default_database="",
                 default_user=None,
                 default_password=None,
-                extra_properties={}
+                extra_properties={},
             )
             self.current_provider = new_provider
             self.load_provider_into_form(new_provider)
@@ -407,7 +405,7 @@ if QT_BINDINGS:
                     self,
                     "Confirm Delete",
                     f"Are you sure you want to delete provider '{provider_name}'?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 )
 
                 if reply == QMessageBox.StandardButton.Yes:
@@ -431,10 +429,7 @@ if QT_BINDINGS:
             # Create the provider with default name based on template
             default_name = f"My {category} Connection"
             provider = PredefinedProviderTemplates.create_provider_from_template(
-                category=category,
-                name=default_name,
-                host="localhost",
-                database=""
+                category=category, name=default_name, host="localhost", database=""
             )
 
             # Add to registry and UI
@@ -446,9 +441,7 @@ if QT_BINDINGS:
             self.provider_list.setCurrentItem(item)
 
             QMessageBox.information(
-                self,
-                "Template Added",
-                f"Added {category} provider template. Fill in the connection details."
+                self, "Template Added", f"Added {category} provider template. Fill in the connection details."
             )
 
         def browse_jar_file(self):
@@ -458,10 +451,7 @@ if QT_BINDINGS:
                 default_dir = os.path.expanduser("~")
 
             fname, _ = QFileDialog.getOpenFileName(
-                self,
-                "Select JDBC Driver JAR",
-                default_dir,
-                "JAR Files (*.jar);;All Files (*)"
+                self, "Select JDBC Driver JAR", default_dir, "JAR Files (*.jar);;All Files (*)"
             )
 
             if fname:
@@ -534,7 +524,7 @@ if QT_BINDINGS:
                 self,
                 "Confirm Reset",
                 "This will reset all providers to default values and lose any custom providers. Continue?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
 
             if reply == QMessageBox.StandardButton.Yes:
@@ -543,11 +533,7 @@ if QT_BINDINGS:
                 self.registry._initialize_default_providers()
                 self.refresh_provider_list()
                 self.clear_form()
-                QMessageBox.information(
-                    self,
-                    "Reset Complete",
-                    "Providers have been reset to defaults."
-                )
+                QMessageBox.information(self, "Reset Complete", "Providers have been reset to defaults.")
 
     def download_jdbc_driver_gui(self):
         """Download JDBC driver for the selected category."""
@@ -578,7 +564,7 @@ if QT_BINDINGS:
                 QMessageBox.information(
                     self,
                     "Select Category",
-                    "Please select a database category first or fill in the driver class field to help identify the database type."
+                    "Please select a database category first or fill in the driver class field to help identify the database type.",
                 )
                 return
 
@@ -588,9 +574,10 @@ if QT_BINDINGS:
             reply = QMessageBox.question(
                 self,
                 "Driver Exists",
-                f"Found existing {category} drivers:\n" + "\n".join([os.path.basename(d) for d in existing_drivers]) +
-                "\n\nDo you want to download anyway?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                f"Found existing {category} drivers:\n"
+                + "\n".join([os.path.basename(d) for d in existing_drivers])
+                + "\n\nDo you want to download anyway?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if reply == QMessageBox.StandardButton.No:
                 # Use existing driver
@@ -600,7 +587,7 @@ if QT_BINDINGS:
                     "Choose an existing driver:",
                     [os.path.basename(d) for d in existing_drivers],
                     0,
-                    False
+                    False,
                 )
                 if ok and selected_driver:
                     # Find the full path for the selected driver
@@ -662,17 +649,14 @@ if QT_BINDINGS:
         from .jdbc_driver_downloader import JDBCDriverRegistry
 
         driver_info = JDBCDriverRegistry.get_driver_info(category)
-            if driver_info:
-                if os.environ.get('DBUTILS_TEST_MODE'):
-                    return driver_info.download_url
-                import webbrowser
-                webbrowser.open(driver_info.download_url)
+        if driver_info:
+            if os.environ.get("DBUTILS_TEST_MODE"):
+                return driver_info.download_url
+            import webbrowser
+
+            webbrowser.open(driver_info.download_url)
         else:
-            QMessageBox.information(
-                self,
-                "No Download Page",
-                f"No specific download page available for {category}"
-            )
+            QMessageBox.information(self, "No Download Page", f"No specific download page available for {category}")
 
     def perform_jdbc_download(self, category):
         """Actually perform the JDBC driver download."""
@@ -696,23 +680,17 @@ if QT_BINDINGS:
             if result:
                 self.jar_path_input.setText(result)
                 QMessageBox.information(
-                    self,
-                    "Download Complete",
-                    f"Successfully downloaded JDBC driver to:\n{os.path.basename(result)}"
+                    self, "Download Complete", f"Successfully downloaded JDBC driver to:\n{os.path.basename(result)}"
                 )
             else:
                 QMessageBox.warning(
                     self,
                     "Download Failed",
                     f"Could not automatically download JDBC driver for {category}.\n"
-                    f"Please download it manually from the official source."
+                    f"Please download it manually from the official source.",
                 )
         except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Download Error",
-                f"Error downloading JDBC driver: {e}"
-            )
+            QMessageBox.critical(self, "Download Error", f"Error downloading JDBC driver: {e}")
         finally:
             self.download_progress.setVisible(False)
 

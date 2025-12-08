@@ -59,13 +59,13 @@ class JDBCDriverDownloader:
         # tests `_url_exists` may be monkeypatched to return a boolean instead of
         # a (bool, status) tuple; other parts of the code handle this case too.
         try:
-            req = urllib.request.Request(url, method='HEAD')
-            req.add_header('User-Agent', 'dbutils-jdbc-downloader/1.0')
+            req = urllib.request.Request(url, method="HEAD")
+            req.add_header("User-Agent", "dbutils-jdbc-downloader/1.0")
             try:
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
                     # Debug: show response type and headers (tests may use fake responses)
                     # Prefer explicit 'status' or getcode; if not present, assume OK
-                    status = getattr(resp, 'status', None)
+                    status = getattr(resp, "status", None)
                     if not status:
                         try:
                             status = resp.getcode()
@@ -73,7 +73,7 @@ class JDBCDriverDownloader:
                             status = None
                     if status is None:
                         # Heuristic: see if response has Content-Length header or readable content
-                        cl = resp.headers.get('Content-Length') if hasattr(resp, 'headers') else None
+                        cl = resp.headers.get("Content-Length") if hasattr(resp, "headers") else None
                         if cl is not None:
                             return True, f"URL exists (Content-Length: {cl})"
                         # Attempt to read a small chunk
@@ -87,7 +87,7 @@ class JDBCDriverDownloader:
                 with urllib.request.urlopen(req) as resp:
                     # Debug: show response type and headers (tests may use fake responses)
                     # Prefer explicit 'status' or getcode; if not present, assume OK
-                    status = getattr(resp, 'status', None)
+                    status = getattr(resp, "status", None)
                     if not status:
                         try:
                             status = resp.getcode()
@@ -95,7 +95,7 @@ class JDBCDriverDownloader:
                             status = None
                     if status is None:
                         # Heuristic: see if response has Content-Length header or readable content
-                        cl = resp.headers.get('Content-Length') if hasattr(resp, 'headers') else None
+                        cl = resp.headers.get("Content-Length") if hasattr(resp, "headers") else None
                         if cl is not None:
                             return True, f"URL exists (Content-Length: {cl})"
                         # Attempt to read a small chunk
@@ -105,17 +105,17 @@ class JDBCDriverDownloader:
                         except Exception:
                             return False, "URL not readable"
                     return status == 200, f"URL exists (HTTP {status})"
-                
+
         except urllib.error.HTTPError:
             # If HEAD fails with 405/403/404, try GET to be more resilient
             try:
-                req2 = urllib.request.Request(url, method='GET')
-                req2.add_header('User-Agent', 'dbutils-jdbc-downloader/1.0')
+                req2 = urllib.request.Request(url, method="GET")
+                req2.add_header("User-Agent", "dbutils-jdbc-downloader/1.0")
                 try:
                     with urllib.request.urlopen(req2, timeout=timeout) as resp2:
-                        status2 = getattr(resp2, 'status', None) or getattr(resp2, 'getcode', lambda: None)()
+                        status2 = getattr(resp2, "status", None) or getattr(resp2, "getcode", lambda: None)()
                         if status2 is None:
-                            cl = resp2.headers.get('Content-Length') if hasattr(resp2, 'headers') else None
+                            cl = resp2.headers.get("Content-Length") if hasattr(resp2, "headers") else None
                             if cl is not None:
                                 return True, f"URL exists via GET (Content-Length: {cl})"
                             # If we can't determine, assume success
@@ -123,15 +123,15 @@ class JDBCDriverDownloader:
                         return status2 == 200, f"URL exists via GET (HTTP {status2})"
                 except TypeError:
                     with urllib.request.urlopen(req2) as resp2:
-                        status2 = getattr(resp2, 'status', None) or getattr(resp2, 'getcode', lambda: None)()
+                        status2 = getattr(resp2, "status", None) or getattr(resp2, "getcode", lambda: None)()
                         if status2 is None:
-                            cl = resp2.headers.get('Content-Length') if hasattr(resp2, 'headers') else None
+                            cl = resp2.headers.get("Content-Length") if hasattr(resp2, "headers") else None
                             if cl is not None:
                                 return True, f"URL exists via GET (Content-Length: {cl})"
                             # If we can't determine, assume success
                             return True, "URL exists via GET"
                         return status2 == 200, f"URL exists via GET (HTTP {status2})"
-                        cl = resp2.headers.get('Content-Length') if hasattr(resp2, 'headers') else None
+                        cl = resp2.headers.get("Content-Length") if hasattr(resp2, "headers") else None
                         if cl is not None:
                             return True, f"URL exists via GET (Content-Length: {cl})"
                         # If we can't determine, assume success
@@ -176,7 +176,7 @@ class JDBCDriverDownloader:
         database_type: str,
         on_progress: Optional[Callable[[int, int], None]] = None,
         version: str = "recommended",
-        on_status: Optional[Callable[[str], None]] = None
+        on_status: Optional[Callable[[str], None]] = None,
     ) -> Optional[str]:
         """
         Download a JDBC driver JAR file for the specified database type with enhanced error handling.
@@ -203,7 +203,9 @@ class JDBCDriverDownloader:
         # Suggest filename(s)
         if version == "recommended":
             if isinstance(download_url, list):
-                jar_filename = [self._suggest_jar_filename(database_type, driver_info.recommended_version) for _ in download_url]
+                jar_filename = [
+                    self._suggest_jar_filename(database_type, driver_info.recommended_version) for _ in download_url
+                ]
             else:
                 jar_filename = self._suggest_jar_filename(database_type, driver_info.recommended_version)
         else:
@@ -228,27 +230,35 @@ class JDBCDriverDownloader:
                 for url, tpath in zip(download_url, target_path):
                     is_jar = self._is_jar_url(url)
                     if is_jar:
-                            # Validate jar exists prior to attempting download
-                            url_check = self._url_exists(url)
-                            if isinstance(url_check, tuple):
-                                url_exists, url_status = url_check
-                            else:
-                                url_exists = bool(url_check)
-                                url_status = "URL check returned boolean"
-                            # If url_exists reports false, still attempt direct download as some servers
-                            # may not support HEAD requests but will still serve GET.
-                            if not url_exists:
-                                if on_status:
-                                    on_status(f"URL not available: {url_status} - attempting GET anyway")
-                            # Attempt direct download with retry logic
-                            res = self._download_single_file(url, tpath, on_progress, on_status)
-                            if res:
-                                results.append(res)
-                            else:
-                                results.append(self._handle_complex_download(url, tpath, database_type, driver_info, on_progress, on_status))
+                        # Validate jar exists prior to attempting download
+                        url_check = self._url_exists(url)
+                        if isinstance(url_check, tuple):
+                            url_exists, url_status = url_check
+                        else:
+                            url_exists = bool(url_check)
+                            url_status = "URL check returned boolean"
+                        # If url_exists reports false, still attempt direct download as some servers
+                        # may not support HEAD requests but will still serve GET.
+                        if not url_exists:
+                            if on_status:
+                                on_status(f"URL not available: {url_status} - attempting GET anyway")
+                        # Attempt direct download with retry logic
+                        res = self._download_single_file(url, tpath, on_progress, on_status)
+                        if res:
+                            results.append(res)
+                        else:
+                            results.append(
+                                self._handle_complex_download(
+                                    url, tpath, database_type, driver_info, on_progress, on_status
+                                )
+                            )
                     else:
                         # fallback: manual instructions for non-jar pages
-                        results.append(self._handle_complex_download(url, tpath, database_type, driver_info, on_progress, on_status))
+                        results.append(
+                            self._handle_complex_download(
+                                url, tpath, database_type, driver_info, on_progress, on_status
+                            )
+                        )
 
                 # Normalize return: return list of successful downloads, or None if none succeeded
                 successes = [r for r in results if r]
@@ -289,16 +299,16 @@ class JDBCDriverDownloader:
     def _get_download_url_for_version(self, driver_info, version: str) -> Optional[str]:
         """Get the appropriate download URL for a specific version."""
         # If the driver defines maven_artifacts, prefer constructing maven artifact URLs
-        if getattr(driver_info, 'maven_artifacts', None):
+        if getattr(driver_info, "maven_artifacts", None):
             # Get maven repositories from environment or defaults
             repos = self._get_maven_repos()
 
             urls = []
             for coord in driver_info.maven_artifacts:
-                group, artifact = coord.split(':', 1)
-                if version == 'recommended':
+                group, artifact = coord.split(":", 1)
+                if version == "recommended":
                     ver = driver_info.recommended_version
-                elif version == 'latest':
+                elif version == "latest":
                     # Try to fetch latest from metadata for each repo until we succeed
                     ver = self._get_latest_version_from_maven(group, artifact, repos)
                     if not ver:
@@ -308,7 +318,7 @@ class JDBCDriverDownloader:
 
                 # Construct primary jar URL for this artifact/version
                 # simple pattern: {repo}{group_path}/{artifact}/{version}/{artifact}-{version}.jar
-                group_path = group.replace('.', '/')
+                group_path = group.replace(".", "/")
                 jar_filename = f"{artifact}-{ver}.jar"
                 # Use first repo that appears to have the artifact; we'll construct full list
                 for repo in repos:
@@ -320,7 +330,7 @@ class JDBCDriverDownloader:
             seen_artifact = set()
             for u in urls:
                 # extract artifact/version portion
-                parts = u.split('/')
+                parts = u.split("/")
                 if len(parts) < 4:
                     continue
                 art = parts[-3]
@@ -359,30 +369,30 @@ class JDBCDriverDownloader:
             metadata_url = f"{repo.rstrip('/')}/{group.replace('.', '/')}/{artifact}/maven-metadata.xml"
             try:
                 req = urllib.request.Request(metadata_url)
-                req.add_header('User-Agent', 'dbutils-jdbc-downloader/1.0')
+                req.add_header("User-Agent", "dbutils-jdbc-downloader/1.0")
                 with urllib.request.urlopen(req) as resp:
-                    xml = resp.read().decode('utf-8')
+                    xml = resp.read().decode("utf-8")
                     # naive parse for <latest> or <release>
-                    if '<latest>' in xml:
-                        start = xml.find('<latest>') + len('<latest>')
-                        end = xml.find('</latest>', start)
+                    if "<latest>" in xml:
+                        start = xml.find("<latest>") + len("<latest>")
+                        end = xml.find("</latest>", start)
                         if end > start:
                             return xml[start:end].strip()
-                    if '<release>' in xml:
-                        start = xml.find('<release>') + len('<release>')
-                        end = xml.find('</release>', start)
+                    if "<release>" in xml:
+                        start = xml.find("<release>") + len("<release>")
+                        end = xml.find("</release>", start)
                         if end > start:
                             return xml[start:end].strip()
                     # fallback: pick last <version> in <versions>
-                    if '<versions>' in xml:
-                        ver_block_start = xml.find('<versions>')
-                        ver_block_end = xml.find('</versions>', ver_block_start)
+                    if "<versions>" in xml:
+                        ver_block_start = xml.find("<versions>")
+                        ver_block_end = xml.find("</versions>", ver_block_start)
                         if ver_block_start != -1 and ver_block_end != -1:
                             block = xml[ver_block_start:ver_block_end]
-                            versions = [v for v in block.split('<version>') if '</version>' in v]
+                            versions = [v for v in block.split("<version>") if "</version>" in v]
                             if versions:
                                 last = versions[-1]
-                                end = last.find('</version>')
+                                end = last.find("</version>")
                                 if end != -1:
                                     return last[:end].strip()
             except Exception:
@@ -393,29 +403,29 @@ class JDBCDriverDownloader:
     def _is_jar_url(self, url: str) -> bool:
         """Check if the URL points directly to a JAR file."""
         parsed = urllib.parse.urlparse(url)
-        return parsed.path.lower().endswith('.jar')
+        return parsed.path.lower().endswith(".jar")
 
     def _download_single_file(
         self,
         url: str,
         target_path: str,
         on_progress: Optional[Callable[[int, int], None]] = None,
-        on_status: Optional[Callable[[str], None]] = None
+        on_status: Optional[Callable[[str], None]] = None,
     ) -> Optional[str]:
         """Download a single JAR file from a direct URL with enhanced error handling."""
         temp_path = None
         try:
             # Create a temporary file for download
-            temp_fd, temp_path = tempfile.mkstemp(suffix='.jar', dir=self.downloads_dir)
+            temp_fd, temp_path = tempfile.mkstemp(suffix=".jar", dir=self.downloads_dir)
 
-            with os.fdopen(temp_fd, 'wb') as temp_file:
+            with os.fdopen(temp_fd, "wb") as temp_file:
                 # Create request with user agent to avoid blocking by some servers
                 req = urllib.request.Request(url)
-                req.add_header('User-Agent', 'dbutils-jdbc-downloader/1.0')
+                req.add_header("User-Agent", "dbutils-jdbc-downloader/1.0")
 
                 # Open the URL
                 with urllib.request.urlopen(req) as response:
-                    total_size = int(response.headers.get('Content-Length', 0))
+                    total_size = int(response.headers.get("Content-Length", 0))
                     downloaded = 0
 
                     # Download in chunks
@@ -442,7 +452,7 @@ class JDBCDriverDownloader:
                             if total_size > 0:
                                 remaining = (total_size - downloaded) / speed if speed > 0 else 0
                                 if current_time - last_update_time >= 0.5:  # Update every 0.5 seconds
-                                    status_msg = f"Downloading: {downloaded/1024/1024:.1f}MB of {total_size/1024/1024:.1f}MB ({speed/1024/1024:.1f}MB/s, {int(remaining)}s remaining)"
+                                    status_msg = f"Downloading: {downloaded / 1024 / 1024:.1f}MB of {total_size / 1024 / 1024:.1f}MB ({speed / 1024 / 1024:.1f}MB/s, {int(remaining)}s remaining)"
                                     if on_status:
                                         on_status(status_msg)
                                     last_update_time = current_time
@@ -477,7 +487,7 @@ class JDBCDriverDownloader:
         database_type: str,
         driver_info,
         on_progress: Optional[Callable[[int, int], None]] = None,
-        on_status: Optional[Callable[[str], None]] = None
+        on_status: Optional[Callable[[str], None]] = None,
     ) -> Optional[str]:
         """
         Handle complex downloads where the URL is a web page that requires manual navigation.
@@ -535,7 +545,8 @@ class JDBCDriverDownloader:
         driver_dir = get_driver_directory()
         try:
             from pathlib import Path
-            all_jars = [str(p) for p in Path(driver_dir).glob('*.jar') if p.is_file()]
+
+            all_jars = [str(p) for p in Path(driver_dir).glob("*.jar") if p.is_file()]
         except Exception:
             all_jars = []
         return [os.path.basename(jar) for jar in all_jars]
@@ -547,7 +558,7 @@ def download_jdbc_driver(
     on_progress: Optional[Callable[[int, int], None]] = None,
     version: str = "recommended",
     on_status: Optional[Callable[[str], None]] = None,
-    background: bool = False
+    background: bool = False,
 ) -> Optional[str]:
     """
     Convenience function to download a JDBC driver with enhanced feedback and background support.
@@ -565,6 +576,7 @@ def download_jdbc_driver(
     downloader = JDBCDriverDownloader()
     if background:
         import threading
+
         result = [None]
 
         def download_wrapper():

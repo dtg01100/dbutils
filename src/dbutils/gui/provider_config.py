@@ -129,6 +129,7 @@ if QT_AVAILABLE:
             """
             try:
                 import os
+
                 # Try to locate a project jars folder
                 start_dir = os.path.join(os.getcwd(), "jars")
                 if not os.path.isdir(start_dir):

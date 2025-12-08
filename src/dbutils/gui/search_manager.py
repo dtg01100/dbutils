@@ -27,21 +27,26 @@ from dbutils.gui.qt_app import SearchResult
 
 class SearchMode(Enum):
     """Search modes supported by the application."""
+
     TABLES = auto()
     COLUMNS = auto()
     ADVANCED = auto()
 
+
 class SearchState(Enum):
     """Current state of search operations."""
+
     IDLE = auto()
     ACTIVE = auto()
     COMPLETED = auto()
     CANCELLED = auto()
     ERROR = auto()
 
+
 @dataclass
 class SearchContext:
     """Context for search operations including state and configuration."""
+
     mode: SearchMode = SearchMode.TABLES
     query: str = ""
     show_non_matching: bool = True
@@ -49,6 +54,7 @@ class SearchContext:
     streaming_enabled: bool = True
     max_results: int = 1000
     debounce_delay: int = 150  # milliseconds
+
 
 class SearchManager:
     """Centralized search manager for database browser operations.
@@ -159,10 +165,10 @@ class SearchManager:
         """Get cache performance statistics."""
         with self._lock:
             return {
-                'cache_hits': self._cache_hits,
-                'cache_misses': self._cache_misses,
-                'cache_size': len(self._result_cache),
-                'search_count': self._search_count
+                "cache_hits": self._cache_hits,
+                "cache_misses": self._cache_misses,
+                "cache_size": len(self._result_cache),
+                "search_count": self._search_count,
             }
 
     def perform_search(
@@ -171,7 +177,7 @@ class SearchManager:
         columns: List[ColumnInfo],
         query: str,
         mode: SearchMode = SearchMode.TABLES,
-        use_cache: bool = True
+        use_cache: bool = True,
     ) -> List[SearchResult]:
         """Perform a search operation with caching and debouncing.
 
@@ -225,10 +231,7 @@ class SearchManager:
                 match_type = "exact" if name_match else "fuzzy"
 
                 result = SearchResult(
-                    item=table,
-                    match_type=match_type,
-                    relevance_score=score,
-                    table_key=f"{table.schema}.{table.name}"
+                    item=table, match_type=match_type, relevance_score=score, table_key=f"{table.schema}.{table.name}"
                 )
                 results.append(result)
 
@@ -257,10 +260,7 @@ class SearchManager:
                 match_type = "exact" if name_match else "fuzzy"
 
                 result = SearchResult(
-                    item=col,
-                    match_type=match_type,
-                    relevance_score=score,
-                    table_key=f"{col.schema}.{col.table}"
+                    item=col, match_type=match_type, relevance_score=score, table_key=f"{col.schema}.{col.table}"
                 )
                 results.append(result)
 
@@ -280,31 +280,21 @@ class SearchManager:
         return combined
 
     def _create_table_aggregates(
-        self,
-        table_aggregates: Dict[str, List[SearchResult]],
-        columns: List[ColumnInfo]
+        self, table_aggregates: Dict[str, List[SearchResult]], columns: List[ColumnInfo]
     ) -> List[SearchResult]:
         """Create aggregate search results for tables containing matching columns."""
         aggregate_results = []
 
         for table_key, col_results in table_aggregates.items():
             # Find the table object for this key
-            schema, table_name = table_key.split('.', 1)
-            table_obj = next(
-                (t for t in self._get_all_tables() if t.schema == schema and t.name == table_name),
-                None
-            )
+            schema, table_name = table_key.split(".", 1)
+            table_obj = next((t for t in self._get_all_tables() if t.schema == schema and t.name == table_name), None)
 
             if table_obj:
                 # Count of matching columns as relevance score
                 count = len(col_results)
                 aggregate_results.append(
-                    SearchResult(
-                        item=table_obj,
-                        match_type="column",
-                        relevance_score=float(count),
-                        table_key=table_key
-                    )
+                    SearchResult(item=table_obj, match_type="column", relevance_score=float(count), table_key=table_key)
                 )
 
         return aggregate_results
@@ -324,12 +314,7 @@ class SearchManager:
         # For now, return empty list as placeholder
         return []
 
-    def _search_advanced(
-        self,
-        tables: List[TableInfo],
-        columns: List[ColumnInfo],
-        query: str
-    ) -> List[SearchResult]:
+    def _search_advanced(self, tables: List[TableInfo], columns: List[ColumnInfo], query: str) -> List[SearchResult]:
         """Advanced search combining table and column searches."""
         # Combine results from both table and column searches
         table_results = self._search_tables(tables, query)
@@ -351,11 +336,11 @@ class SearchManager:
     def get_search_performance_metrics(self) -> Dict[str, Any]:
         """Get performance metrics for search operations."""
         return {
-            'search_count': self._search_count,
-            'cache_hits': self._cache_hits,
-            'cache_misses': self._cache_misses,
-            'cache_efficiency': self._cache_hits / max(1, self._search_count),
-            'average_search_time': 0.0  # Would be tracked in actual implementation
+            "search_count": self._search_count,
+            "cache_hits": self._cache_hits,
+            "cache_misses": self._cache_misses,
+            "cache_efficiency": self._cache_hits / max(1, self._search_count),
+            "average_search_time": 0.0,  # Would be tracked in actual implementation
         }
 
     def __del__(self):
@@ -363,8 +348,10 @@ class SearchManager:
         self.cancel_search()
         self.clear_cache()
 
+
 # Singleton instance for easy access
 _search_manager_instance = None
+
 
 def get_search_manager() -> SearchManager:
     """Get the singleton search manager instance."""

@@ -34,6 +34,8 @@ USE_COMPRESSION = True
 
 # Allow tests to override compression setting via environment variable
 import os
+
+
 def _get_compression_setting():
     """Get compression setting, checking environment variable.
 
@@ -41,9 +43,10 @@ def _get_compression_setting():
     to detect compression per-file by extension, but tests that rely on the
     DBUTILS_TEST_MODE environment may still use this helper.
     """
-    if os.environ.get('DBUTILS_TEST_MODE') == '1':
+    if os.environ.get("DBUTILS_TEST_MODE") == "1":
         return False
     return True
+
 
 # Dynamic chunk sizing configuration
 MIN_BATCH_SIZE = 100
@@ -105,7 +108,7 @@ def load_cached_data(schema_filter: Optional[str]) -> Optional[Tuple[List[Dict],
             return None
 
         # Read and decompress based on file extension (.gz) or content
-        if str(cache_path).endswith('.gz'):
+        if str(cache_path).endswith(".gz"):
             with gzip.open(cache_path, "rt", encoding="utf-8") as f:
                 data = json.load(f)
         else:
@@ -145,7 +148,7 @@ def save_data_to_cache(schema_filter: Optional[str], tables: List[Dict], columns
         }
 
         # Write with compression when filename indicates compressed cache (.gz)
-        if str(cache_path).endswith('.gz'):
+        if str(cache_path).endswith(".gz"):
             with gzip.open(cache_path, "wt", encoding="utf-8", compresslevel=6) as f:
                 json.dump(data, f, separators=(",", ":"))  # Compact JSON
         else:
@@ -167,7 +170,7 @@ def load_cached_schemas() -> Optional[List[str]]:
     try:
         cache_path = get_schema_cache_path()
         if cache_path.exists():
-            if str(cache_path).endswith('.gz'):
+            if str(cache_path).endswith(".gz"):
                 with gzip.open(cache_path, "rt", encoding="utf-8") as f:
                     data = json.load(f)
                     return data.get("schemas", [])
@@ -186,7 +189,7 @@ def save_schemas_to_cache(schemas: List[str]) -> None:
     try:
         cache_path = get_schema_cache_path()
 
-        if str(cache_path).endswith('.gz'):
+        if str(cache_path).endswith(".gz"):
             with gzip.open(cache_path, "wt", encoding="utf-8", compresslevel=6) as f:
                 json.dump({"schemas": schemas}, f, separators=(",", ":"))
         else:

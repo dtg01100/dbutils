@@ -29,18 +29,22 @@ try:
     from PySide6.QtCore import QObject, Qt, Signal
     from PySide6.QtGui import QAccessible, QAccessibleEvent, QAccessibleInterface
     from PySide6.QtWidgets import QApplication, QWidget
+
     QT_AVAILABLE = True
 except ImportError:
     try:
         from PyQt6.QtCore import QObject, Qt, Signal
         from PyQt6.QtGui import QAccessible, QAccessibleEvent, QAccessibleInterface
         from PyQt6.QtWidgets import QApplication, QWidget
+
         QT_AVAILABLE = True
     except ImportError:
         QT_AVAILABLE = False
 
+
 class AccessibilityLevel(Enum):
     """Accessibility compliance levels."""
+
     BASIC = auto()
     INTERMEDIATE = auto()
     ADVANCED = auto()
@@ -48,8 +52,10 @@ class AccessibilityLevel(Enum):
     WCAG_AA = auto()
     WCAG_AAA = auto()
 
+
 class AccessibilityIssue(Enum):
     """Types of accessibility issues."""
+
     MISSING_LABEL = auto()
     POOR_CONTRAST = auto()
     MISSING_ALT_TEXT = auto()
@@ -60,15 +66,18 @@ class AccessibilityIssue(Enum):
     TEXT_SCALING = auto()
     ANIMATION = auto()
 
+
 @dataclass
 class AccessibilityAuditResult:
     """Result of an accessibility audit."""
+
     widget: Any
     issue_type: AccessibilityIssue
     severity: str  # "low", "medium", "high"
     description: str
     suggested_fix: str
     element_identifier: Optional[str] = None
+
 
 class AccessibilityManager:
     """Accessibility management for the database browser UI."""
@@ -93,7 +102,7 @@ class AccessibilityManager:
                 QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps)
 
                 # Set accessibility interface if available
-                if hasattr(QAccessible, 'setFactory'):
+                if hasattr(QAccessible, "setFactory"):
                     QAccessible.setFactory(self._create_accessible_factory())
             except Exception:
                 # Gracefully handle any Qt accessibility API issues
@@ -101,6 +110,7 @@ class AccessibilityManager:
 
     def _create_accessible_factory(self):
         """Create accessible interface factory."""
+
         class AccessibleFactory(QAccessible.Factory):
             def create(self, object: str, interface: QAccessibleInterface) -> QAccessibleInterface:
                 # Create enhanced accessible interface
@@ -147,7 +157,11 @@ class AccessibilityManager:
 
     def _update_accessibility_settings(self):
         """Update accessibility settings based on compliance level."""
-        if self._accessibility_level in [AccessibilityLevel.WCAG_A, AccessibilityLevel.WCAG_AA, AccessibilityLevel.WCAG_AAA]:
+        if self._accessibility_level in [
+            AccessibilityLevel.WCAG_A,
+            AccessibilityLevel.WCAG_AA,
+            AccessibilityLevel.WCAG_AAA,
+        ]:
             self.enable_high_contrast_mode(True)
             self.optimize_for_screen_reader(True)
             self.enable_keyboard_navigation(True)
@@ -230,7 +244,7 @@ class AccessibilityManager:
             name = self._generate_accessible_name(widget)
             widget.setAccessibleName(name)
 
-        if not widget.accessibleDescription() and hasattr(widget, 'toolTip'):
+        if not widget.accessibleDescription() and hasattr(widget, "toolTip"):
             widget.setAccessibleDescription(widget.toolTip() or "")
 
     def _generate_accessible_name(self, widget: QWidget) -> str:
@@ -239,11 +253,11 @@ class AccessibilityManager:
         text = ""
 
         # Try to get text from common widget types
-        if hasattr(widget, 'text') and widget.text():
+        if hasattr(widget, "text") and widget.text():
             text = widget.text()
-        elif hasattr(widget, 'title') and widget.title():
+        elif hasattr(widget, "title") and widget.title():
             text = widget.title()
-        elif hasattr(widget, 'windowTitle') and widget.windowTitle():
+        elif hasattr(widget, "windowTitle") and widget.windowTitle():
             text = widget.windowTitle()
 
         if text:
@@ -272,40 +286,46 @@ class AccessibilityManager:
 
         # Check for missing accessible name
         if not widget.accessibleName():
-            results.append(AccessibilityAuditResult(
-                widget=widget,
-                issue_type=AccessibilityIssue.MISSING_LABEL,
-                severity="medium",
-                description=f"{widget_type} is missing accessible name",
-                suggested_fix="Add setAccessibleName() with descriptive text",
-                element_identifier=self._get_widget_identifier(widget)
-            ))
+            results.append(
+                AccessibilityAuditResult(
+                    widget=widget,
+                    issue_type=AccessibilityIssue.MISSING_LABEL,
+                    severity="medium",
+                    description=f"{widget_type} is missing accessible name",
+                    suggested_fix="Add setAccessibleName() with descriptive text",
+                    element_identifier=self._get_widget_identifier(widget),
+                )
+            )
 
         # Check for poor color contrast (simplified check)
-        if hasattr(widget, 'palette'):
+        if hasattr(widget, "palette"):
             bg_color = widget.palette().color(widget.backgroundRole())
             text_color = widget.palette().color(widget.foregroundRole())
 
             if self._calculate_contrast_ratio(bg_color, text_color) < 4.5:
-                results.append(AccessibilityAuditResult(
-                    widget=widget,
-                    issue_type=AccessibilityIssue.POOR_CONTRAST,
-                    severity="high",
-                    description=f"{widget_type} has poor color contrast",
-                    suggested_fix="Adjust colors to meet WCAG contrast requirements",
-                    element_identifier=self._get_widget_identifier(widget)
-                ))
+                results.append(
+                    AccessibilityAuditResult(
+                        widget=widget,
+                        issue_type=AccessibilityIssue.POOR_CONTRAST,
+                        severity="high",
+                        description=f"{widget_type} has poor color contrast",
+                        suggested_fix="Adjust colors to meet WCAG contrast requirements",
+                        element_identifier=self._get_widget_identifier(widget),
+                    )
+                )
 
         # Check for keyboard navigation issues
         if widget.focusPolicy() not in [Qt.FocusPolicy.StrongFocus, Qt.FocusPolicy.WheelFocus]:
-            results.append(AccessibilityAuditResult(
-                widget=widget,
-                issue_type=AccessibilityIssue.KEYBOARD_NAVIGATION,
-                severity="low",
-                description=f"{widget_type} may not be keyboard accessible",
-                suggested_fix="Set appropriate focus policy",
-                element_identifier=self._get_widget_identifier(widget)
-            ))
+            results.append(
+                AccessibilityAuditResult(
+                    widget=widget,
+                    issue_type=AccessibilityIssue.KEYBOARD_NAVIGATION,
+                    severity="low",
+                    description=f"{widget_type} may not be keyboard accessible",
+                    suggested_fix="Set appropriate focus policy",
+                    element_identifier=self._get_widget_identifier(widget),
+                )
+            )
 
         return results
 
@@ -321,13 +341,14 @@ class AccessibilityManager:
             identifier_parts.append(f"name={widget.objectName()}")
 
         # Add text if available
-        if hasattr(widget, 'text') and widget.text():
+        if hasattr(widget, "text") and widget.text():
             identifier_parts.append(f"text={widget.text()[:20]}...")
 
         return " | ".join(identifier_parts)
 
     def _calculate_contrast_ratio(self, color1: QColor, color2: QColor) -> float:
         """Calculate contrast ratio between two colors."""
+
         def get_luminance(color: QColor) -> float:
             r, g, b = color.red() / 255.0, color.green() / 255.0, color.blue() / 255.0
 
@@ -367,7 +388,7 @@ class AccessibilityManager:
         """Generate an accessibility compliance report."""
         # Count issues by type and severity
         by_type = {}
-        by_severity = {'low': 0, 'medium': 0, 'high': 0}
+        by_severity = {"low": 0, "medium": 0, "high": 0}
 
         for issue in self._audit_results:
             type_name = issue.issue_type.name
@@ -381,12 +402,12 @@ class AccessibilityManager:
         compliance_level = self._determine_compliance_level()
 
         return {
-            'compliance_level': compliance_level.name,
-            'total_issues': len(self._audit_results),
-            'issues_by_type': by_type,
-            'issues_by_severity': by_severity,
-            'warnings': list(self._accessibility_warnings),
-            'recommendations': self._get_recommendations(compliance_level)
+            "compliance_level": compliance_level.name,
+            "total_issues": len(self._audit_results),
+            "issues_by_type": by_type,
+            "issues_by_severity": by_severity,
+            "warnings": list(self._accessibility_warnings),
+            "recommendations": self._get_recommendations(compliance_level),
         }
 
     def _determine_compliance_level(self) -> AccessibilityLevel:
@@ -409,59 +430,71 @@ class AccessibilityManager:
         recommendations = []
 
         if current_level == AccessibilityLevel.BASIC:
-            recommendations.extend([
-                "Add accessible names to all interactive elements",
-                "Ensure proper color contrast for all text",
-                "Implement keyboard navigation for all features",
-                "Add alt text for all images and icons",
-                "Test with screen readers"
-            ])
+            recommendations.extend(
+                [
+                    "Add accessible names to all interactive elements",
+                    "Ensure proper color contrast for all text",
+                    "Implement keyboard navigation for all features",
+                    "Add alt text for all images and icons",
+                    "Test with screen readers",
+                ]
+            )
         elif current_level == AccessibilityLevel.INTERMEDIATE:
-            recommendations.extend([
-                "Improve color contrast for better readability",
-                "Add ARIA attributes where needed",
-                "Test keyboard navigation thoroughly",
-                "Add focus indicators for all interactive elements",
-                "Test with multiple screen readers"
-            ])
+            recommendations.extend(
+                [
+                    "Improve color contrast for better readability",
+                    "Add ARIA attributes where needed",
+                    "Test keyboard navigation thoroughly",
+                    "Add focus indicators for all interactive elements",
+                    "Test with multiple screen readers",
+                ]
+            )
         elif current_level == AccessibilityLevel.ADVANCED:
-            recommendations.extend([
-                "Fine-tune keyboard navigation",
-                "Add skip navigation links",
-                "Implement proper heading hierarchy",
-                "Add language attributes",
-                "Test with users with disabilities"
-            ])
+            recommendations.extend(
+                [
+                    "Fine-tune keyboard navigation",
+                    "Add skip navigation links",
+                    "Implement proper heading hierarchy",
+                    "Add language attributes",
+                    "Test with users with disabilities",
+                ]
+            )
         elif current_level == AccessibilityLevel.WCAG_A:
-            recommendations.extend([
-                "Address remaining contrast issues",
-                "Ensure all functionality is keyboard accessible",
-                "Add text alternatives for all non-text content",
-                "Test with various assistive technologies",
-                "Conduct user testing with diverse users"
-            ])
+            recommendations.extend(
+                [
+                    "Address remaining contrast issues",
+                    "Ensure all functionality is keyboard accessible",
+                    "Add text alternatives for all non-text content",
+                    "Test with various assistive technologies",
+                    "Conduct user testing with diverse users",
+                ]
+            )
         elif current_level == AccessibilityLevel.WCAG_AA:
-            recommendations.extend([
-                "Maintain current accessibility standards",
-                "Conduct regular accessibility audits",
-                "Stay updated with WCAG guidelines",
-                "Train team on accessibility best practices",
-                "Involve users with disabilities in testing"
-            ])
+            recommendations.extend(
+                [
+                    "Maintain current accessibility standards",
+                    "Conduct regular accessibility audits",
+                    "Stay updated with WCAG guidelines",
+                    "Train team on accessibility best practices",
+                    "Involve users with disabilities in testing",
+                ]
+            )
         else:  # WCAG_AAA
-            recommendations.extend([
-                "Maintain excellent accessibility standards",
-                "Conduct frequent accessibility reviews",
-                "Stay ahead of accessibility trends",
-                "Share best practices with the community",
-                "Continue user testing and feedback"
-            ])
+            recommendations.extend(
+                [
+                    "Maintain excellent accessibility standards",
+                    "Conduct frequent accessibility reviews",
+                    "Stay ahead of accessibility trends",
+                    "Share best practices with the community",
+                    "Continue user testing and feedback",
+                ]
+            )
 
         return recommendations
 
     def add_keyboard_shortcut(self, widget: QWidget, key_sequence: str, callback: Callable, description: str):
         """Add a keyboard shortcut to a widget with accessibility description."""
-        if QT_AVAILABLE and hasattr(widget, 'addAction'):
+        if QT_AVAILABLE and hasattr(widget, "addAction"):
             action = QAction(widget)
             action.setShortcut(key_sequence)
             action.triggered.connect(callback)
@@ -545,51 +578,46 @@ class AccessibilityManager:
                 "Ensure all functionality is keyboard accessible",
                 "Provide text alternatives for non-text content",
                 "Make content adaptable and distinguishable",
-                "Ensure content is readable and understandable"
+                "Ensure content is readable and understandable",
             ],
             "Visual": [
                 "Use sufficient color contrast (4.5:1 minimum)",
                 "Don't rely solely on color to convey information",
                 "Provide clear visual focus indicators",
-                "Ensure text is resizable up to 200% without loss of content"
+                "Ensure text is resizable up to 200% without loss of content",
             ],
             "Keyboard": [
                 "All functionality should be operable via keyboard",
                 "Provide visible focus indicators",
                 "Ensure logical tab order",
-                "Provide keyboard shortcuts for frequent actions"
+                "Provide keyboard shortcuts for frequent actions",
             ],
             "Screen Readers": [
                 "Use proper semantic HTML equivalents",
                 "Provide descriptive labels and names",
                 "Use ARIA attributes appropriately",
-                "Ensure dynamic content changes are announced"
+                "Ensure dynamic content changes are announced",
             ],
             "Forms": [
                 "Associate labels with form controls",
                 "Provide clear error messages",
                 "Group related form elements",
-                "Provide instructions and help text"
-            ]
+                "Provide instructions and help text",
+            ],
         }
 
     def check_wcag_compliance(self) -> Dict[str, bool]:
         """Check WCAG compliance for key criteria."""
-        compliance = {
-            'perceivable': True,
-            'operable': True,
-            'understandable': True,
-            'robust': True
-        }
+        compliance = {"perceivable": True, "operable": True, "understandable": True, "robust": True}
 
         # Check for basic compliance issues
         if len(self._audit_results) > 0:
             for issue in self._audit_results:
-                if issue.severity == 'high':
+                if issue.severity == "high":
                     if issue.issue_type in [AccessibilityIssue.MISSING_LABEL, AccessibilityIssue.POOR_CONTRAST]:
-                        compliance['perceivable'] = False
+                        compliance["perceivable"] = False
                     elif issue.issue_type == AccessibilityIssue.KEYBOARD_NAVIGATION:
-                        compliance['operable'] = False
+                        compliance["operable"] = False
 
         return compliance
 
@@ -597,6 +625,7 @@ class AccessibilityManager:
         """Clean up accessibility resources."""
         self._audit_results.clear()
         self._accessibility_warnings.clear()
+
 
 class EnhancedAccessibleInterface(QAccessibleInterface):
     """Enhanced accessible interface with additional features."""
@@ -625,7 +654,7 @@ class EnhancedAccessibleInterface(QAccessibleInterface):
 
         # Add widget type for better context
         widget = self.object()
-        if hasattr(widget, 'metaObject'):
+        if hasattr(widget, "metaObject"):
             widget_type = widget.metaObject().className()
             return f"{widget_type}: {name}"
 
@@ -638,7 +667,7 @@ class EnhancedAccessibleInterface(QAccessibleInterface):
 
         # Add keyboard shortcuts if available
         widget = self.object()
-        if hasattr(widget, 'shortcut'):
+        if hasattr(widget, "shortcut"):
             shortcut = widget.shortcut().toString()
             if shortcut:
                 description += f" Shortcut: {shortcut}"
@@ -651,20 +680,20 @@ class EnhancedAccessibleInterface(QAccessibleInterface):
 
         # Try to provide more specific roles
         widget = self.object()
-        if hasattr(widget, 'metaObject'):
+        if hasattr(widget, "metaObject"):
             class_name = widget.metaObject().className()
 
-            if 'Button' in class_name:
+            if "Button" in class_name:
                 return QAccessible.Role.Button
-            elif 'CheckBox' in class_name:
+            elif "CheckBox" in class_name:
                 return QAccessible.Role.CheckBox
-            elif 'ComboBox' in class_name:
+            elif "ComboBox" in class_name:
                 return QAccessible.Role.ComboBox
-            elif 'LineEdit' in class_name:
+            elif "LineEdit" in class_name:
                 return QAccessible.Role.EditableText
-            elif 'Table' in class_name:
+            elif "Table" in class_name:
                 return QAccessible.Role.Table
-            elif 'Tree' in class_name:
+            elif "Tree" in class_name:
                 return QAccessible.Role.Tree
 
         return base_role
@@ -676,19 +705,21 @@ class EnhancedAccessibleInterface(QAccessibleInterface):
         # Add additional states based on widget properties
         widget = self.object()
 
-        if hasattr(widget, 'isEnabled') and not widget.isEnabled():
+        if hasattr(widget, "isEnabled") and not widget.isEnabled():
             base_state.disabled = True
 
-        if hasattr(widget, 'hasFocus') and widget.hasFocus():
+        if hasattr(widget, "hasFocus") and widget.hasFocus():
             base_state.focused = True
 
-        if hasattr(widget, 'isChecked') and widget.isChecked():
+        if hasattr(widget, "isChecked") and widget.isChecked():
             base_state.checked = True
 
         return base_state
 
+
 # Singleton instance for easy access
 _accessibility_manager_instance = None
+
 
 def get_accessibility_manager() -> AccessibilityManager:
     """Get the singleton accessibility manager instance."""
@@ -696,6 +727,7 @@ def get_accessibility_manager() -> AccessibilityManager:
     if _accessibility_manager_instance is None:
         _accessibility_manager_instance = AccessibilityManager()
     return _accessibility_manager_instance
+
 
 # Convenience functions for common accessibility tasks
 def ensure_widget_accessibility(widget: QWidget, name: str = "", description: str = ""):
@@ -710,6 +742,7 @@ def ensure_widget_accessibility(widget: QWidget, name: str = "", description: st
         if widget.focusPolicy() == Qt.FocusPolicy.NoFocus:
             widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
+
 def add_accessible_tooltip(widget: QWidget, tooltip: str, description: str = ""):
     """Add accessible tooltip to a widget."""
     if QT_AVAILABLE and widget:
@@ -718,10 +751,12 @@ def add_accessible_tooltip(widget: QWidget, tooltip: str, description: str = "")
             current_desc = widget.accessibleDescription() or ""
             widget.setAccessibleDescription(f"{current_desc} {description}".strip())
 
+
 def check_accessibility_compliance(widget: Optional[QWidget] = None) -> Dict[str, Any]:
     """Check accessibility compliance for a widget or application."""
     manager = get_accessibility_manager()
     return manager.get_accessibility_report()
+
 
 def run_accessibility_audit(widget: Optional[QWidget] = None) -> List[AccessibilityAuditResult]:
     """Run accessibility audit and return results."""
