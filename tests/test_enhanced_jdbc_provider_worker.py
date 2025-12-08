@@ -3,7 +3,7 @@ from dbutils.enhanced_jdbc_provider import QueryWorker
 
 class FakeCursor:
     def __init__(self):
-        self.description = (('col1',),)
+        self.description = (("col1",),)
         self.rows = [(1,), (2,), (3,)]
 
     def execute(self, sql):
@@ -22,7 +22,7 @@ class FakeConn:
 
 
 def test_queryworker_cancel_before_run():
-    w = QueryWorker(FakeConn(), 'SELECT 1')
+    w = QueryWorker(FakeConn(), "SELECT 1")
     # cancel before run should just finish
     w.cancel()
     # Running should not raise
@@ -35,7 +35,7 @@ def test_queryworker_handles_cursor_exceptions(monkeypatch):
             description = None
 
             def execute(self, sql):
-                raise RuntimeError('fail')
+                raise RuntimeError("fail")
 
             def close(self):
                 pass
@@ -46,7 +46,6 @@ def test_queryworker_handles_cursor_exceptions(monkeypatch):
         def cursor(self):
             return bad_cursor()
 
-    w = QueryWorker(FakeConn2(), 'SELECT 1')
+    w = QueryWorker(FakeConn2(), "SELECT 1")
     # Should not raise when run is called
     w.run()
-

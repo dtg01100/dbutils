@@ -1,4 +1,5 @@
 """Comprehensive tests for Qt worker classes."""
+
 from unittest.mock import patch
 
 from dbutils.db_browser import ColumnInfo, TableInfo
@@ -13,9 +14,9 @@ class TestSearchWorker:
         worker = SearchWorker()
 
         assert worker._search_cancelled is False
-        assert hasattr(worker, 'results_ready')
-        assert hasattr(worker, 'search_complete')
-        assert hasattr(worker, 'error_occurred')
+        assert hasattr(worker, "results_ready")
+        assert hasattr(worker, "search_complete")
+        assert hasattr(worker, "error_occurred")
 
     def test_search_worker_cancel_search(self):
         """Test canceling search."""
@@ -36,7 +37,7 @@ class TestSearchWorker:
         tables = [
             TableInfo(schema="TEST", name="USERS", remarks="User table"),
             TableInfo(schema="TEST", name="ORDERS", remarks="Order table"),
-            TableInfo(schema="TEST", name="CUSTOMERS", remarks="Customer table")
+            TableInfo(schema="TEST", name="CUSTOMERS", remarks="Customer table"),
         ]
         columns = []
 
@@ -74,13 +75,38 @@ class TestSearchWorker:
         worker = SearchWorker()
 
         # Create test data
-        tables = [
-            TableInfo(schema="TEST", name="USERS", remarks="User table")
-        ]
+        tables = [TableInfo(schema="TEST", name="USERS", remarks="User table")]
         columns = [
-            ColumnInfo(schema="TEST", table="USERS", name="USER_ID", typename="INTEGER", length=10, scale=0, nulls="N", remarks="User ID"),
-            ColumnInfo(schema="TEST", table="USERS", name="USER_NAME", typename="VARCHAR", length=50, scale=0, nulls="Y", remarks="User name"),
-            ColumnInfo(schema="TEST", table="USERS", name="EMAIL", typename="VARCHAR", length=100, scale=0, nulls="Y", remarks="Email address")
+            ColumnInfo(
+                schema="TEST",
+                table="USERS",
+                name="USER_ID",
+                typename="INTEGER",
+                length=10,
+                scale=0,
+                nulls="N",
+                remarks="User ID",
+            ),
+            ColumnInfo(
+                schema="TEST",
+                table="USERS",
+                name="USER_NAME",
+                typename="VARCHAR",
+                length=50,
+                scale=0,
+                nulls="Y",
+                remarks="User name",
+            ),
+            ColumnInfo(
+                schema="TEST",
+                table="USERS",
+                name="EMAIL",
+                typename="VARCHAR",
+                length=100,
+                scale=0,
+                nulls="Y",
+                remarks="Email address",
+            ),
         ]
 
         # Mock the signals to capture results
@@ -117,10 +143,7 @@ class TestSearchWorker:
         worker = SearchWorker()
 
         # Create large test data to ensure search takes time
-        tables = [
-            TableInfo(schema="TEST", name=f"TABLE_{i}", remarks=f"Table {i} description")
-            for i in range(100)
-        ]
+        tables = [TableInfo(schema="TEST", name=f"TABLE_{i}", remarks=f"Table {i} description") for i in range(100)]
         columns = []
 
         # Mock the signals
@@ -154,7 +177,7 @@ class TestSearchWorker:
         worker.error_occurred.connect(capture_error)
 
         # Force an error by passing invalid data
-        with patch.object(worker, '_search_cancelled', False):
+        with patch.object(worker, "_search_cancelled", False):
             worker.perform_search(None, None, None, None)
 
         # The error handling might be too robust, so check if error was captured
@@ -164,6 +187,7 @@ class TestSearchWorker:
             # If no error was captured, the method might have handled it gracefully
             assert True  # This is acceptable behavior
 
+
 class TestTableContentsWorker:
     """Test the TableContentsWorker class."""
 
@@ -172,8 +196,8 @@ class TestTableContentsWorker:
         worker = TableContentsWorker()
 
         assert worker._cancelled is False
-        assert hasattr(worker, 'results_ready')
-        assert hasattr(worker, 'error_occurred')
+        assert hasattr(worker, "results_ready")
+        assert hasattr(worker, "error_occurred")
 
     def test_table_contents_worker_cancel(self):
         """Test canceling table contents fetch."""
@@ -208,12 +232,9 @@ class TestTableContentsWorker:
         worker = TableContentsWorker()
 
         # Mock the query_runner to return test data
-        test_rows = [
-            {"id": 1, "name": "John"},
-            {"id": 2, "name": "Jane"}
-        ]
+        test_rows = [{"id": 1, "name": "John"}, {"id": 2, "name": "Jane"}]
 
-        with patch('dbutils.db_browser.query_runner') as mock_query_runner:
+        with patch("dbutils.db_browser.query_runner") as mock_query_runner:
             mock_query_runner.return_value = test_rows
 
             # Mock signals
@@ -231,12 +252,7 @@ class TestTableContentsWorker:
             worker.error_occurred.connect(capture_error)
 
             # Perform fetch
-            worker.perform_fetch(
-                schema="TEST",
-                table="USERS",
-                limit=10,
-                start_offset=0
-            )
+            worker.perform_fetch(schema="TEST", table="USERS", limit=10, start_offset=0)
 
             # Verify results
             assert len(results_captured) == 1
@@ -253,6 +269,7 @@ class TestTableContentsWorker:
         # Mock query_runner to take time
         def slow_query_runner(sql):
             import time
+
             time.sleep(0.1)  # Simulate slow query
             return [{"id": 1, "name": "John"}]
 
@@ -264,17 +281,13 @@ class TestTableContentsWorker:
 
         worker.results_ready.connect(capture_results)
 
-        with patch('dbutils.db_browser.query_runner', side_effect=slow_query_runner):
+        with patch("dbutils.db_browser.query_runner", side_effect=slow_query_runner):
             # Start the fetch
-            worker.perform_fetch(
-                schema="TEST",
-                table="USERS",
-                limit=10,
-                start_offset=0
-            )
+            worker.perform_fetch(schema="TEST", table="USERS", limit=10, start_offset=0)
 
             # Cancel during execution (after a short delay)
             import time
+
             time.sleep(0.05)  # Wait a bit then cancel
             worker.cancel()
 
@@ -290,7 +303,7 @@ class TestTableContentsWorker:
         worker = TableContentsWorker()
 
         # Mock query_runner to raise exception
-        with patch('dbutils.db_browser.query_runner') as mock_query_runner:
+        with patch("dbutils.db_browser.query_runner") as mock_query_runner:
             mock_query_runner.side_effect = Exception("Database connection failed")
 
             error_captured = None
@@ -302,16 +315,12 @@ class TestTableContentsWorker:
             worker.error_occurred.connect(capture_error)
 
             # Perform fetch
-            worker.perform_fetch(
-                schema="TEST",
-                table="USERS",
-                limit=10,
-                start_offset=0
-            )
+            worker.perform_fetch(schema="TEST", table="USERS", limit=10, start_offset=0)
 
             # Verify error was captured
             assert error_captured is not None
             assert "Database connection failed" in error_captured
+
 
 class TestDataLoaderWorker:
     """Test the DataLoaderWorker class."""
@@ -320,34 +329,41 @@ class TestDataLoaderWorker:
         """Test DataLoaderWorker initialization."""
         worker = DataLoaderWorker()
 
-        assert hasattr(worker, 'data_loaded')
-        assert hasattr(worker, 'chunk_loaded')
-        assert hasattr(worker, 'error_occurred')
-        assert hasattr(worker, 'progress_updated')
-        assert hasattr(worker, 'progress_value')
+        assert hasattr(worker, "data_loaded")
+        assert hasattr(worker, "chunk_loaded")
+        assert hasattr(worker, "error_occurred")
+        assert hasattr(worker, "progress_updated")
+        assert hasattr(worker, "progress_value")
 
     def test_data_loader_worker_load_data(self):
         """Test loading data with DataLoaderWorker."""
         worker = DataLoaderWorker()
 
         # Mock the required functions - they are imported inside the method, so we need to patch them at their source
-        with patch('dbutils.db_browser.get_all_tables_and_columns_async') as mock_get_data, \
-             patch('dbutils.catalog.get_tables') as mock_get_tables:
-
+        with (
+            patch("dbutils.db_browser.get_all_tables_and_columns_async") as mock_get_data,
+            patch("dbutils.catalog.get_tables") as mock_get_tables,
+        ):
             # Mock data
             mock_tables = [
                 TableInfo(schema="TEST", name="USERS", remarks="User table"),
-                TableInfo(schema="TEST", name="ORDERS", remarks="Order table")
+                TableInfo(schema="TEST", name="ORDERS", remarks="Order table"),
             ]
             mock_columns = {
                 "TEST.USERS": [
-                    ColumnInfo(schema="TEST", table="USERS", name="ID", typename="INTEGER", length=10, scale=0, nulls="N", remarks="User ID")
+                    ColumnInfo(
+                        schema="TEST",
+                        table="USERS",
+                        name="ID",
+                        typename="INTEGER",
+                        length=10,
+                        scale=0,
+                        nulls="N",
+                        remarks="User ID",
+                    )
                 ]
             }
-            mock_all_tables = [
-                {"TABSCHEMA": "TEST", "TABNAME": "USERS"},
-                {"TABSCHEMA": "TEST", "TABNAME": "ORDERS"}
-            ]
+            mock_all_tables = [{"TABSCHEMA": "TEST", "TABNAME": "USERS"}, {"TABSCHEMA": "TEST", "TABNAME": "ORDERS"}]
 
             mock_get_data.return_value = (mock_tables, mock_columns)
             mock_get_tables.return_value = mock_all_tables
@@ -396,7 +412,7 @@ class TestDataLoaderWorker:
         worker = DataLoaderWorker()
 
         # Mock functions to raise exceptions
-        with patch('dbutils.db_browser.get_all_tables_and_columns_async') as mock_get_data:
+        with patch("dbutils.db_browser.get_all_tables_and_columns_async") as mock_get_data:
             mock_get_data.side_effect = Exception("Database error")
 
             error_captured = None
@@ -419,9 +435,10 @@ class TestDataLoaderWorker:
         worker = DataLoaderWorker()
 
         # Mock functions with progress
-        with patch('dbutils.db_browser.get_all_tables_and_columns_async') as mock_get_data, \
-             patch('dbutils.catalog.get_tables') as mock_get_tables:
-
+        with (
+            patch("dbutils.db_browser.get_all_tables_and_columns_async") as mock_get_data,
+            patch("dbutils.catalog.get_tables") as mock_get_tables,
+        ):
             # Mock data
             mock_tables = [TableInfo(schema="TEST", name=f"TABLE_{i}", remarks="") for i in range(5)]
             mock_columns = {}

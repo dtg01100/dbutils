@@ -1,4 +1,5 @@
 """Comprehensive tests for BusyOverlay widget functionality."""
+
 from unittest.mock import MagicMock
 
 from PySide6.QtCore import Qt

@@ -7,7 +7,6 @@ Tests for:
 - Non-UI logic
 """
 
-
 import pytest
 
 # Import the functions we can test without Qt
@@ -81,12 +80,7 @@ class TestSearchResult:
         if SearchResult is None:
             pytest.skip("Qt not available, skipping SearchResult tests")
 
-        result = SearchResult(
-            item="test_item",
-            match_type="exact",
-            relevance_score=0.9,
-            table_key="test.key"
-        )
+        result = SearchResult(item="test_item", match_type="exact", relevance_score=0.9, table_key="test.key")
 
         assert result.item == "test_item"
         assert result.match_type == "exact"
@@ -154,7 +148,7 @@ class TestColumnModel:
                     length=10,
                     scale=0,
                     nulls="N",
-                    remarks="ID column"
+                    remarks="ID column",
                 )
             ]
 

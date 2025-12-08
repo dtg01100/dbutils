@@ -16,14 +16,14 @@ def test_dbutils_init():
     import dbutils
 
     # Test that main functions are available
-    assert hasattr(dbutils, 'db_browser_main')
-    assert hasattr(dbutils, 'qt_gui_main')
-    assert hasattr(dbutils, 'smart_launcher_main')
+    assert hasattr(dbutils, "db_browser_main")
+    assert hasattr(dbutils, "qt_gui_main")
+    assert hasattr(dbutils, "smart_launcher_main")
 
     # Test that __all__ is properly defined
-    assert 'db_browser_main' in dbutils.__all__
-    assert 'qt_gui_main' in dbutils.__all__
-    assert 'smart_launcher_main' in dbutils.__all__
+    assert "db_browser_main" in dbutils.__all__
+    assert "qt_gui_main" in dbutils.__all__
+    assert "smart_launcher_main" in dbutils.__all__
 
 
 def test_db_browser_module():
@@ -40,14 +40,7 @@ def test_db_browser_module():
     assert table.name == "USERS"
 
     column = ColumnInfo(
-        schema="TEST",
-        table="USERS",
-        name="ID",
-        typename="INTEGER",
-        length=10,
-        scale=0,
-        nulls="N",
-        remarks="ID column"
+        schema="TEST", table="USERS", name="ID", typename="INTEGER", length=10, scale=0, nulls="N", remarks="ID column"
     )
     assert column.name == "ID"
 
@@ -62,16 +55,14 @@ def test_jdbc_provider_module():
 
     # Test basic provider creation
     provider = JDBCProvider(
-        name="Test",
-        driver_class="com.test.Driver",
-        jar_path="/path.jar",
-        url_template="jdbc:test://{host}:{port}/{db}"
+        name="Test", driver_class="com.test.Driver", jar_path="/path.jar", url_template="jdbc:test://{host}:{port}/{db}"
     )
     assert provider.name == "Test"
 
     # Test that registry can be created
     # We can't test full functionality without actual JDBC setup
     from dbutils.jdbc_provider import get_registry
+
     registry = get_registry()
     assert registry is not None
 
@@ -85,7 +76,7 @@ def test_utils_module():
     assert fuzzy_match("hello world", "hello")
 
     # Test query runner raises error without proper environment
-    with patch.dict('os.environ', {}, clear=True):
+    with patch.dict("os.environ", {}, clear=True):
         with pytest.raises(RuntimeError, match="DBUTILS_JDBC_PROVIDER"):
             query_runner("SELECT 1")
 
@@ -95,8 +86,9 @@ def test_catalog_module():
     # Import the catalog module (this may or may not exist in the project)
     try:
         from dbutils import catalog
+
         # If it exists, it should have the expected functions
-        if hasattr(catalog, 'get_all_tables_and_columns'):
+        if hasattr(catalog, "get_all_tables_and_columns"):
             assert callable(catalog.get_all_tables_and_columns)
     except ImportError:
         # If it doesn't exist, that's ok - just a different project structure
@@ -107,8 +99,9 @@ def test_main_launcher_imports():
     """Test that main launcher can be imported without errors."""
     try:
         from dbutils import main_launcher
+
         # The module should at least have a main function
-        assert hasattr(main_launcher, 'main') or hasattr(main_launcher, 'smart_launcher_main')
+        assert hasattr(main_launcher, "main") or hasattr(main_launcher, "smart_launcher_main")
     except ImportError:
         # If main_launcher doesn't exist, that's fine
         pass
@@ -119,6 +112,7 @@ def test_gui_module_imports():
     # Test that the gui module structure is correct
     try:
         import dbutils.gui
+
         # Module should exist
         assert dbutils.gui is not None
     except ImportError:
@@ -154,24 +148,10 @@ def test_dataclass_immutability_patterns():
 
     # Test ColumnInfo
     col1 = ColumnInfo(
-        schema="TEST",
-        table="USERS",
-        name="ID",
-        typename="INTEGER",
-        length=10,
-        scale=0,
-        nulls="N",
-        remarks="ID"
+        schema="TEST", table="USERS", name="ID", typename="INTEGER", length=10, scale=0, nulls="N", remarks="ID"
     )
     col2 = ColumnInfo(
-        schema="TEST",
-        table="USERS",
-        name="ID",
-        typename="INTEGER",
-        length=10,
-        scale=0,
-        nulls="N",
-        remarks="ID"
+        schema="TEST", table="USERS", name="ID", typename="INTEGER", length=10, scale=0, nulls="N", remarks="ID"
     )
 
     # Should be equal with same content
@@ -224,13 +204,13 @@ def test_schema_info_dataclass():
         pass
 
 
-@patch.dict('os.environ', {'DBUTILS_JDBC_PROVIDER': 'test_provider'})
+@patch.dict("os.environ", {"DBUTILS_JDBC_PROVIDER": "test_provider"})
 def test_query_runner_environment_check():
     """Test query runner environment requirements."""
     from dbutils.db_browser import query_runner
 
     # Should fail with proper error when JDBC provider is set but connection fails
-    with patch('dbutils.jdbc_provider.connect') as mock_connect:
+    with patch("dbutils.jdbc_provider.connect") as mock_connect:
         mock_connect.side_effect = RuntimeError("Connection failed")
 
         with pytest.raises(RuntimeError, match="JDBC query failed"):
@@ -384,11 +364,11 @@ def test_import_structure():
     import dbutils.utils
 
     # Test that expected attributes exist
-    assert hasattr(dbutils.db_browser, 'TableInfo')
-    assert hasattr(dbutils.db_browser, 'ColumnInfo')
-    assert hasattr(dbutils.jdbc_provider, 'JDBCProvider')
-    assert hasattr(dbutils.utils, 'edit_distance')
-    assert hasattr(dbutils.utils, 'fuzzy_match')
+    assert hasattr(dbutils.db_browser, "TableInfo")
+    assert hasattr(dbutils.db_browser, "ColumnInfo")
+    assert hasattr(dbutils.jdbc_provider, "JDBCProvider")
+    assert hasattr(dbutils.utils, "edit_distance")
+    assert hasattr(dbutils.utils, "fuzzy_match")
 
 
 def test_module_docstrings():

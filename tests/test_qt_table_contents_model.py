@@ -1,4 +1,5 @@
 """Comprehensive tests for TableContentsModel functionality."""
+
 from PySide6.QtCore import Qt
 
 from dbutils.db_browser import ColumnInfo
@@ -25,7 +26,7 @@ class TestTableContentsModel:
         columns = ["id", "name", "email"]
         rows = [
             {"id": 1, "name": "John", "email": "john@example.com"},
-            {"id": 2, "name": "Jane", "email": "jane@example.com"}
+            {"id": 2, "name": "Jane", "email": "jane@example.com"},
         ]
 
         model.set_contents(columns, rows)
@@ -111,10 +112,7 @@ class TestTableContentsModel:
 
         # Set some content
         columns = ["id", "name"]
-        rows = [
-            {"id": 1, "name": "John"},
-            {"id": 2, "name": "Jane"}
-        ]
+        rows = [{"id": 1, "name": "John"}, {"id": 2, "name": "Jane"}]
         model.set_contents(columns, rows)
 
         # Test valid data retrieval
@@ -185,9 +183,36 @@ class TestTableContentsModel:
 
         # Create column metadata
         column_meta = [
-            ColumnInfo(schema="TEST", table="USERS", name="id", typename="INTEGER", length=10, scale=0, nulls="N", remarks="User ID"),
-            ColumnInfo(schema="TEST", table="USERS", name="name", typename="VARCHAR", length=50, scale=0, nulls="Y", remarks="User name"),
-            ColumnInfo(schema="TEST", table="USERS", name="email", typename="VARCHAR", length=100, scale=0, nulls="Y", remarks="User email")
+            ColumnInfo(
+                schema="TEST",
+                table="USERS",
+                name="id",
+                typename="INTEGER",
+                length=10,
+                scale=0,
+                nulls="N",
+                remarks="User ID",
+            ),
+            ColumnInfo(
+                schema="TEST",
+                table="USERS",
+                name="name",
+                typename="VARCHAR",
+                length=50,
+                scale=0,
+                nulls="Y",
+                remarks="User name",
+            ),
+            ColumnInfo(
+                schema="TEST",
+                table="USERS",
+                name="email",
+                typename="VARCHAR",
+                length=100,
+                scale=0,
+                nulls="Y",
+                remarks="User email",
+            ),
         ]
 
         # Test name mode (default)
@@ -200,8 +225,19 @@ class TestTableContentsModel:
 
         # Test fallback to name when description not available
         column_meta_no_desc = [
-            ColumnInfo(schema="TEST", table="USERS", name="id", typename="INTEGER", length=10, scale=0, nulls="N", remarks=""),
-            ColumnInfo(schema="TEST", table="USERS", name="name", typename="VARCHAR", length=50, scale=0, nulls="Y", remarks=None),
+            ColumnInfo(
+                schema="TEST", table="USERS", name="id", typename="INTEGER", length=10, scale=0, nulls="N", remarks=""
+            ),
+            ColumnInfo(
+                schema="TEST",
+                table="USERS",
+                name="name",
+                typename="VARCHAR",
+                length=50,
+                scale=0,
+                nulls="Y",
+                remarks=None,
+            ),
         ]
         model.set_contents(["id", "name"], [])
         model.set_header_display_mode("description", column_meta_no_desc)
@@ -217,11 +253,9 @@ class TestTableContentsModel:
 
         # Incremental update - should append
         new_rows = [{"id": 2, "name": "Jane"}, {"id": 3, "name": "Bob"}]
-        model.set_contents(["id", "name"], [
-            {"id": 1, "name": "John"},
-            {"id": 2, "name": "Jane"},
-            {"id": 3, "name": "Bob"}
-        ])
+        model.set_contents(
+            ["id", "name"], [{"id": 1, "name": "John"}, {"id": 2, "name": "Jane"}, {"id": 3, "name": "Bob"}]
+        )
 
         assert len(model._rows) == 3
         assert model._rows[1]["name"] == "Jane"

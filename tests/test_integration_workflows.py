@@ -45,16 +45,16 @@ class TestEndToEndWorkflows:
         column_results = search_index.search_columns("ID")
         assert len(column_results) > 0
 
-    @patch.dict('os.environ', {'DBUTILS_JDBC_PROVIDER': 'test_provider'})
+    @patch.dict("os.environ", {"DBUTILS_JDBC_PROVIDER": "test_provider"})
     def test_jdbc_workflow(self):
         """Test JDBC workflow from provider to query execution."""
         # Create all mocks inline to ensure proper chain
         # The JDBCConnection object has a query method, not execute on cursor
         mock_conn = MagicMock()
-        expected_result = [{'result': 'test_data'}]
+        expected_result = [{"result": "test_data"}]
         mock_conn.query.return_value = expected_result
 
-        with patch('dbutils.jdbc_provider.connect', return_value=mock_conn) as mock_connect:
+        with patch("dbutils.jdbc_provider.connect", return_value=mock_conn) as mock_connect:
             result = query_runner("SELECT 'test' as result FROM SYSIBM.SYSDUMMY1")
 
             # Verify connection was established and query executed
@@ -102,7 +102,7 @@ class TestComponentIntegration:
             name="Integration Test Provider",
             driver_class="com.test.Driver",
             jar_path="/path/to/test.jar",
-            url_template="jdbc:test://{host}:{port}/{database}"
+            url_template="jdbc:test://{host}:{port}/{database}",
         )
         registry.add_or_update(test_provider)
 
@@ -115,8 +115,8 @@ class TestComponentIntegration:
         names = registry.list_names()
         assert "Integration Test Provider" in names
 
-    @patch('dbutils.jdbc_provider.jpype')
-    @patch('dbutils.jdbc_provider.jaydebeapi')
+    @patch("dbutils.jdbc_provider.jpype")
+    @patch("dbutils.jdbc_provider.jaydebeapi")
     def test_jdbc_integration_with_db_browser(self, mock_jaydebeapi, mock_jpype):
         """Test integration between JDBC provider and db_browser functions."""
         # Set up mocks
@@ -127,26 +127,19 @@ class TestComponentIntegration:
         mock_jaydebeapi.connect.return_value = mock_conn
 
         # Mock data for query results
-        mock_cursor.fetchall.return_value = [
-            ('TEST', 'USERS', 'Users table'),
-            ('TEST', 'ORDERS', 'Orders table')
-        ]
-        mock_cursor.description = [('TABLE_SCHEMA',), ('TABLE_NAME',), ('TABLE_TEXT',)]
+        mock_cursor.fetchall.return_value = [("TEST", "USERS", "Users table"), ("TEST", "ORDERS", "Orders table")]
+        mock_cursor.description = [("TABLE_SCHEMA",), ("TABLE_NAME",), ("TABLE_TEXT",)]
 
         # Test with mock=False to trigger actual JDBC connection
-        with patch.dict('os.environ', {'DBUTILS_JDBC_PROVIDER': 'TestProvider'}):
-            with patch('dbutils.jdbc_provider.connect') as mock_connect_func:
+        with patch.dict("os.environ", {"DBUTILS_JDBC_PROVIDER": "TestProvider"}):
+            with patch("dbutils.jdbc_provider.connect") as mock_connect_func:
                 mock_connect_func.return_value = mock_conn
 
                 # Try to call the function that would use JDBC
                 # Since the real query would fail without actual DB,
                 # we test that the right calls are made
                 try:
-                    tables, columns = get_all_tables_and_columns(
-                        schema_filter="TEST",
-                        use_mock=False,
-                        use_cache=False
-                    )
+                    tables, columns = get_all_tables_and_columns(schema_filter="TEST", use_mock=False, use_cache=False)
                 except Exception:
                     # We expect this to fail without real DB, but we want to verify
                     # the calls were made correctly
@@ -166,13 +159,13 @@ class TestComponentIntegration:
         search_index.build_index(tables, columns)
 
         # Test that specific searches return expected results
-        user_tables = [t for t in tables if 'USER' in t.name.upper()]
+        user_tables = [t for t in tables if "USER" in t.name.upper()]
         user_search_results = search_index.search_tables("USER")
 
         # Should find at least the USERS table
         assert len(user_search_results) >= len(user_tables)
 
-        id_columns = [c for c in columns if c.name == 'ID']
+        id_columns = [c for c in columns if c.name == "ID"]
         id_search_results = search_index.search_columns("ID")
 
         # Should find at least the ID columns
@@ -182,18 +175,18 @@ class TestComponentIntegration:
 class TestAsyncIntegration:
     """Test async functionality integration."""
 
-    @patch.dict('os.environ', {'DBUTILS_JDBC_PROVIDER': 'test_provider'})
+    @patch.dict("os.environ", {"DBUTILS_JDBC_PROVIDER": "test_provider"})
     def test_async_data_loading(self, mock_jdbc_connection):
         """Test async data loading integration."""
-        mock_conn = mock_jdbc_connection['connection']
-        mock_cursor = mock_jdbc_connection['cursor']
+        mock_conn = mock_jdbc_connection["connection"]
+        mock_cursor = mock_jdbc_connection["cursor"]
 
         # Configure mock to return test data
-        mock_cursor.fetchall.return_value = [('test_schema', 'test_table', 'test_remarks')]
-        mock_cursor.description = [('TABLE_SCHEMA',), ('TABLE_NAME',), ('TABLE_TEXT',)]
+        mock_cursor.fetchall.return_value = [("test_schema", "test_table", "test_remarks")]
+        mock_cursor.description = [("TABLE_SCHEMA",), ("TABLE_NAME",), ("TABLE_TEXT",)]
 
         # Mock the async query execution
-        with patch('dbutils.jdbc_provider.connect') as mock_connect:
+        with patch("dbutils.jdbc_provider.connect") as mock_connect:
             mock_connect.return_value = mock_conn
 
             # Call the async function via asyncio.run to avoid requiring pytest-asyncio
@@ -246,7 +239,7 @@ class TestCachingIntegration:
         columns = mock_get_columns()
 
         # Test saving to cache
-        with patch('dbutils.db_browser.CACHE_FILE', cache_file):
+        with patch("dbutils.db_browser.CACHE_FILE", cache_file):
             # Save to cache
             save_to_cache("TEST", tables, columns)
 
@@ -288,7 +281,7 @@ class TestProviderConfiguration:
             url_template="jdbc:test://{host}:{port}/{database}",
             default_user="testuser",
             default_password="testpass",
-            extra_properties={"ssl": "true"}
+            extra_properties={"ssl": "true"},
         )
 
         registry.add_or_update(provider)
@@ -315,7 +308,7 @@ class TestProviderConfiguration:
             name="Connection Test Provider",
             driver_class="com.test.Driver",
             jar_path="/path/to/driver.jar",
-            url_template="jdbc:test://{host}:{port}/{database}"
+            url_template="jdbc:test://{host}:{port}/{database}",
         )
         registry.add_or_update(provider)
 
@@ -330,8 +323,8 @@ class TestErrorHandlingIntegration:
     def test_error_propagation_from_jdbc_to_db_browser(self):
         """Test that JDBC errors are properly propagated."""
         # Test the error handling in query_runner when JDBC fails
-        with patch.dict('os.environ', {'DBUTILS_JDBC_PROVIDER': 'test_provider'}):
-            with patch('dbutils.jdbc_provider.connect') as mock_connect:
+        with patch.dict("os.environ", {"DBUTILS_JDBC_PROVIDER": "test_provider"}):
+            with patch("dbutils.jdbc_provider.connect") as mock_connect:
                 mock_connect.side_effect = Exception("JDBC Connection failed")
 
                 with pytest.raises(RuntimeError, match="JDBC query failed"):

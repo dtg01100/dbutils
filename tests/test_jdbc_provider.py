@@ -33,7 +33,7 @@ class TestJDBCProvider:
             url_template="jdbc:test://{host}:{port}/{database}",
             default_user="testuser",
             default_password="testpass",
-            extra_properties={"prop1": "value1"}
+            extra_properties={"prop1": "value1"},
         )
 
         assert provider.name == "Test Provider"
@@ -53,7 +53,7 @@ class TestJDBCProvider:
             url_template="jdbc:test://{host}:{port}/{database}",
             default_user="testuser",
             default_password="testpass",
-            extra_properties={"prop1": "value1"}
+            extra_properties={"prop1": "value1"},
         )
 
         provider_dict = provider.to_dict()
@@ -75,7 +75,7 @@ class TestJDBCProvider:
             "url_template": "jdbc:test://{host}:{port}/{database}",
             "default_user": "testuser",
             "default_password": "testpass",
-            "extra_properties": {"prop1": "value1"}
+            "extra_properties": {"prop1": "value1"},
         }
 
         provider = JDBCProvider.from_dict(provider_dict)
@@ -94,7 +94,7 @@ class TestJDBCProvider:
             name="Minimal Provider",
             driver_class="com.test.Driver",
             jar_path="/path/to/driver.jar",
-            url_template="jdbc:test://{host}:{port}/{database}"
+            url_template="jdbc:test://{host}:{port}/{database}",
         )
 
         assert provider.default_user is None
@@ -115,7 +115,7 @@ class TestProviderRegistry:
         """Test registry loading with empty config file."""
         # Create empty config file
         config_path = temp_config_dir.parent / "providers.json"
-        with open(config_path, 'w') as f:
+        with open(config_path, "w") as f:
             json.dump([], f)
 
         registry = ProviderRegistry(config_path=str(config_path))
@@ -125,7 +125,7 @@ class TestProviderRegistry:
         """Test registry loading with invalid config file."""
         # Create invalid config file
         config_path = temp_config_dir.parent / "providers.json"
-        with open(config_path, 'w') as f:
+        with open(config_path, "w") as f:
             f.write("invalid json")
 
         registry = ProviderRegistry(config_path=str(config_path))
@@ -140,7 +140,7 @@ class TestProviderRegistry:
             name="New Provider",
             driver_class="com.test.Driver",
             jar_path="/path/to/driver.jar",
-            url_template="jdbc:test://{host}:{port}/{database}"
+            url_template="jdbc:test://{host}:{port}/{database}",
         )
 
         registry.add_or_update(provider)
@@ -159,7 +159,7 @@ class TestProviderRegistry:
             name="Provider to Remove",
             driver_class="com.test.Driver",
             jar_path="/path/to/driver.jar",
-            url_template="jdbc:test://{host}:{port}/{database}"
+            url_template="jdbc:test://{host}:{port}/{database}",
         )
         registry.add_or_update(provider)
 
@@ -182,7 +182,7 @@ class TestProviderRegistry:
             name="Test Get Provider",
             driver_class="com.test.Driver",
             jar_path="/path/to/driver.jar",
-            url_template="jdbc:test://{host}:{port}/{database}"
+            url_template="jdbc:test://{host}:{port}/{database}",
         )
         registry.add_or_update(provider)
 
@@ -224,8 +224,8 @@ class TestProviderRegistry:
 class TestJDBCConnection:
     """Test the JDBCConnection functionality."""
 
-    @patch('dbutils.jdbc_provider.jpype')
-    @patch('dbutils.jdbc_provider.jaydebeapi')
+    @patch("dbutils.jdbc_provider.jpype")
+    @patch("dbutils.jdbc_provider.jaydebeapi")
     def test_jdbc_connection_creation(self, mock_jaydebeapi, mock_jpype):
         """Test basic JDBC connection creation."""
         # Setup mocks
@@ -239,7 +239,7 @@ class TestJDBCConnection:
             jar_path="/path/to/driver.jar",
             url_template="jdbc:test://{host}:{port}/{database}",
             default_user="testuser",
-            default_password="testpass"
+            default_password="testpass",
         )
 
         # Create connection
@@ -250,8 +250,8 @@ class TestJDBCConnection:
         assert conn.user == "testuser"
         assert conn.password == "testpass"
 
-    @patch('dbutils.jdbc_provider.jpype')
-    @patch('dbutils.jdbc_provider.jaydebeapi')
+    @patch("dbutils.jdbc_provider.jpype")
+    @patch("dbutils.jdbc_provider.jaydebeapi")
     def test_jdbc_connection_with_custom_credentials(self, mock_jaydebeapi, mock_jpype):
         """Test JDBC connection with custom credentials."""
         mock_jpype.isJVMStarted.return_value = True
@@ -264,7 +264,7 @@ class TestJDBCConnection:
             jar_path="/path/to/driver.jar",
             url_template="jdbc:test://{host}:{port}/{database}",
             default_user="defaultuser",
-            default_password="defaultpass"
+            default_password="defaultpass",
         )
 
         # Create connection with custom credentials
@@ -272,7 +272,7 @@ class TestJDBCConnection:
             provider,
             {"host": "localhost", "port": "5432", "database": "mydb"},
             user="customuser",
-            password="custompass"
+            password="custompass",
         )
 
         # Verify custom credentials override defaults
@@ -280,8 +280,8 @@ class TestJDBCConnection:
         assert conn.user == "customuser"
         assert conn.password == "custompass"
 
-    @patch('dbutils.jdbc_provider.jpype')
-    @patch('dbutils.jdbc_provider.jaydebeapi')
+    @patch("dbutils.jdbc_provider.jpype")
+    @patch("dbutils.jdbc_provider.jaydebeapi")
     def test_jdbc_connection_without_credentials(self, mock_jaydebeapi, mock_jpype):
         """Test JDBC connection without any credentials."""
         mock_jpype.isJVMStarted.return_value = True
@@ -292,7 +292,7 @@ class TestJDBCConnection:
             name="Test Provider",
             driver_class="com.test.Driver",
             jar_path="/path/to/driver.jar",
-            url_template="jdbc:test://{host}:{port}/{database}"
+            url_template="jdbc:test://{host}:{port}/{database}",
         )
 
         # Create connection without credentials
@@ -303,8 +303,8 @@ class TestJDBCConnection:
         assert conn.user is None
         assert conn.password is None
 
-    @patch('dbutils.jdbc_provider.jpype')
-    @patch('dbutils.jdbc_provider.jaydebeapi')
+    @patch("dbutils.jdbc_provider.jpype")
+    @patch("dbutils.jdbc_provider.jaydebeapi")
     def test_connect_method_success(self, mock_jaydebeapi, mock_jpype):
         """Test successful connection establishment."""
         mock_jpype.isJVMStarted.return_value = True
@@ -315,7 +315,7 @@ class TestJDBCConnection:
             name="Test Provider",
             driver_class="com.test.Driver",
             jar_path="/path/to/driver.jar",
-            url_template="jdbc:test://{host}:{port}/{database}"
+            url_template="jdbc:test://{host}:{port}/{database}",
         )
 
         conn = JDBCConnection(provider, {"host": "localhost", "port": "5432", "database": "mydb"})
@@ -330,11 +330,11 @@ class TestJDBCConnection:
             "com.test.Driver",
             "jdbc:test://localhost:5432/mydb",
             ["", ""],  # Empty user/password since none provided in provider defaults
-            "/path/to/driver.jar"
+            "/path/to/driver.jar",
         )
 
-    @patch('dbutils.jdbc_provider.jpype')
-    @patch('dbutils.jdbc_provider.jaydebeapi')
+    @patch("dbutils.jdbc_provider.jpype")
+    @patch("dbutils.jdbc_provider.jaydebeapi")
     def test_query_method(self, mock_jaydebeapi, mock_jpype):
         """Test query execution method."""
         mock_jpype.isJVMStarted.return_value = True
@@ -352,7 +352,7 @@ class TestJDBCConnection:
             name="Test Provider",
             driver_class="com.test.Driver",
             jar_path="/path/to/driver.jar",
-            url_template="jdbc:test://{host}:{port}/{database}"
+            url_template="jdbc:test://{host}:{port}/{database}",
         )
 
         conn = JDBCConnection(provider, {"host": "localhost", "port": "5432", "database": "mydb"})
@@ -366,8 +366,8 @@ class TestJDBCConnection:
         # Verify results are formatted correctly
         assert result == [{"id": 1, "name": "test"}, {"id": 2, "name": "example"}]
 
-    @patch('dbutils.jdbc_provider.jpype')
-    @patch('dbutils.jdbc_provider.jaydebeapi')
+    @patch("dbutils.jdbc_provider.jpype")
+    @patch("dbutils.jdbc_provider.jaydebeapi")
     def test_query_method_no_columns(self, mock_jaydebeapi, mock_jpype):
         """Test query execution when cursor has no description."""
         mock_jpype.isJVMStarted.return_value = True
@@ -385,7 +385,7 @@ class TestJDBCConnection:
             name="Test Provider",
             driver_class="com.test.Driver",
             jar_path="/path/to/driver.jar",
-            url_template="jdbc:test://{host}:{port}/{database}"
+            url_template="jdbc:test://{host}:{port}/{database}",
         )
 
         conn = JDBCConnection(provider, {"host": "localhost", "port": "5432", "database": "mydb"})
@@ -398,8 +398,8 @@ class TestJDBCConnection:
         # The actual behavior is that when description is None, cols=[] and zip([], row) produces {}
         assert result == [{}, {}]
 
-    @patch('dbutils.jdbc_provider.jpype')
-    @patch('dbutils.jdbc_provider.jaydebeapi')
+    @patch("dbutils.jdbc_provider.jpype")
+    @patch("dbutils.jdbc_provider.jaydebeapi")
     def test_close_method(self, mock_jaydebeapi, mock_jpype):
         """Test connection close method."""
         mock_jpype.isJVMStarted.return_value = True
@@ -410,7 +410,7 @@ class TestJDBCConnection:
             name="Test Provider",
             driver_class="com.test.Driver",
             jar_path="/path/to/driver.jar",
-            url_template="jdbc:test://{host}:{port}/{database}"
+            url_template="jdbc:test://{host}:{port}/{database}",
         )
 
         conn = JDBCConnection(provider, {"host": "localhost", "port": "5432", "database": "mydb"})
@@ -424,15 +424,15 @@ class TestJDBCConnection:
         # Verify internal connection is set to None
         assert conn._conn is None
 
-    @patch('dbutils.jdbc_provider.jpype')
-    @patch('dbutils.jdbc_provider.jaydebeapi')
+    @patch("dbutils.jdbc_provider.jpype")
+    @patch("dbutils.jdbc_provider.jaydebeapi")
     def test_close_method_no_connection(self, mock_jaydebeapi, mock_jpype):
         """Test closing a connection that was never established."""
         provider = JDBCProvider(
             name="Test Provider",
             driver_class="com.test.Driver",
             jar_path="/path/to/driver.jar",
-            url_template="jdbc:test://{host}:{port}/{database}"
+            url_template="jdbc:test://{host}:{port}/{database}",
         )
 
         conn = JDBCConnection(provider, {"host": "localhost", "port": "5432", "database": "mydb"})
@@ -458,7 +458,7 @@ class TestJDBCConnection:
                 name="Test Provider",
                 driver_class="com.test.Driver",
                 jar_path="/path/to/driver.jar",
-                url_template="jdbc:test://{host}:{port}/{database}"
+                url_template="jdbc:test://{host}:{port}/{database}",
             )
 
             with pytest.raises(RuntimeError, match="JDBC bridge libraries"):
@@ -478,8 +478,8 @@ class TestTopLevelFunctions:
         registry2 = get_registry()
         assert registry1 is registry2
 
-    @patch('dbutils.jdbc_provider.jpype')
-    @patch('dbutils.jdbc_provider.jaydebeapi')
+    @patch("dbutils.jdbc_provider.jpype")
+    @patch("dbutils.jdbc_provider.jaydebeapi")
     def test_connect_function(self, mock_jaydebeapi, mock_jpype, temp_config_dir, tmp_path):
         """Test the connect function."""
         mock_jpype.isJVMStarted.return_value = True
@@ -491,7 +491,7 @@ class TestTopLevelFunctions:
             name="Test Provider",
             driver_class="com.test.Driver",
             jar_path="/path/to/driver.jar",
-            url_template="jdbc:test://{host}:{port}/{database}"
+            url_template="jdbc:test://{host}:{port}/{database}",
         )
 
         # Get the global registry and add our provider there

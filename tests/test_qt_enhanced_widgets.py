@@ -1,4 +1,5 @@
 """Comprehensive tests for enhanced widgets functionality."""
+
 from unittest.mock import MagicMock
 
 from PySide6.QtWidgets import QWidget
@@ -72,6 +73,7 @@ class TestStatusIndicator:
         # The method should reset the style to default
         assert True  # Method should execute without error
 
+
 class TestEnhancedTableItem:
     """Test the EnhancedTableItem widget."""
 
@@ -123,6 +125,7 @@ class TestEnhancedTableItem:
         assert "border: 1px solid #e0e0e0" in item.styleSheet()
         assert "background-color: white" in item.styleSheet()
 
+
 class TestSearchHighlightWidget:
     """Test the SearchHighlightWidget."""
 
@@ -131,8 +134,8 @@ class TestSearchHighlightWidget:
         widget = SearchHighlightWidget()
 
         assert widget.search_text == ""
-        assert hasattr(widget, 'search_input')
-        assert hasattr(widget, 'suggestions_widget')
+        assert hasattr(widget, "search_input")
+        assert hasattr(widget, "suggestions_widget")
 
     def test_search_highlight_widget_search_text(self):
         """Test SearchHighlightWidget search text functionality."""
@@ -157,6 +160,7 @@ class TestSearchHighlightWidget:
         placeholder = widget.search_input.placeholderText()
         assert "Search" in placeholder
 
+
 class TestProgressBar:
     """Test the ProgressBar widget."""
 
@@ -166,9 +170,9 @@ class TestProgressBar:
 
         assert progress_bar.value == 0
         assert progress_bar.maximum == 100
-        assert hasattr(progress_bar, 'progress_container')
-        assert hasattr(progress_bar, 'progress_bar')
-        assert hasattr(progress_bar, 'progress_text')
+        assert hasattr(progress_bar, "progress_container")
+        assert hasattr(progress_bar, "progress_bar")
+        assert hasattr(progress_bar, "progress_text")
 
     def test_progress_bar_value_updates(self):
         """Test ProgressBar value updates."""
@@ -204,6 +208,7 @@ class TestProgressBar:
         progress_bar.update_progress()
         assert progress_bar.progress_text.text() == "0%"  # Should handle division by zero
 
+
 class TestCollapsiblePanel:
     """Test the CollapsiblePanel widget."""
 
@@ -213,8 +218,8 @@ class TestCollapsiblePanel:
 
         assert panel.title == "Test Panel"
         assert panel.is_collapsed is False
-        assert hasattr(panel, 'toggle_button')
-        assert hasattr(panel, 'content_widget')
+        assert hasattr(panel, "toggle_button")
+        assert hasattr(panel, "content_widget")
 
     def test_collapsible_panel_collapsed_state(self):
         """Test CollapsiblePanel collapsed state."""
@@ -271,6 +276,7 @@ class TestCollapsiblePanel:
 
         # Create a test layout
         from PySide6.QtWidgets import QHBoxLayout
+
         test_layout = QHBoxLayout()
 
         # Add layout

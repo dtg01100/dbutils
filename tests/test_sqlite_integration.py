@@ -22,7 +22,8 @@ from dbutils.jdbc_provider import JDBCProvider, ProviderRegistry
 TEST_DB_NAME = "test_integration.db"
 TEST_PROVIDER_NAME = "SQLite (Test Integration)"
 
-@pytest.fixture(scope='module', autouse=True)
+
+@pytest.fixture(scope="module", autouse=True)
 def check_sqlite_dependencies():
     """Check if SQLite JDBC dependencies are available before running tests."""
     # Check for JDBC dependencies
@@ -40,11 +41,12 @@ def check_sqlite_dependencies():
     except Exception as e:
         pytest.skip(f"Cannot access provider registry: {e}")
 
+
 @pytest.fixture
 def sqlite_test_db():
     """Create a temporary SQLite database for testing."""
     # Create temporary database file
-    db_path = tempfile.NamedTemporaryFile(suffix='.db', delete=False)
+    db_path = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
     db_path.close()
 
     # Create database with sample schema
@@ -97,6 +99,7 @@ def sqlite_test_db():
     if os.path.exists(db_path.name):
         os.remove(db_path.name)
 
+
 @pytest.fixture
 def sqlite_provider():
     """Create a test SQLite JDBC provider."""
@@ -107,15 +110,17 @@ def sqlite_provider():
         url_template="jdbc:sqlite:{database}",
         default_user=None,
         default_password=None,
-        extra_properties={}
+        extra_properties={},
     )
+
 
 @pytest.fixture
 def mock_sqlite_connection(sqlite_test_db):
     """Mock SQLite JDBC connection for testing."""
-    with patch("dbutils.jdbc_provider.jaydebeapi") as mock_jaydebeapi, \
-         patch("dbutils.jdbc_provider.jpype") as mock_jpype:
-
+    with (
+        patch("dbutils.jdbc_provider.jaydebeapi") as mock_jaydebeapi,
+        patch("dbutils.jdbc_provider.jpype") as mock_jpype,
+    ):
         # Setup mock JPype
         mock_jpype.isJVMStarted.return_value = False
         mock_jpype.getDefaultJVMPath.return_value = "/fake/java/path"
@@ -129,20 +134,16 @@ def mock_sqlite_connection(sqlite_test_db):
         def mock_execute(sql):
             # Simulate SQLite query results
             if "SELECT name FROM sqlite_master WHERE type='table'" in sql:
-                mock_cursor.description = [('name',), ('type',)]
-                mock_cursor.fetchall.return_value = [
-                    ('users', 'table'),
-                    ('orders', 'table'),
-                    ('products', 'table')
-                ]
+                mock_cursor.description = [("name",), ("type",)]
+                mock_cursor.fetchall.return_value = [("users", "table"), ("orders", "table"), ("products", "table")]
             elif "SELECT COUNT(*) as count FROM users" in sql:
-                mock_cursor.description = [('count',)]
+                mock_cursor.description = [("count",)]
                 mock_cursor.fetchall.return_value = [(2,)]
             elif "SELECT * FROM users" in sql:
-                mock_cursor.description = [('id',), ('name',), ('email',), ('created_at',)]
+                mock_cursor.description = [("id",), ("name",), ("email",), ("created_at",)]
                 mock_cursor.fetchall.return_value = [
-                    (1, 'John Doe', 'john@example.com', None),
-                    (2, 'Jane Smith', 'jane@example.com', None)
+                    (1, "John Doe", "john@example.com", None),
+                    (2, "Jane Smith", "jane@example.com", None),
                 ]
             else:
                 mock_cursor.description = []
@@ -156,8 +157,9 @@ def mock_sqlite_connection(sqlite_test_db):
             "jpype": mock_jpype,
             "connection": mock_conn,
             "cursor": mock_cursor,
-            "db_path": sqlite_test_db
+            "db_path": sqlite_test_db,
         }
+
 
 def test_sqlite_jdbc_driver_connection_setup():
     """Test SQLite JDBC driver connection and setup."""
@@ -167,7 +169,7 @@ def test_sqlite_jdbc_driver_connection_setup():
         jar_path=os.path.abspath("jars/sqlite-jdbc.jar"),
         url_template="jdbc:sqlite:{database}",
         default_user=None,
-        default_password=None
+        default_password=None,
     )
 
     # Verify provider configuration
@@ -177,89 +179,81 @@ def test_sqlite_jdbc_driver_connection_setup():
     assert provider.default_user is None
     assert provider.default_password is None
 
+
 def test_sqlite_connection_creation(mock_sqlite_connection):
     """Test SQLite JDBC connection creation."""
     from dbutils.jdbc_provider import connect
 
     # Test connection creation
-    conn = connect(
-        TEST_PROVIDER_NAME,
-        {"database": mock_sqlite_connection["db_path"]}
-    )
+    conn = connect(TEST_PROVIDER_NAME, {"database": mock_sqlite_connection["db_path"]})
 
     # Verify connection was created
     assert conn is not None
     assert conn.provider.name == TEST_PROVIDER_NAME
+
 
 def test_sqlite_database_operations_crud(mock_sqlite_connection):
     """Test SQLite database CRUD operations."""
     from dbutils.jdbc_provider import connect
 
     # Create connection
-    conn = connect(
-        TEST_PROVIDER_NAME,
-        {"database": mock_sqlite_connection["db_path"]}
-    )
+    conn = connect(TEST_PROVIDER_NAME, {"database": mock_sqlite_connection["db_path"]})
 
     # Test CREATE operation (already done in fixture)
     # Test READ operation
     result = conn.query("SELECT * FROM users")
     assert len(result) == 2
-    assert result[0]['name'] == 'John Doe'
-    assert result[1]['name'] == 'Jane Smith'
+    assert result[0]["name"] == "John Doe"
+    assert result[1]["name"] == "Jane Smith"
 
     # Test UPDATE operation
     update_result = conn.query("UPDATE users SET name = 'John Updated' WHERE id = 1")
     # Verify update worked
     verify_result = conn.query("SELECT name FROM users WHERE id = 1")
-    assert verify_result[0]['name'] == 'John Updated'
+    assert verify_result[0]["name"] == "John Updated"
 
     # Test DELETE operation
     delete_result = conn.query("DELETE FROM users WHERE id = 2")
     # Verify delete worked
     verify_result = conn.query("SELECT COUNT(*) as count FROM users")
-    assert verify_result[0]['count'] == 1
+    assert verify_result[0]["count"] == 1
+
 
 def test_sqlite_specific_query_patterns(mock_sqlite_connection):
     """Test SQLite-specific query patterns and limitations."""
     from dbutils.jdbc_provider import connect
 
-    conn = connect(
-        TEST_PROVIDER_NAME,
-        {"database": mock_sqlite_connection["db_path"]}
-    )
+    conn = connect(TEST_PROVIDER_NAME, {"database": mock_sqlite_connection["db_path"]})
 
     # Test SQLite-specific functions
     result = conn.query("SELECT sqlite_version() as version")
-    assert 'version' in result[0]
+    assert "version" in result[0]
 
     # Test SQLite date functions
     result = conn.query("SELECT date('now') as current_date")
-    assert 'current_date' in result[0]
+    assert "current_date" in result[0]
 
     # Test SQLite JSON functions (if available)
     try:
         result = conn.query("SELECT json_object('key', 'value') as json_result")
-        assert 'json_result' in result[0]
+        assert "json_result" in result[0]
     except Exception:
         # JSON functions may not be available in all SQLite versions
         pass
+
 
 def test_sqlite_schema_and_table_operations(mock_sqlite_connection):
     """Test SQLite schema and table operations."""
     from dbutils.jdbc_provider import connect
 
-    conn = connect(
-        TEST_PROVIDER_NAME,
-        {"database": mock_sqlite_connection["db_path"]}
-    )
+    conn = connect(TEST_PROVIDER_NAME, {"database": mock_sqlite_connection["db_path"]})
 
     # Test schema inspection
     tables_result = conn.query("SELECT name FROM sqlite_master WHERE type='table'")
-    table_names = [row['name'] for row in tables_result]
-    assert 'users' in table_names
-    assert 'orders' in table_names
-    assert 'products' in table_names
+    table_names = [row["name"] for row in tables_result]
+    assert "users" in table_names
+    assert "orders" in table_names
+    assert "products" in table_names
 
     # Test table creation
     conn.query("""
@@ -271,28 +265,26 @@ def test_sqlite_schema_and_table_operations(mock_sqlite_connection):
 
     # Verify new table exists
     tables_result = conn.query("SELECT name FROM sqlite_master WHERE type='table'")
-    table_names = [row['name'] for row in tables_result]
-    assert 'test_new_table' in table_names
+    table_names = [row["name"] for row in tables_result]
+    assert "test_new_table" in table_names
 
     # Test table alteration (SQLite has limited ALTER TABLE support)
     try:
         conn.query("ALTER TABLE test_new_table ADD COLUMN new_column TEXT")
         # Verify column was added
         columns_result = conn.query("PRAGMA table_info(test_new_table)")
-        column_names = [row['name'] for row in columns_result]
-        assert 'new_column' in column_names
+        column_names = [row["name"] for row in columns_result]
+        assert "new_column" in column_names
     except Exception:
         # Some SQLite versions may not support ALTER TABLE ADD COLUMN
         pass
+
 
 def test_sqlite_error_handling_and_edge_cases(mock_sqlite_connection):
     """Test SQLite error handling and edge cases."""
     from dbutils.jdbc_provider import connect
 
-    conn = connect(
-        TEST_PROVIDER_NAME,
-        {"database": mock_sqlite_connection["db_path"]}
-    )
+    conn = connect(TEST_PROVIDER_NAME, {"database": mock_sqlite_connection["db_path"]})
 
     # Test invalid SQL syntax
     with pytest.raises(sqlite3.DatabaseError):
@@ -310,26 +302,21 @@ def test_sqlite_error_handling_and_edge_cases(mock_sqlite_connection):
     with pytest.raises(sqlite3.IntegrityError):
         conn.query("INSERT INTO users (email) VALUES ('test@example.com')")  # Missing required name
 
+
 def test_sqlite_connection_pooling_and_resource_management(mock_sqlite_connection):
     """Test SQLite connection pooling and resource management."""
     from dbutils.jdbc_provider import connect
 
     # Create multiple connections
-    conn1 = connect(
-        TEST_PROVIDER_NAME,
-        {"database": mock_sqlite_connection["db_path"]}
-    )
+    conn1 = connect(TEST_PROVIDER_NAME, {"database": mock_sqlite_connection["db_path"]})
 
-    conn2 = connect(
-        TEST_PROVIDER_NAME,
-        {"database": mock_sqlite_connection["db_path"]}
-    )
+    conn2 = connect(TEST_PROVIDER_NAME, {"database": mock_sqlite_connection["db_path"]})
 
     # Verify both connections work
     result1 = conn1.query("SELECT COUNT(*) as count FROM users")
     result2 = conn2.query("SELECT COUNT(*) as count FROM users")
 
-    assert result1[0]['count'] == result2[0]['count']
+    assert result1[0]["count"] == result2[0]["count"]
 
     # Test connection closing
     conn1.close()
@@ -339,17 +326,15 @@ def test_sqlite_connection_pooling_and_resource_management(mock_sqlite_connectio
     assert conn1._conn is None
     assert conn2._conn is None
 
+
 def test_sqlite_transaction_management(mock_sqlite_connection):
     """Test SQLite transaction management."""
     from dbutils.jdbc_provider import connect
 
-    conn = connect(
-        TEST_PROVIDER_NAME,
-        {"database": mock_sqlite_connection["db_path"]}
-    )
+    conn = connect(TEST_PROVIDER_NAME, {"database": mock_sqlite_connection["db_path"]})
 
     # Test transaction isolation
-    initial_count = conn.query("SELECT COUNT(*) as count FROM users")[0]['count']
+    initial_count = conn.query("SELECT COUNT(*) as count FROM users")[0]["count"]
 
     # Start transaction (SQLite uses implicit transactions)
     conn.query("BEGIN TRANSACTION")
@@ -358,24 +343,22 @@ def test_sqlite_transaction_management(mock_sqlite_connection):
     conn.query("INSERT INTO users (name, email) VALUES ('Temp User', 'temp@example.com')")
 
     # Verify change is visible in current connection
-    temp_count = conn.query("SELECT COUNT(*) as count FROM users")[0]['count']
+    temp_count = conn.query("SELECT COUNT(*) as count FROM users")[0]["count"]
     assert temp_count == initial_count + 1
 
     # Rollback transaction
     conn.query("ROLLBACK")
 
     # Verify change was rolled back
-    final_count = conn.query("SELECT COUNT(*) as count FROM users")[0]['count']
+    final_count = conn.query("SELECT COUNT(*) as count FROM users")[0]["count"]
     assert final_count == initial_count
+
 
 def test_sqlite_performance_and_large_data(mock_sqlite_connection):
     """Test SQLite performance with larger datasets."""
     from dbutils.jdbc_provider import connect
 
-    conn = connect(
-        TEST_PROVIDER_NAME,
-        {"database": mock_sqlite_connection["db_path"]}
-    )
+    conn = connect(TEST_PROVIDER_NAME, {"database": mock_sqlite_connection["db_path"]})
 
     # Create a larger test table
     conn.query("""
@@ -392,52 +375,52 @@ def test_sqlite_performance_and_large_data(mock_sqlite_connection):
 
     # Test query performance
     result = conn.query("SELECT COUNT(*) as count FROM large_data")
-    assert result[0]['count'] == 100
+    assert result[0]["count"] == 100
 
     # Test filtered query
     result = conn.query("SELECT * FROM large_data WHERE number >= 50")
     assert len(result) == 50
 
+
 def test_sqlite_integration_with_catalog_functions(mock_sqlite_connection):
     """Test SQLite integration with catalog functions."""
     # Set required environment variable for catalog functions
     import os
+
     os.environ["DBUTILS_JDBC_PROVIDER"] = TEST_PROVIDER_NAME
 
     # Mock the catalog functions to use our test database
-    with patch('dbutils.jdbc_provider.connect') as mock_connect:
+    with patch("dbutils.jdbc_provider.connect") as mock_connect:
         # Setup mock connection
         mock_conn = MagicMock()
         mock_conn.query.return_value = [
-            {'TABNAME': 'users', 'TABLE_SCHEMA': 'main'},
-            {'TABNAME': 'orders', 'TABLE_SCHEMA': 'main'},
-            {'TABNAME': 'products', 'TABLE_SCHEMA': 'main'}
+            {"TABNAME": "users", "TABLE_SCHEMA": "main"},
+            {"TABNAME": "orders", "TABLE_SCHEMA": "main"},
+            {"TABNAME": "products", "TABLE_SCHEMA": "main"},
         ]
         mock_connect.return_value = mock_conn
 
         # Test catalog functions
-        tables = catalog.get_tables(schema='main', mock=False)
+        tables = catalog.get_tables(schema="main", mock=False)
         assert len(tables) == 3
-        assert any(t['TABNAME'] == 'users' for t in tables)
+        assert any(t["TABNAME"] == "users" for t in tables)
 
         # Test columns
-        columns = catalog.get_columns(schema='main', table='users', mock=False)
+        columns = catalog.get_columns(schema="main", table="users", mock=False)
         assert len(columns) > 0
-        assert any(c['COLNAME'] == 'id' for c in columns)
+        assert any(c["COLNAME"] == "id" for c in columns)
+
 
 def test_sqlite_connection_teardown(mock_sqlite_connection):
     """Test proper connection teardown and cleanup."""
     from dbutils.jdbc_provider import connect
 
     # Create and close connection
-    conn = connect(
-        TEST_PROVIDER_NAME,
-        {"database": mock_sqlite_connection["db_path"]}
-    )
+    conn = connect(TEST_PROVIDER_NAME, {"database": mock_sqlite_connection["db_path"]})
 
     # Verify connection is active
     result = conn.query("SELECT 1 as test")
-    assert result[0]['test'] == 1
+    assert result[0]["test"] == 1
 
     # Close connection
     conn.close()
@@ -447,6 +430,7 @@ def test_sqlite_connection_teardown(mock_sqlite_connection):
 
     # Verify database file still exists (should be cleaned up by fixture)
     assert os.path.exists(mock_sqlite_connection["db_path"])
+
 
 # Additional helper functions for more comprehensive testing
 def create_complex_sqlite_schema(conn):
@@ -480,14 +464,12 @@ def create_complex_sqlite_schema(conn):
         END
     """)
 
+
 def test_sqlite_advanced_features(mock_sqlite_connection):
     """Test advanced SQLite features."""
     from dbutils.jdbc_provider import connect
 
-    conn = connect(
-        TEST_PROVIDER_NAME,
-        {"database": mock_sqlite_connection["db_path"]}
-    )
+    conn = connect(TEST_PROVIDER_NAME, {"database": mock_sqlite_connection["db_path"]})
 
     # Create complex schema
     create_complex_sqlite_schema(conn)
@@ -503,7 +485,8 @@ def test_sqlite_advanced_features(mock_sqlite_connection):
     # Test trigger functionality
     conn.query("INSERT INTO complex_table (name, price, quantity) VALUES ('Test Product', 19.99, 10)")
     result = conn.query("SELECT updated_at FROM complex_table WHERE name = 'Test Product'")
-    assert result[0]['updated_at'] is not None
+    assert result[0]["updated_at"] is not None
+
 
 def test_sqlite_connection_string_variations():
     """Test different SQLite connection string variations."""
@@ -513,7 +496,7 @@ def test_sqlite_connection_string_variations():
         jar_path=os.path.abspath("jars/sqlite-jdbc.jar"),
         url_template="jdbc:sqlite:{database}",
         default_user=None,
-        default_password=None
+        default_password=None,
     )
 
     # Test different URL parameter combinations
@@ -521,7 +504,7 @@ def test_sqlite_connection_string_variations():
         {"database": "test.db"},
         {"database": "/absolute/path/to/test.db"},
         {"database": "file:test.db?mode=ro"},
-        {"database": ":memory:"}
+        {"database": ":memory:"},
     ]
 
     for params in test_cases:
@@ -529,14 +512,12 @@ def test_sqlite_connection_string_variations():
         assert url.startswith("jdbc:sqlite:")
         assert "test.db" in url or "memory" in url or "/absolute/path" in url
 
+
 def test_sqlite_error_recovery(mock_sqlite_connection):
     """Test SQLite error recovery and connection resilience."""
     from dbutils.jdbc_provider import connect
 
-    conn = connect(
-        TEST_PROVIDER_NAME,
-        {"database": mock_sqlite_connection["db_path"]}
-    )
+    conn = connect(TEST_PROVIDER_NAME, {"database": mock_sqlite_connection["db_path"]})
 
     # Test connection recovery after error
     try:
@@ -546,7 +527,7 @@ def test_sqlite_error_recovery(mock_sqlite_connection):
 
     # Verify connection is still usable
     result = conn.query("SELECT 1 as test")
-    assert result[0]['test'] == 1
+    assert result[0]["test"] == 1
 
     # Close connection
     conn.close()

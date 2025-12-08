@@ -1,7 +1,7 @@
 """Unit tests for dbutils.db_browser module.
 
 Tests for core functionality including:
-- Data structures (TableInfo, ColumnInfo) 
+- Data structures (TableInfo, ColumnInfo)
 - Search index and trie functionality
 - Database schema loading functions
 - Fuzzy matching algorithms
@@ -45,22 +45,14 @@ class TestTableInfo:
 
     def test_table_info_creation(self):
         """Test basic TableInfo creation and initialization."""
-        table = TableInfo(
-            schema="TEST",
-            name="USERS",
-            remarks="User information table"
-        )
+        table = TableInfo(schema="TEST", name="USERS", remarks="User information table")
         assert table.schema == "TEST"
         assert table.name == "USERS"
         assert table.remarks == "User information table"
 
     def test_string_interning(self):
         """Test that strings are properly interned."""
-        table = TableInfo(
-            schema="TEST",
-            name="USERS",
-            remarks="User information table"
-        )
+        table = TableInfo(schema="TEST", name="USERS", remarks="User information table")
 
         # Check that interned strings are the same object
         assert table.schema is intern_string("TEST")
@@ -81,7 +73,7 @@ class TestColumnInfo:
             length=10,
             scale=0,
             nulls="N",
-            remarks="User identifier"
+            remarks="User identifier",
         )
         assert column.schema == "TEST"
         assert column.table == "USERS"
@@ -102,7 +94,7 @@ class TestColumnInfo:
             length=10,
             scale=0,
             nulls="N",
-            remarks="User identifier"
+            remarks="User identifier",
         )
 
         # Check that interned strings are the same object
@@ -170,7 +162,7 @@ class TestSearchIndex:
                 length=10,
                 scale=0,
                 nulls="N",
-                remarks="User identifier"
+                remarks="User identifier",
             ),
             ColumnInfo(
                 schema="TEST",
@@ -180,7 +172,7 @@ class TestSearchIndex:
                 length=100,
                 scale=0,
                 nulls="N",
-                remarks="User name"
+                remarks="User name",
             ),
         ]
 
@@ -211,7 +203,7 @@ class TestSearchIndex:
                 length=10,
                 scale=0,
                 nulls="N",
-                remarks="User identifier"
+                remarks="User identifier",
             ),
         ]
 
@@ -225,16 +217,16 @@ class TestSearchIndex:
 class TestQueryRunner:
     """Test the query_runner function."""
 
-    @patch.dict('os.environ', {'DBUTILS_JDBC_PROVIDER': 'test_provider'})
+    @patch.dict("os.environ", {"DBUTILS_JDBC_PROVIDER": "test_provider"})
     def test_query_runner_with_jdbc(self):
         """Test query runner with JDBC provider."""
         # Create all mocks inline to ensure proper chain
         # The JDBCConnection object has a query method, not execute on cursor
         mock_conn = MagicMock()
-        expected_result = [{'col1': 'value1', 'col2': 'value2'}]
+        expected_result = [{"col1": "value1", "col2": "value2"}]
         mock_conn.query.return_value = expected_result
 
-        with patch('dbutils.jdbc_provider.connect', return_value=mock_conn) as mock_connect:
+        with patch("dbutils.jdbc_provider.connect", return_value=mock_conn) as mock_connect:
             result = query_runner("SELECT * FROM TEST")
 
             # Verify connection was established and query executed
@@ -244,7 +236,7 @@ class TestQueryRunner:
 
     def test_query_runner_no_provider(self):
         """Test query runner without provider raises error."""
-        with patch.dict('os.environ', {}, clear=True):
+        with patch.dict("os.environ", {}, clear=True):
             with pytest.raises(RuntimeError, match="DBUTILS_JDBC_PROVIDER"):
                 query_runner("SELECT * FROM TEST")
 
@@ -386,6 +378,7 @@ class TestGetAvailableSchemas:
     def test_get_available_schemas_mock(self):
         """Test getting available schemas with mock."""
         from dbutils.db_browser import SchemaInfo
+
         schemas = get_available_schemas(use_mock=True)
 
         assert len(schemas) > 0
@@ -428,18 +421,11 @@ class TestCacheFunctions:
         tables = [TableInfo(schema="TEST", name="USERS", remarks="Users")]
         columns = [
             ColumnInfo(
-                schema="TEST",
-                table="USERS",
-                name="ID",
-                typename="INTEGER",
-                length=10,
-                scale=0,
-                nulls="N",
-                remarks="ID"
+                schema="TEST", table="USERS", name="ID", typename="INTEGER", length=10, scale=0, nulls="N", remarks="ID"
             )
         ]
 
-        with patch('dbutils.db_browser.CACHE_FILE', cache_file):
+        with patch("dbutils.db_browser.CACHE_FILE", cache_file):
             # Save to cache
             save_to_cache("TEST", tables, columns)
 

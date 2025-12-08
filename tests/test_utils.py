@@ -23,16 +23,16 @@ from dbutils.utils import (
 class TestQueryRunner:
     """Test the query_runner function."""
 
-    @patch.dict('os.environ', {'DBUTILS_JDBC_PROVIDER': 'test_provider'})
+    @patch.dict("os.environ", {"DBUTILS_JDBC_PROVIDER": "test_provider"})
     def test_query_runner_with_jdbc(self):
         """Test query runner with JDBC provider."""
         # Create all mocks inline to ensure proper chain
         # The JDBCConnection object has a query method, not execute on cursor
         mock_conn = MagicMock()
-        expected_result = [{'col1': 'value1', 'col2': 'value2'}]
+        expected_result = [{"col1": "value1", "col2": "value2"}]
         mock_conn.query.return_value = expected_result
 
-        with patch('dbutils.jdbc_provider.connect', return_value=mock_conn) as mock_connect:
+        with patch("dbutils.jdbc_provider.connect", return_value=mock_conn) as mock_connect:
             result = query_runner("SELECT * FROM TEST")
 
             # Verify connection was established and query executed
@@ -42,7 +42,7 @@ class TestQueryRunner:
 
     def test_query_runner_no_provider(self):
         """Test query runner without provider raises error."""
-        with patch.dict('os.environ', {}, clear=True):
+        with patch.dict("os.environ", {}, clear=True):
             with pytest.raises(RuntimeError, match="DBUTILS_JDBC_PROVIDER"):
                 query_runner("SELECT * FROM TEST")
 
@@ -146,17 +146,17 @@ class TestFuzzyMatch:
 
     def test_fuzzy_match_short_query(self):
         """Test short query handling."""
-        assert fuzzy_match("hello", "h") is True   # Single char is substring of "hello"
+        assert fuzzy_match("hello", "h") is True  # Single char is substring of "hello"
         assert fuzzy_match("hello", "he") is True  # Two chars are substring of "hello"
-        assert fuzzy_match("hello", "hel") is True # Three chars are substring of "hello"
+        assert fuzzy_match("hello", "hel") is True  # Three chars are substring of "hello"
         assert fuzzy_match("hello", "xyz") is False  # Non-matching substring should not match
 
     def test_fuzzy_match_edit_distance(self):
         """Test edit distance based matching."""
         # These should match based on edit distance
         assert fuzzy_match("customer", "custer") is True  # edit distance 1
-        assert fuzzy_match("hello", "helo") is True     # edit distance 1
-        assert fuzzy_match("hello", "cello") is True    # edit distance 1
+        assert fuzzy_match("hello", "helo") is True  # edit distance 1
+        assert fuzzy_match("hello", "cello") is True  # edit distance 1
 
 
 class TestInternalFuzzyFunctions:
@@ -178,12 +178,12 @@ class TestInternalFuzzyFunctions:
 
         # Test edit distance matching for similar words
         assert _word_prefix_or_edit("customer", "custer") is True  # edit distance 1
-        assert _word_prefix_or_edit("hello", "xyz") is False   # no match
+        assert _word_prefix_or_edit("hello", "xyz") is False  # no match
 
     def test_sequential_char_match(self):
         """Test sequential character matching."""
-        assert _sequential_char_match("hello", "hlo") is True   # h, l, o appear in sequence
-        assert _sequential_char_match("hello", "hel") is True   # h, e, l appear in sequence
+        assert _sequential_char_match("hello", "hlo") is True  # h, l, o appear in sequence
+        assert _sequential_char_match("hello", "hel") is True  # h, e, l appear in sequence
         assert _sequential_char_match("hello", "ole") is False  # o, l, e not in sequence
         assert _sequential_char_match("programming", "pram") is True  # p, r, a, m in sequence
         assert _sequential_char_match("hello", "xyz") is False  # x, y, z not in sequence

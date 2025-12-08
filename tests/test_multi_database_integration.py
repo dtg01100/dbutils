@@ -33,7 +33,7 @@ TEST_DB_NAMES = {
     "h2": "test_multi_h2_mem",
     "derby": "test_multi_derby_db",
     "hsqldb": "test_multi_hsqldb_mem",
-    "duckdb": "test_multi_duckdb.db"
+    "duckdb": "test_multi_duckdb.db",
 }
 
 # Database-specific configurations
@@ -43,39 +43,40 @@ DATABASE_SPECIFIC_CONFIGS = {
         "url_template": "jdbc:sqlite:{database}",
         "user": None,
         "password": None,
-        "features": ["json_functions", "date_functions", "file_based"]
+        "features": ["json_functions", "date_functions", "file_based"],
     },
     "h2": {
         "driver_class": "org.h2.Driver",
         "url_template": "jdbc:h2:mem:{database};DB_CLOSE_DELAY=-1",
         "user": "sa",
         "password": "",
-        "features": ["in_memory", "sequence_support", "array_support"]
+        "features": ["in_memory", "sequence_support", "array_support"],
     },
     "derby": {
         "driver_class": "org.apache.derby.jdbc.EmbeddedDriver",
         "url_template": "jdbc:derby:{database};create=true",
         "user": None,
         "password": None,
-        "features": ["embedded", "identity_columns", "schema_support"]
+        "features": ["embedded", "identity_columns", "schema_support"],
     },
     "hsqldb": {
         "driver_class": "org.hsqldb.jdbc.JDBCDriver",
         "url_template": "jdbc:hsqldb:mem:{database}",
         "user": "SA",
         "password": "",
-        "features": ["in_memory", "text_tables", "cached_tables"]
+        "features": ["in_memory", "text_tables", "cached_tables"],
     },
     "duckdb": {
         "driver_class": "org.duckdb.DuckDBDriver",
         "url_template": "jdbc:duckdb:{database}",
         "user": None,
         "password": None,
-        "features": ["parquet_support", "json_functions", "analytical_functions"]
-    }
+        "features": ["parquet_support", "json_functions", "analytical_functions"],
+    },
 }
 
-@pytest.fixture(scope='module', autouse=True)
+
+@pytest.fixture(scope="module", autouse=True)
 def check_multi_database_dependencies():
     """Check if multi-database dependencies are available before running tests."""
     # Check for JDBC dependencies
@@ -93,7 +94,7 @@ def check_multi_database_dependencies():
             "H2 (Test Integration)",
             "Apache Derby (Test Integration)",
             "HSQLDB (Test Integration)",
-            "DuckDB (Test Integration)"
+            "DuckDB (Test Integration)",
         ]
 
         missing_providers = [p for p in required_providers if p not in registry.providers]
@@ -101,6 +102,7 @@ def check_multi_database_dependencies():
             pytest.skip(f"Missing database providers: {', '.join(missing_providers)}")
     except Exception as e:
         pytest.skip(f"Cannot access provider registry: {e}")
+
 
 @pytest.fixture(params=["sqlite", "h2", "derby", "hsqldb", "duckdb"])
 def database_provider(request):
@@ -114,7 +116,7 @@ def database_provider(request):
         "h2": "H2 (Test Integration)",
         "derby": "Apache Derby (Test Integration)",
         "hsqldb": "HSQLDB (Test Integration)",
-        "duckdb": "DuckDB (Test Integration)"
+        "duckdb": "DuckDB (Test Integration)",
     }
     return JDBCProvider(
         name=provider_mapping.get(db_type, f"{db_type.capitalize()} (Test Integration)"),
@@ -124,6 +126,7 @@ def database_provider(request):
         default_user=config["user"],
         default_password=config["password"],
     )
+
 
 @pytest.fixture
 def test_database_connection(database_provider):
@@ -143,7 +146,7 @@ def test_database_connection(database_provider):
         provider=database_provider,
         url_params={"database": db_path},
         user=database_provider.default_user,
-        password=database_provider.default_password
+        password=database_provider.default_password,
     )
     conn.connect()
 
@@ -162,6 +165,7 @@ def test_database_connection(database_provider):
                 os.remove(db_path)
         except Exception:
             pass
+
 
 def _create_test_database(db_type: str, db_path: str):
     """Create a test database file for file-based databases."""
@@ -201,13 +205,16 @@ def _create_test_database(db_type: str, db_path: str):
         # Insert test data
         cursor.execute("INSERT INTO users (name, email) VALUES (?, ?)", ("John Doe", "john@example.com"))
         cursor.execute("INSERT INTO users (name, email) VALUES (?, ?)", ("Jane Smith", "jane@example.com"))
-        cursor.execute("INSERT INTO products (name, price, category) VALUES (?, ?, ?)", ("Laptop", 999.99, "Electronics"))
+        cursor.execute(
+            "INSERT INTO products (name, price, category) VALUES (?, ?, ?)", ("Laptop", 999.99, "Electronics")
+        )
         cursor.execute("INSERT INTO products (name, price, category) VALUES (?, ?, ?)", ("Book", 19.99, "Books"))
         cursor.execute("INSERT INTO orders (user_id, total_amount) VALUES (?, ?)", (1, 1019.98))
         cursor.execute("INSERT INTO orders (user_id, total_amount) VALUES (?, ?)", (2, 19.99))
 
         conn.commit()
         conn.close()
+
 
 def _create_test_schema(conn: JDBCConnection):
     """Create test schema in the database connection."""
@@ -243,7 +250,7 @@ def _create_test_schema(conn: JDBCConnection):
     # Insert test data if tables are empty
     try:
         result = conn.query("SELECT COUNT(*) as count FROM users")
-        if result[0]['count'] == 0:
+        if result[0]["count"] == 0:
             conn.query("INSERT INTO users (name, email) VALUES ('John Doe', 'john@example.com')")
             conn.query("INSERT INTO users (name, email) VALUES ('Jane Smith', 'jane@example.com')")
             conn.query("INSERT INTO products (name, price, category) VALUES ('Laptop', 999.99, 'Electronics')")
@@ -254,17 +261,19 @@ def _create_test_schema(conn: JDBCConnection):
         # Some databases may not support the exact same syntax
         pass
 
+
 def test_multi_database_connection_setup(database_provider, test_database_connection):
     """Test database connection setup for all supported databases."""
     conn = test_database_connection
 
     # Verify connection is active
     result = conn.query("SELECT 1 as test")
-    assert result[0]['test'] == 1
+    assert result[0]["test"] == 1
 
     # Verify provider configuration
     assert conn.provider.name == database_provider.name
     assert conn.provider.driver_class == database_provider.driver_class
+
 
 def test_multi_database_crud_operations(test_database_connection):
     """Test CRUD operations across all database types."""
@@ -279,13 +288,14 @@ def test_multi_database_crud_operations(test_database_connection):
     update_result = conn.query("UPDATE users SET name = 'John Updated' WHERE id = 1")
     # Verify update worked
     verify_result = conn.query("SELECT name FROM users WHERE id = 1")
-    assert verify_result[0]['name'] == 'John Updated'
+    assert verify_result[0]["name"] == "John Updated"
 
     # Test DELETE operation
     delete_result = conn.query("DELETE FROM users WHERE id = 2")
     # Verify delete worked
     verify_result = conn.query("SELECT COUNT(*) as count FROM users")
-    assert verify_result[0]['count'] >= 1  # At least one user should remain
+    assert verify_result[0]["count"] >= 1  # At least one user should remain
+
 
 def test_multi_database_schema_operations(test_database_connection):
     """Test schema operations across different database types."""
@@ -293,12 +303,12 @@ def test_multi_database_schema_operations(test_database_connection):
 
     # Test table inspection
     tables_result = conn.query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'PUBLIC'")
-    table_names = [row['table_name'] for row in tables_result]
+    table_names = [row["table_name"] for row in tables_result]
 
     # Verify core tables exist
-    assert 'users' in table_names
-    assert 'orders' in table_names
-    assert 'products' in table_names
+    assert "users" in table_names
+    assert "orders" in table_names
+    assert "products" in table_names
 
     # Test table creation
     conn.query("""
@@ -310,15 +320,16 @@ def test_multi_database_schema_operations(test_database_connection):
 
     # Verify new table exists
     tables_result = conn.query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'PUBLIC'")
-    table_names = [row['table_name'] for row in tables_result]
-    assert 'test_new_table' in table_names
+    table_names = [row["table_name"] for row in tables_result]
+    assert "test_new_table" in table_names
+
 
 def test_multi_database_transaction_management(test_database_connection):
     """Test transaction management across database types."""
     conn = test_database_connection
 
     # Test transaction isolation
-    initial_count = conn.query("SELECT COUNT(*) as count FROM users")[0]['count']
+    initial_count = conn.query("SELECT COUNT(*) as count FROM users")[0]["count"]
 
     # Start transaction
     conn.query("BEGIN TRANSACTION")
@@ -327,15 +338,16 @@ def test_multi_database_transaction_management(test_database_connection):
     conn.query("INSERT INTO users (name, email) VALUES ('Temp User', 'temp@example.com')")
 
     # Verify change is visible in current connection
-    temp_count = conn.query("SELECT COUNT(*) as count FROM users")[0]['count']
+    temp_count = conn.query("SELECT COUNT(*) as count FROM users")[0]["count"]
     assert temp_count == initial_count + 1
 
     # Rollback transaction
     conn.query("ROLLBACK")
 
     # Verify change was rolled back
-    final_count = conn.query("SELECT COUNT(*) as count FROM users")[0]['count']
+    final_count = conn.query("SELECT COUNT(*) as count FROM users")[0]["count"]
     assert final_count == initial_count
+
 
 def test_multi_database_error_handling(test_database_connection):
     """Test error handling across different database types."""
@@ -350,6 +362,7 @@ def test_multi_database_error_handling(test_database_connection):
     with pytest.raises(Exception) as exc_info:
         conn.query("SELECT * FROM non_existent_table")
     assert str(exc_info.value)  # Verify some error message exists
+
 
 def test_multi_database_performance(test_database_connection):
     """Test performance characteristics across database types."""
@@ -370,11 +383,12 @@ def test_multi_database_performance(test_database_connection):
 
     # Test query performance
     result = conn.query("SELECT COUNT(*) as count FROM large_data")
-    assert result[0]['count'] == 100
+    assert result[0]["count"] == 100
 
     # Test filtered query
     result = conn.query("SELECT * FROM large_data WHERE number >= 50")
     assert len(result) == 50
+
 
 @pytest.mark.parametrize("db_type", ["sqlite", "h2", "derby", "hsqldb", "duckdb"])
 def test_database_specific_features(db_type, test_database_connection):
@@ -385,36 +399,36 @@ def test_database_specific_features(db_type, test_database_connection):
     if db_type == "sqlite":
         # Test SQLite-specific functions
         result = conn.query("SELECT sqlite_version() as version")
-        assert 'version' in result[0]
+        assert "version" in result[0]
 
         # Test SQLite date functions
         result = conn.query("SELECT date('now') as current_date")
-        assert 'current_date' in result[0]
+        assert "current_date" in result[0]
 
     elif db_type == "h2":
         # Test H2-specific functions
         result = conn.query("SELECT CURRENT_TIMESTAMP as current_timestamp")
-        assert 'current_timestamp' in result[0]
+        assert "current_timestamp" in result[0]
 
         # Test H2 sequence support
         conn.query("CREATE SEQUENCE IF NOT EXISTS test_sequence START WITH 1")
         result = conn.query("SELECT NEXT VALUE FOR test_sequence as seq_value FROM (VALUES(0))")
-        assert 'seq_value' in result[0]
+        assert "seq_value" in result[0]
 
     elif db_type == "derby":
         # Test Derby-specific functions
         result = conn.query("SELECT CURRENT_TIMESTAMP as current_timestamp FROM SYSIBM.SYSDUMMY1")
-        assert 'current_timestamp' in result[0]
+        assert "current_timestamp" in result[0]
 
     elif db_type == "hsqldb":
         # Test HSQLDB-specific functions
         result = conn.query("SELECT CURRENT_TIMESTAMP as current_timestamp FROM (VALUES(0))")
-        assert 'current_timestamp' in result[0]
+        assert "current_timestamp" in result[0]
 
     elif db_type == "duckdb":
         # Test DuckDB-specific functions
         result = conn.query("SELECT CURRENT_TIMESTAMP as current_timestamp")
-        assert 'current_timestamp' in result[0]
+        assert "current_timestamp" in result[0]
 
         # Test DuckDB JSON functions if available
         try:
@@ -423,6 +437,7 @@ def test_database_specific_features(db_type, test_database_connection):
         except Exception:
             # JSON functions may not be available in all versions
             pass
+
 
 def test_cross_database_comparison():
     """Test cross-database functionality comparison."""
@@ -439,14 +454,14 @@ def test_cross_database_comparison():
                 "h2": "H2 (Test Integration)",
                 "derby": "Apache Derby (Test Integration)",
                 "hsqldb": "HSQLDB (Test Integration)",
-                "duckdb": "DuckDB (Test Integration)"
+                "duckdb": "DuckDB (Test Integration)",
             }
             provider_name = provider_mapping.get(db_type, f"{db_type.capitalize()} (Test Integration)")
             conn = connect(provider_name, {"database": db_name})
 
             # Test basic query
             result = conn.query("SELECT COUNT(*) as count FROM users")
-            results[db_type] = result[0]['count'] if result else 0
+            results[db_type] = result[0]["count"] if result else 0
 
             conn.close()
         except Exception as e:
@@ -456,6 +471,7 @@ def test_cross_database_comparison():
     # Verify we got results from multiple databases
     successful_dbs = [db_type for db_type, count in results.items() if count is not None]
     assert len(successful_dbs) >= 2, f"At least 2 databases should work, got: {successful_dbs}"
+
 
 def test_multi_database_connection_pooling():
     """Test connection pooling and resource management across databases."""
@@ -469,7 +485,7 @@ def test_multi_database_connection_pooling():
         "h2": "H2 (Test Integration)",
         "derby": "Apache Derby (Test Integration)",
         "hsqldb": "HSQLDB (Test Integration)",
-        "duckdb": "DuckDB (Test Integration)"
+        "duckdb": "DuckDB (Test Integration)",
     }
     provider_name = provider_mapping.get(db_type, f"{db_type.capitalize()} (Test Integration)")
     db_name = TEST_DB_NAMES[db_type]
@@ -482,7 +498,7 @@ def test_multi_database_connection_pooling():
     result1 = conn1.query("SELECT COUNT(*) as count FROM users")
     result2 = conn2.query("SELECT COUNT(*) as count FROM users")
 
-    assert result1[0]['count'] == result2[0]['count']
+    assert result1[0]["count"] == result2[0]["count"]
 
     # Test connection closing
     conn1.close()
@@ -492,32 +508,35 @@ def test_multi_database_connection_pooling():
     assert conn1._conn is None
     assert conn2._conn is None
 
+
 def test_multi_database_catalog_integration():
     """Test catalog integration with multiple database types."""
     # Set required environment variable for catalog functions
     import os
+
     os.environ["DBUTILS_JDBC_PROVIDER"] = "SQLite (Test Integration)"
 
     # Mock the catalog functions to use our test database
-    with patch('dbutils.jdbc_provider.connect') as mock_connect:
+    with patch("dbutils.jdbc_provider.connect") as mock_connect:
         # Setup mock connection
         mock_conn = MagicMock()
         mock_conn.query.return_value = [
-            {'TABNAME': 'users', 'TABLE_SCHEMA': 'main'},
-            {'TABNAME': 'orders', 'TABLE_SCHEMA': 'main'},
-            {'TABNAME': 'products', 'TABLE_SCHEMA': 'main'}
+            {"TABNAME": "users", "TABLE_SCHEMA": "main"},
+            {"TABNAME": "orders", "TABLE_SCHEMA": "main"},
+            {"TABNAME": "products", "TABLE_SCHEMA": "main"},
         ]
         mock_connect.return_value = mock_conn
 
         # Test catalog functions
-        tables = catalog.get_tables(schema='main', mock=False)
+        tables = catalog.get_tables(schema="main", mock=False)
         assert len(tables) == 3
-        assert any(t['TABNAME'] == 'users' for t in tables)
+        assert any(t["TABNAME"] == "users" for t in tables)
 
         # Test columns
-        columns = catalog.get_columns(schema='main', table='users', mock=False)
+        columns = catalog.get_columns(schema="main", table="users", mock=False)
         assert len(columns) > 0
-        assert any(c['COLNAME'] == 'id' for c in columns)
+        assert any(c["COLNAME"] == "id" for c in columns)
+
 
 def test_multi_database_error_recovery():
     """Test error recovery and connection resilience across databases."""
@@ -531,7 +550,7 @@ def test_multi_database_error_recovery():
         "h2": "H2 (Test Integration)",
         "derby": "Apache Derby (Test Integration)",
         "hsqldb": "HSQLDB (Test Integration)",
-        "duckdb": "DuckDB (Test Integration)"
+        "duckdb": "DuckDB (Test Integration)",
     }
     provider_name = provider_mapping.get(db_type, f"{db_type.capitalize()} (Test Integration)")
     db_name = TEST_DB_NAMES[db_type]
@@ -546,10 +565,11 @@ def test_multi_database_error_recovery():
 
     # Verify connection is still usable
     result = conn.query("SELECT 1 as test")
-    assert result[0]['test'] == 1
+    assert result[0]["test"] == 1
 
     # Close connection
     conn.close()
+
 
 def test_multi_database_metadata_operations():
     """Test database metadata operations across different database types."""
@@ -567,16 +587,17 @@ def test_multi_database_metadata_operations():
         # Test metadata queries
         result = conn.query("PRAGMA table_info(users)")
         assert len(result) > 0
-        assert any(row['name'] == 'id' for row in result)
+        assert any(row["name"] == "id" for row in result)
 
         # Test schema information
         result = conn.query("SELECT name FROM sqlite_master WHERE type='table'")
-        table_names = [row['name'] for row in result]
-        assert 'users' in table_names
+        table_names = [row["name"] for row in result]
+        assert "users" in table_names
 
     finally:
         if conn:
             conn.close()
+
 
 def test_multi_database_data_types():
     """Test data type handling across different database types."""
@@ -592,7 +613,7 @@ def test_multi_database_data_types():
             "h2": "H2 (Test Integration)",
             "derby": "Apache Derby (Test Integration)",
             "hsqldb": "HSQLDB (Test Integration)",
-            "duckdb": "DuckDB (Test Integration)"
+            "duckdb": "DuckDB (Test Integration)",
         }
         provider_name = provider_mapping.get(db_type, f"{db_type.capitalize()} (Test Integration)")
         db_name = TEST_DB_NAMES[db_type]
@@ -611,18 +632,21 @@ def test_multi_database_data_types():
         """)
 
         # Insert test data
-        conn.query("INSERT INTO data_types_test (text_data, numeric_data, boolean_data, timestamp_data) VALUES (?, ?, ?, ?)",
-                   ("test text", 3.14, True, "2023-01-01 12:00:00"))
+        conn.query(
+            "INSERT INTO data_types_test (text_data, numeric_data, boolean_data, timestamp_data) VALUES (?, ?, ?, ?)",
+            ("test text", 3.14, True, "2023-01-01 12:00:00"),
+        )
 
         # Verify data
         result = conn.query("SELECT * FROM data_types_test")
         assert len(result) == 1
-        assert result[0]['text_data'] == "test text"
-        assert abs(result[0]['numeric_data'] - 3.14) < 0.01
+        assert result[0]["text_data"] == "test text"
+        assert abs(result[0]["numeric_data"] - 3.14) < 0.01
 
     finally:
         if conn:
             conn.close()
+
 
 def test_multi_database_connection_teardown():
     """Test proper connection teardown and cleanup across databases."""
@@ -636,7 +660,7 @@ def test_multi_database_connection_teardown():
         "h2": "H2 (Test Integration)",
         "derby": "Apache Derby (Test Integration)",
         "hsqldb": "HSQLDB (Test Integration)",
-        "duckdb": "DuckDB (Test Integration)"
+        "duckdb": "DuckDB (Test Integration)",
     }
     provider_name = provider_mapping.get(db_type, f"{db_type.capitalize()} (Test Integration)")
     db_name = TEST_DB_NAMES[db_type]
@@ -646,13 +670,14 @@ def test_multi_database_connection_teardown():
 
     # Verify connection is active
     result = conn.query("SELECT 1 as test")
-    assert result[0]['test'] == 1
+    assert result[0]["test"] == 1
 
     # Close connection
     conn.close()
 
     # Verify connection is closed
     assert conn._conn is None
+
 
 # Additional helper functions for more comprehensive testing
 def create_complex_schema(conn: JDBCConnection, db_type: str):
@@ -692,6 +717,7 @@ def create_complex_schema(conn: JDBCConnection, db_type: str):
 
         conn.query("CREATE INDEX idx_complex_name ON complex_table(name)")
 
+
 def test_multi_database_advanced_features():
     """Test advanced features across different database types."""
     from dbutils.jdbc_provider import connect
@@ -704,7 +730,7 @@ def test_multi_database_advanced_features():
         "h2": "H2 (Test Integration)",
         "derby": "Apache Derby (Test Integration)",
         "hsqldb": "HSQLDB (Test Integration)",
-        "duckdb": "DuckDB (Test Integration)"
+        "duckdb": "DuckDB (Test Integration)",
     }
     provider_name = provider_mapping.get(db_type, f"{db_type.capitalize()} (Test Integration)")
     db_name = TEST_DB_NAMES[db_type]
@@ -724,6 +750,7 @@ def test_multi_database_advanced_features():
     assert str(exc_info.value)  # Verify some error message exists
 
     conn.close()
+
 
 def test_multi_database_connection_string_variations():
     """Test different connection string variations for each database type."""

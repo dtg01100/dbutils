@@ -4,6 +4,7 @@ This test demonstrates overriding the protected BusyOverlay._create_painter
 factory to return a MagicMock painter so paintEvent runs using a Mock rather
 than a real QPainter (which requires a paint engine).
 """
+
 from unittest.mock import MagicMock
 
 from PySide6.QtGui import QPainter
@@ -19,7 +20,7 @@ def test_busyoverlay_painter_injection(qapp):
     MagicMock that mirrors QPainter's API. This avoids painting on a real
     paint engine while asserting that the painting code path executed.
     """
-    overlay = BusyOverlay(None, message='Hello Test')
+    overlay = BusyOverlay(None, message="Hello Test")
 
     # Inject a MagicMock painter instance via the factory method
     mock_painter = MagicMock(spec=QPainter)
@@ -38,4 +39,4 @@ def test_busyoverlay_painter_injection(qapp):
     assert mock_painter.drawText.called, "drawText not called"
 
     # Last painter reference should be cleared after paintEvent
-    assert not hasattr(overlay, '_last_painter')
+    assert not hasattr(overlay, "_last_painter")
