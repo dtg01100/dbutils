@@ -12,7 +12,7 @@ import os
 import sys
 
 # Add src to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from dbutils.gui.downloader_prefs import get_maven_repos
 from dbutils.gui.jdbc_auto_downloader import get_driver_directory, get_jdbc_driver_url
@@ -33,7 +33,7 @@ def verify_infrastructure():
     config_files = ["setup_multi_database_test.py", "tests/database_test_utils.py", "conftest.py"]
     for file_path in config_files:
         if os.path.exists(file_path):
-            with open(file_path, 'r') as f:
+            with open(file_path, "r") as f:
                 content = f.read()
             if "AUTO_DOWNLOAD_" in content:
                 print(f"   ✅ {file_path}")
@@ -75,9 +75,9 @@ def verify_infrastructure():
     print("\n6. Configuration Files:")
     config_file = os.path.join(config.config_dir, "providers.json")
     if os.path.exists(config_file):
-        with open(config_file, 'r') as f:
+        with open(config_file, "r") as f:
             providers = json.load(f)
-        auto_providers = [p for p in providers if p.get('auto_download', False)]
+        auto_providers = [p for p in providers if p.get("auto_download", False)]
         print(f"   ✅ Providers file: {len(providers)} total, {len(auto_providers)} auto-download")
     else:
         print("   ❌ Providers file not found")
@@ -128,6 +128,7 @@ def verify_infrastructure():
 
     return True
 
+
 def demonstrate_functionality():
     """Demonstrate the key functionality of the auto-download system."""
     print("\n🎬 FUNCTIONALITY DEMONSTRATION")
@@ -162,6 +163,7 @@ def demonstrate_functionality():
 
     return True
 
+
 def main():
     """Run the verification."""
     try:
@@ -179,6 +181,7 @@ def main():
     except Exception as e:
         print(f"\n💥 VERIFICATION ERROR: {e}")
         return False
+
 
 if __name__ == "__main__":
     success = main()

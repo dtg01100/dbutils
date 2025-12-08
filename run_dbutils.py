@@ -7,8 +7,9 @@ import os
 import sys
 
 # Add the src directory to Python path
-src_path = os.path.join(os.path.dirname(__file__), 'src')
+src_path = os.path.join(os.path.dirname(__file__), "src")
 sys.path.insert(0, src_path)
+
 
 def main():
     """Launch the dbutils Qt application."""
@@ -26,8 +27,10 @@ def main():
     except Exception as e:
         print(f"Error running application: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

@@ -29,9 +29,10 @@ def test_fuzzy_match_performance():
     fuzzy_time = time.time() - start_time
 
     print(f"Completed {iterations * len(test_cases)} fuzzy matches in {fuzzy_time:.3f}s")
-    print(f"Average time per fuzzy match: {fuzzy_time/(iterations * len(test_cases)):.6f}s")
+    print(f"Average time per fuzzy match: {fuzzy_time / (iterations * len(test_cases)):.6f}s")
 
     return fuzzy_time
+
 
 def test_edit_distance_performance():
     """Test edit distance performance directly."""
@@ -53,9 +54,10 @@ def test_edit_distance_performance():
     edit_time = time.time() - start_time
 
     print(f"Completed {iterations * len(test_pairs)} edit distance calculations in {edit_time:.3f}s")
-    print(f"Average time per edit distance: {edit_time/(iterations * len(test_pairs)):.6f}s")
+    print(f"Average time per edit distance: {edit_time / (iterations * len(test_pairs)):.6f}s")
 
     return edit_time
+
 
 def test_edge_cases():
     """Test edge cases to ensure correctness."""
@@ -76,6 +78,7 @@ def test_edge_cases():
         result = fuzzy_match(text, query)
         print(f"fuzzy_match('{text}', '{query}') = {result}")
 
+
 def main():
     print("Running comprehensive performance tests...\n")
 
@@ -87,6 +90,7 @@ def main():
     print(f"- Edit distance: {edit_time:.3f}s for {(5000 * 5)} calculations")
     print(f"- Fuzzy matching: {fuzzy_time:.3f}s for {(1000 * 7)} operations")
     print("Optimizations completed successfully!")
+
 
 if __name__ == "__main__":
     main()

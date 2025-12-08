@@ -17,11 +17,12 @@ def profile_data_loading():
     # Load mock data multiple times to get better profiling data
     for i in range(10):
         tables, columns = get_all_tables_and_columns(use_mock=True)
-        print(f"Iteration {i+1}: Loaded {len(tables)} tables, {len(columns)} columns")
+        print(f"Iteration {i + 1}: Loaded {len(tables)} tables, {len(columns)} columns")
 
     elapsed = time.time() - start_time
     print(f"Data loading completed in {elapsed:.3f}s")
     return tables, columns
+
 
 def profile_search_indexing(tables, columns):
     """Profile search index building and searching."""
@@ -43,9 +44,9 @@ def profile_search_indexing(tables, columns):
         column_results = search_index.search_columns(term)
         search_elapsed = time.time() - start_search
         print(
-            f"Search for '{term}': {len(table_results)} tables, "
-            f"{len(column_results)} columns in {search_elapsed:.3f}s"
+            f"Search for '{term}': {len(table_results)} tables, {len(column_results)} columns in {search_elapsed:.3f}s"
         )
+
 
 def profile_string_operations():
     """Profile string operations that might be bottlenecks."""
@@ -81,6 +82,7 @@ def profile_string_operations():
     elapsed = time.time() - start_time
     print(f"String operations completed in {elapsed:.3f}s")
 
+
 def profile_relationship_inference(tables, columns):
     """Profile relationship inference logic."""
     print("\nProfiling relationship inference...")
@@ -89,12 +91,7 @@ def profile_relationship_inference(tables, columns):
     # Mock primary keys for relationship inference
     pks = []
     for table in tables:
-        pks.append({
-            "TABSCHEMA": table.schema,
-            "TABNAME": table.name,
-            "COLNAME": "ID",
-            "TYPENAME": "INTEGER"
-        })
+        pks.append({"TABSCHEMA": table.schema, "TABNAME": table.name, "COLNAME": "ID", "TYPENAME": "INTEGER"})
 
     # Run inference multiple times
     for _ in range(100):
@@ -102,6 +99,7 @@ def profile_relationship_inference(tables, columns):
 
     elapsed = time.time() - start_time
     print(f"Relationship inference completed in {elapsed:.3f}s with {len(relationships)} relationships")
+
 
 def main():
     """Run all profiling tests."""
@@ -123,6 +121,7 @@ def main():
         print(f"Relationship inference profiling skipped: {e}")
 
     print("\nProfiling completed!")
+
 
 if __name__ == "__main__":
     main()

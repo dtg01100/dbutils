@@ -18,7 +18,7 @@ def run_tests():
 
     # Set up environment
     env = os.environ.copy()
-    env['PYTHONPATH'] = f"{project_root}/src:{env.get('PYTHONPATH', '')}"
+    env["PYTHONPATH"] = f"{project_root}/src:{env.get('PYTHONPATH', '')}"
 
     print("Running dbutils test suite...")
     print(f"Project root: {project_root}")
@@ -26,7 +26,9 @@ def run_tests():
 
     # Run only the tests we created, not the existing broken ones
     cmd = [
-        sys.executable, "-m", "pytest",
+        sys.executable,
+        "-m",
+        "pytest",
         "tests/test_db_browser_functionality.py",
         "tests/test_jdbc_provider.py",
         "tests/test_utils.py",
@@ -36,7 +38,8 @@ def run_tests():
         "tests/test_jdbc_driver_downloader.py",
         "-v",
         "--tb=short",
-        "-k", "not test_async_data_loading"  # Skip the async test that requires pytest-asyncio
+        "-k",
+        "not test_async_data_loading",  # Skip the async test that requires pytest-asyncio
     ]
 
     print(f"Running command: {' '.join(cmd)}")
@@ -48,9 +51,11 @@ def run_tests():
     # Run the async tests separately with a try-catch to handle the missing plugin
     print("\nRunning async test separately...")
     cmd_async = [
-        sys.executable, "-m", "pytest",
+        sys.executable,
+        "-m",
+        "pytest",
         "tests/test_integration_workflows.py::TestAsyncIntegration::test_async_vs_sync_consistency",
-        "-v"
+        "-v",
     ]
 
     result_async = subprocess.run(cmd_async, env=env, cwd=project_root)
@@ -58,6 +63,7 @@ def run_tests():
 
     # Return the overall exit code (0 if all tests pass, non-zero otherwise)
     return result.returncode
+
 
 if __name__ == "__main__":
     exit_code = run_tests()

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 import sys
 
-sys.path.insert(0, 'src')
+sys.path.insert(0, "src")
 
 try:
     from dbutils.gui.provider_config_dialog import ProviderConfigDialog
+
     print("Successfully imported ProviderConfigDialog")
 
     # Try to instantiate
@@ -19,13 +20,14 @@ try:
 
     # Count occurrences of method definitions
     import re
-    method_defs = re.findall(r'^\s*def\s+(\w+)', class_source, re.MULTILINE)
+
+    method_defs = re.findall(r"^\s*def\s+(\w+)", class_source, re.MULTILINE)
     print(f"Methods found in class definition: {len(method_defs)}")
-    download_methods = [m for m in method_defs if 'download' in m.lower()]
+    download_methods = [m for m in method_defs if "download" in m.lower()]
     print(f"Download-related methods: {download_methods}")
 
     # Check if our function is there
-    if 'download_jdbc_driver' in method_defs:
+    if "download_jdbc_driver" in method_defs:
         print("✅ download_jdbc_driver method is in the class!")
     else:
         print("❌ download_jdbc_driver method is NOT in the class")
@@ -42,4 +44,5 @@ except SyntaxError as e:
 except Exception as e:
     print(f"Error: {e}")
     import traceback
+
     traceback.print_exc()

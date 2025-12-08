@@ -31,6 +31,7 @@ def test_edit_distance_optimizations():
     print("✅ Edit distance optimizations verified!")
     return True
 
+
 def test_fuzzy_match_optimizations():
     """Test that fuzzy match optimizations work correctly."""
     print("\nTesting fuzzy_match optimizations...")
@@ -44,7 +45,7 @@ def test_fuzzy_match_optimizations():
         ("TEST", "", True),
         ("TEST", "DIFFERENT", False),
         ("CUSTOMER_ORDER", "CUST", True),
-        ("TABLE_NAME", "TBL", True),   # Sequential match: T-A-B-L-E -> T-B-L matches "TBL"
+        ("TABLE_NAME", "TBL", True),  # Sequential match: T-A-B-L-E -> T-B-L matches "TBL"
     ]
 
     all_passed = True
@@ -62,6 +63,7 @@ def test_fuzzy_match_optimizations():
 
     return all_passed
 
+
 def test_search_index_performance():
     """Test SearchIndex performance with a larger dataset."""
     print("\nTesting SearchIndex optimizations...")
@@ -70,9 +72,7 @@ def test_search_index_performance():
     tables = []
     for i in range(100):
         table = TableInfo(
-            schema="TEST",
-            name=f"TABLE_{i:03d}",
-            remarks=f"Test table number {i} for performance testing"
+            schema="TEST", name=f"TABLE_{i:03d}", remarks=f"Test table number {i} for performance testing"
         )
         tables.append(table)
 
@@ -88,7 +88,7 @@ def test_search_index_performance():
             length=100,
             scale=0,
             nulls="Y",
-            remarks=f"Column {i} for testing"
+            remarks=f"Column {i} for testing",
         )
         columns.append(col)
 
@@ -111,6 +111,7 @@ def test_search_index_performance():
     print("✅ Search index optimizations verified!")
     return True
 
+
 def main():
     print("Running final verification tests for all optimizations...\n")
 
@@ -124,6 +125,7 @@ def main():
     else:
         print("\n❌ Some optimizations failed verification!")
         return False
+
 
 if __name__ == "__main__":
     main()

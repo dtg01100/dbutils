@@ -6,7 +6,7 @@ import time
 from dbutils.utils import edit_distance
 
 print("🔍 FINAL VERIFICATION OF OPTIMIZATIONS")
-print("="*50)
+print("=" * 50)
 
 # 1. Verify the optimized edit_distance function
 print("\n1. Testing edit_distance optimization...")
@@ -18,14 +18,14 @@ for _ in range(5000):
     edit_distance("ORDER_TRANSACTION", "ORD_TRNS")
 elapsed = time.time() - start
 
-print(f"   15,000 operations completed in {elapsed:.3f}s ({elapsed/15000*1000:.3f}ms per op)")
+print(f"   15,000 operations completed in {elapsed:.3f}s ({elapsed / 15000 * 1000:.3f}ms per op)")
 print("   ✅ Edit distance function optimized")
 
 # 2. Verify Qt app structure
 print("\n2. Verifying Qt-only application structure...")
 qt_app_path = "/workspaces/dbutils/src/dbutils/gui/qt_app.py"
 if os.path.exists(qt_app_path):
-    with open(qt_app_path, 'r') as f:
+    with open(qt_app_path, "r") as f:
         content = f.read()
     if "QApplication" in content and ("textual" not in content.lower() or "Textual" not in content):
         print("   ✅ Qt application present and Textual removed")
@@ -56,7 +56,7 @@ si = SearchIndex()
 print("   ✅ Enhanced SearchIndex available")
 
 # Check if optimizations are in place
-with open("/workspaces/dbutils/src/dbutils/utils.py", 'r') as f:
+with open("/workspaces/dbutils/src/dbutils/utils.py", "r") as f:
     utils_content = f.read()
 
 if "single array instead of two arrays" in utils_content or "cache-friendly" in utils_content:
@@ -66,7 +66,7 @@ else:
 
 # 5. Check project configuration
 print("\n5. Verifying project configuration...")
-with open("/workspaces/dbutils/pyproject.toml", 'r') as f:
+with open("/workspaces/dbutils/pyproject.toml", "r") as f:
     toml_content = f.read()
 
 if "textual" not in toml_content:
@@ -83,7 +83,7 @@ else:
 print("\n6. Verifying enhanced provider configuration...")
 provider_config_path = "/workspaces/dbutils/src/dbutils/gui/provider_config_dialog.py"
 if os.path.exists(provider_config_path):
-    with open(provider_config_path, 'r') as f:
+    with open(provider_config_path, "r") as f:
         pc_content = f.read()
     if "download_jdbc_driver" in pc_content and "jdbc_auto_downloader" in pc_content:
         print("   ✅ JDBC download functionality integrated")
@@ -103,7 +103,7 @@ if perf_files:
 else:
     print("   ⚠️  No additional performance files found (may be fine)")
 
-print("\n" + "="*50)
+print("\n" + "=" * 50)
 print("✅ ALL MAJOR OPTIMIZATIONS VERIFIED")
 print("   • Edit distance algorithm optimized")
 print("   • Qt-only application architecture")
@@ -112,4 +112,4 @@ print("   • Improved data loading performance")
 print("   • Streaming search with debouncing")
 print("   • Proper threading and UI responsiveness")
 print("   • Enhanced provider configuration")
-print("="*50)
+print("=" * 50)

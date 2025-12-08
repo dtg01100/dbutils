@@ -33,7 +33,7 @@ DATABASE_CONFIGS = {
         "default_user": None,
         "default_password": None,
         "test_db": "test_integration.db",
-        "description": "SQLite embedded database"
+        "description": "SQLite embedded database",
     },
     "h2": {
         "name": "H2 (Test Integration)",
@@ -43,7 +43,7 @@ DATABASE_CONFIGS = {
         "default_user": "sa",
         "default_password": "",
         "test_db": "test_h2_mem",
-        "description": "H2 in-memory database"
+        "description": "H2 in-memory database",
     },
     "derby": {
         "name": "Apache Derby (Test Integration)",
@@ -53,7 +53,7 @@ DATABASE_CONFIGS = {
         "default_user": None,
         "default_password": None,
         "test_db": "test_derby_db",
-        "description": "Apache Derby embedded database"
+        "description": "Apache Derby embedded database",
     },
     "hsqldb": {
         "name": "HSQLDB (Test Integration)",
@@ -63,7 +63,7 @@ DATABASE_CONFIGS = {
         "default_user": "SA",
         "default_password": "",
         "test_db": "test_hsqldb_mem",
-        "description": "HSQLDB in-memory database"
+        "description": "HSQLDB in-memory database",
     },
     "duckdb": {
         "name": "DuckDB (Test Integration)",
@@ -73,37 +73,38 @@ DATABASE_CONFIGS = {
         "default_user": None,
         "default_password": None,
         "test_db": "test_duckdb.db",
-        "description": "DuckDB embedded database"
-    }
+        "description": "DuckDB embedded database",
+    },
 }
+
 
 def check_dependencies() -> Dict[str, bool]:
     """Check if required dependencies are installed."""
-    dependencies = {
-        'jaydebeapi': False,
-        'jpype1': False,
-        'PySide6': False
-    }
+    dependencies = {"jaydebeapi": False, "jpype1": False, "PySide6": False}
 
     try:
         import jaydebeapi
-        dependencies['jaydebeapi'] = True
+
+        dependencies["jaydebeapi"] = True
     except ImportError:
         logger.warning("jaydebeapi not found - JDBC functionality will be limited")
 
     try:
         import jpype
-        dependencies['jpype1'] = True
+
+        dependencies["jpype1"] = True
     except ImportError:
         logger.warning("jpype not found - JDBC functionality will be limited")
 
     try:
         import PySide6
-        dependencies['PySide6'] = True
+
+        dependencies["PySide6"] = True
     except ImportError:
         logger.warning("PySide6 not found - GUI functionality will be limited")
 
     return dependencies
+
 
 def install_missing_dependencies() -> bool:
     """Install missing dependencies using pip with graceful fallback."""
@@ -118,10 +119,9 @@ def install_missing_dependencies() -> bool:
 
         logger.info(f"Installing missing dependencies: {', '.join(missing)}")
         try:
-            result = subprocess.run([
-                sys.executable, "-m", "pip", "install",
-                *missing
-            ], capture_output=True, text=True, timeout=300)
+            result = subprocess.run(
+                [sys.executable, "-m", "pip", "install", *missing], capture_output=True, text=True, timeout=300
+            )
 
             if result.returncode == 0:
                 logger.info("Dependencies installed successfully.")
@@ -140,6 +140,7 @@ def install_missing_dependencies() -> bool:
     except Exception as e:
         logger.error(f"Unexpected error in dependency installation: {e}")
         return False
+
 
 def create_test_database(db_type: str, db_path: str) -> bool:
     """Create a test database with sample schema for the specified database type."""
@@ -186,7 +187,9 @@ def create_test_database(db_type: str, db_path: str) -> bool:
         # Insert test data
         cursor.execute("INSERT INTO users (name, email) VALUES (?, ?)", ("John Doe", "john@example.com"))
         cursor.execute("INSERT INTO users (name, email) VALUES (?, ?)", ("Jane Smith", "jane@example.com"))
-        cursor.execute("INSERT INTO products (name, price, category) VALUES (?, ?, ?)", ("Laptop", 999.99, "Electronics"))
+        cursor.execute(
+            "INSERT INTO products (name, price, category) VALUES (?, ?, ?)", ("Laptop", 999.99, "Electronics")
+        )
         cursor.execute("INSERT INTO products (name, price, category) VALUES (?, ?, ?)", ("Book", 19.99, "Books"))
         cursor.execute("INSERT INTO orders (user_id, total_amount) VALUES (?, ?)", (1, 1019.98))
         cursor.execute("INSERT INTO orders (user_id, total_amount) VALUES (?, ?)", (2, 19.99))
@@ -198,6 +201,7 @@ def create_test_database(db_type: str, db_path: str) -> bool:
     except Exception as e:
         logger.error(f"Failed to create test database for {db_type}: {e}")
         return False
+
 
 def setup_database_providers(config_dir: Optional[str] = None) -> Dict[str, Any]:
     """Setup JDBC providers for all supported databases."""
@@ -213,7 +217,7 @@ def setup_database_providers(config_dir: Optional[str] = None) -> Dict[str, Any]
     providers = []
     if os.path.exists(providers_file):
         try:
-            with open(providers_file, 'r') as f:
+            with open(providers_file, "r") as f:
                 providers = json.load(f)
         except Exception as e:
             logger.warning(f"Error loading existing providers: {e}")
@@ -231,16 +235,17 @@ def setup_database_providers(config_dir: Optional[str] = None) -> Dict[str, Any]
             "url_template": config["url_template"],
             "default_user": config["default_user"],
             "default_password": config["default_password"],
-            "extra_properties": {}
+            "extra_properties": {},
         }
         providers.append(provider_config)
 
     # Save providers
-    with open(providers_file, 'w') as f:
+    with open(providers_file, "w") as f:
         json.dump(providers, f, indent=2)
 
     logger.info(f"Setup database providers: {providers_file}")
     return {db_type: config for db_type, config in DATABASE_CONFIGS.items()}
+
 
 def setup_test_environment() -> Dict[str, str]:
     """Set up environment variables for multi-database testing."""
@@ -264,10 +269,12 @@ def setup_test_environment() -> Dict[str, str]:
 
     return env_vars
 
+
 def test_database_connections() -> Dict[str, bool]:
     """Test JDBC connections for all configured databases with graceful fallback."""
     import sys
-    sys.path.insert(0, 'src')
+
+    sys.path.insert(0, "src")
 
     results = {}
 
@@ -301,10 +308,7 @@ def test_database_connections() -> Dict[str, bool]:
                     db_path = config["test_db"]
 
                 # Test connection
-                conn = connect(
-                    config["name"],
-                    {"database": db_path}
-                )
+                conn = connect(config["name"], {"database": db_path})
 
                 # Test a simple query
                 result = conn.query("SELECT 1 as test")
@@ -331,16 +335,19 @@ def test_database_connections() -> Dict[str, bool]:
 
     return results
 
+
 def cleanup_test_environment():
     """Clean up test environment."""
     test_config_dir = os.path.join(os.path.dirname(__file__), "test_config")
     try:
         if os.path.exists(test_config_dir):
             import shutil
+
             shutil.rmtree(test_config_dir)
             logger.info(f"Cleaned up test config directory: {test_config_dir}")
     except Exception as e:
         logger.error(f"Error cleaning up test environment: {e}")
+
 
 def create_database_specific_test_data(db_type: str) -> Dict[str, Any]:
     """Create database-specific test data and configurations."""
@@ -348,48 +355,42 @@ def create_database_specific_test_data(db_type: str) -> Dict[str, Any]:
         "schema": {
             "users": ["id", "name", "email", "created_at"],
             "orders": ["id", "user_id", "total_amount", "order_date"],
-            "products": ["id", "name", "price", "category"]
+            "products": ["id", "name", "price", "category"],
         },
         "sample_queries": {
             "count_users": "SELECT COUNT(*) as count FROM users",
             "find_user": "SELECT * FROM users WHERE name LIKE ?",
-            "join_query": "SELECT u.name, o.total_amount FROM users u JOIN orders o ON u.id = o.user_id"
+            "join_query": "SELECT u.name, o.total_amount FROM users u JOIN orders o ON u.id = o.user_id",
         },
-        "expected_results": {
-            "user_count": 2,
-            "product_count": 2,
-            "order_count": 2
-        }
+        "expected_results": {"user_count": 2, "product_count": 2, "order_count": 2},
     }
 
     # Database-specific configurations
     if db_type == "sqlite":
         test_data["specific_features"] = {
             "json_support": "SELECT json_object('key', 'value') as json_result",
-            "date_functions": "SELECT date('now') as current_date"
+            "date_functions": "SELECT date('now') as current_date",
         }
     elif db_type == "h2":
         test_data["specific_features"] = {
             "sequence_support": "NEXT VALUE FOR SEQUENCE_NAME",
-            "array_support": "ARRAY[1, 2, 3]"
+            "array_support": "ARRAY[1, 2, 3]",
         }
     elif db_type == "derby":
         test_data["specific_features"] = {
             "identity_columns": "GENERATED ALWAYS AS IDENTITY",
-            "schema_support": "CREATE SCHEMA TEST_SCHEMA"
+            "schema_support": "CREATE SCHEMA TEST_SCHEMA",
         }
     elif db_type == "hsqldb":
-        test_data["specific_features"] = {
-            "text_tables": "CREATE TEXT TABLE",
-            "cached_tables": "CREATE CACHED TABLE"
-        }
+        test_data["specific_features"] = {"text_tables": "CREATE TEXT TABLE", "cached_tables": "CREATE CACHED TABLE"}
     elif db_type == "duckdb":
         test_data["specific_features"] = {
             "parquet_support": "SELECT * FROM read_parquet('file.parquet')",
-            "json_functions": "SELECT * FROM json_each('{\"a\":1}')"
+            "json_functions": "SELECT * FROM json_each('{\"a\":1}')",
         }
 
     return test_data
+
 
 def main():
     """Main setup function for multi-database testing."""
@@ -440,11 +441,12 @@ def main():
         print("  pytest tests/test_multi_database_integration.py")
         print("\nEnvironment variables are already set for this session.")
         print("If running in a new terminal, set these variables:")
-        print("  export DBUTILS_TEST_MODE=\"1\"")
-        print(f"  export DBUTILS_CONFIG_DIR=\"{os.path.abspath('test_config')}\"")
+        print('  export DBUTILS_TEST_MODE="1"')
+        print(f'  export DBUTILS_CONFIG_DIR="{os.path.abspath("test_config")}"')
     else:
         print("\nSetup failed. Please check the error messages above.")
         cleanup_test_environment()
+
 
 if __name__ == "__main__":
     main()

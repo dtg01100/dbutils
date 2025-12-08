@@ -7,7 +7,7 @@ import os
 import sys
 
 # Add src to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 # Import the test module directly
 from tests.test_enhanced_auto_downloads import *
@@ -25,7 +25,7 @@ def run_tests():
         TestRepositoryManagement,
         TestIntegration,
         TestEdgeCases,
-        TestPerformance
+        TestPerformance,
     ]
 
     results = {}
@@ -36,7 +36,7 @@ def run_tests():
             test_instance = test_class()
 
             # Get all test methods
-            test_methods = [method for method in dir(test_instance) if method.startswith('test_')]
+            test_methods = [method for method in dir(test_instance) if method.startswith("test_")]
 
             for method_name in test_methods:
                 method = getattr(test_instance, method_name)
@@ -47,16 +47,20 @@ def run_tests():
                     class MockMonkeypatch:
                         def setattr(self, target, value):
                             pass
+
                         def setenv(self, key, value):
                             os.environ[key] = value
+
                         def __getattr__(self, name):
                             return lambda *args, **kwargs: None
 
                     class MockTmpPath:
                         def __init__(self):
                             self.path = tempfile.mkdtemp()
+
                         def __truediv__(self, other):
                             return os.path.join(self.path, other)
+
                         def mkdir(self, *args, **kwargs):
                             os.makedirs(self.path, exist_ok=True)
 
@@ -66,17 +70,13 @@ def run_tests():
                             return "", ""
 
                     # Run the test method
-                    if method_name == 'test_license_validation_before_downloads':
+                    if method_name == "test_license_validation_before_downloads":
                         # Skip this one as it's not implemented
                         print("SKIPPED (not implemented)")
                         continue
 
                     # Call the method with mocks
-                    method(
-                        monkeypatch=MockMonkeypatch(),
-                        tmp_path=MockTmpPath(),
-                        capsys=MockCapsys()
-                    )
+                    method(monkeypatch=MockMonkeypatch(), tmp_path=MockTmpPath(), capsys=MockCapsys())
                     print("PASSED")
 
                 except Exception as e:
@@ -99,6 +99,7 @@ def run_tests():
         print("All tests passed!")
 
     return len(results) == 0
+
 
 if __name__ == "__main__":
     success = run_tests()

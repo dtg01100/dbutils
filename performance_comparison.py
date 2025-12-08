@@ -24,6 +24,7 @@ def edit_distance_original(s1: str, s2: str) -> int:
 
     return previous_row[-1]
 
+
 def edit_distance_optimized(s1: str, s2: str) -> int:
     """Optimized edit distance calculation."""
     if len(s1) < len(s2):
@@ -60,6 +61,7 @@ def edit_distance_optimized(s1: str, s2: str) -> int:
 
     return previous_row[-1]
 
+
 def test_performance_comparison():
     """Compare performance between original and optimized versions."""
     test_pairs = [
@@ -93,6 +95,7 @@ def test_performance_comparison():
 
     return original_time, optimized_time
 
+
 def test_correctness():
     """Verify that both functions produce the same results."""
     test_cases = [
@@ -122,6 +125,7 @@ def test_correctness():
 
     print("All correctness tests passed!")
     return True
+
 
 if __name__ == "__main__":
     correctness_ok = test_correctness()

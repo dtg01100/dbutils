@@ -2,6 +2,7 @@
 
 This file contains pytest configuration and fixtures used across all test modules.
 """
+
 import logging
 import os
 import sys
@@ -23,9 +24,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 @pytest.fixture
 def mock_jdbc_connection():
     """Mock JDBC connection for testing without actual database."""
-    with patch("dbutils.jdbc_provider.jaydebeapi") as mock_jaydebeapi, \
-         patch("dbutils.jdbc_provider.jpype") as mock_jpype:
-
+    with (
+        patch("dbutils.jdbc_provider.jaydebeapi") as mock_jaydebeapi,
+        patch("dbutils.jdbc_provider.jpype") as mock_jpype,
+    ):
         # Setup mock JPype
         mock_jpype.isJVMStarted.return_value = False
         mock_jpype.getDefaultJVMPath.return_value = "/fake/java/path"
@@ -37,12 +39,7 @@ def mock_jdbc_connection():
 
         mock_jaydebeapi.connect.return_value = mock_conn
 
-        yield {
-            "jaydebeapi": mock_jaydebeapi,
-            "jpype": mock_jpype,
-            "connection": mock_conn,
-            "cursor": mock_cursor
-        }
+        yield {"jaydebeapi": mock_jaydebeapi, "jpype": mock_jpype, "connection": mock_conn, "cursor": mock_cursor}
 
 
 @pytest.fixture
@@ -123,7 +120,7 @@ def temp_config_dir(tmp_path):
         yield config_dir
 
 
-@pytest.fixture(scope='session', autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def enable_test_mode_env():
     """Set an environment variable so the GUI code can avoid blocking modal dialogs
     and other real UI interactions during automated tests.
@@ -131,7 +128,8 @@ def enable_test_mode_env():
     with patch.dict(os.environ, {"DBUTILS_TEST_MODE": "1"}):
         yield
 
-@pytest.fixture(scope='session', autouse=True)
+
+@pytest.fixture(scope="session", autouse=True)
 def setup_sqlite_provider_for_tests():
     """Setup SQLite JDBC provider configuration for testing."""
     from dbutils.jdbc_provider import JDBCProvider, ProviderRegistry
@@ -141,10 +139,9 @@ def setup_sqlite_provider_for_tests():
     os.makedirs(test_config_dir, exist_ok=True)
 
     # Set environment variable to use test config directory
-    with patch.dict(os.environ, {
-        "DBUTILS_CONFIG_DIR": test_config_dir,
-        "DBUTILS_JDBC_PROVIDER": "SQLite (Test Integration)"
-    }):
+    with patch.dict(
+        os.environ, {"DBUTILS_CONFIG_DIR": test_config_dir, "DBUTILS_JDBC_PROVIDER": "SQLite (Test Integration)"}
+    ):
         # Create a test provider registry
         registry = ProviderRegistry()
 
@@ -165,12 +162,14 @@ def setup_sqlite_provider_for_tests():
         # Cleanup: remove test config directory
         try:
             import shutil
+
             if os.path.exists(test_config_dir):
                 shutil.rmtree(test_config_dir)
         except Exception:
             pass
 
-@pytest.fixture(scope='session', autouse=True)
+
+@pytest.fixture(scope="session", autouse=True)
 def setup_multi_database_providers_for_tests():
     """Setup all multi-database JDBC providers for testing."""
     from dbutils.jdbc_provider import JDBCProvider, ProviderRegistry
@@ -180,9 +179,12 @@ def setup_multi_database_providers_for_tests():
     os.makedirs(test_config_dir, exist_ok=True)
 
     # Set environment variable to use test config directory
-    with patch.dict(os.environ, {
-        "DBUTILS_CONFIG_DIR": test_config_dir,
-    }):
+    with patch.dict(
+        os.environ,
+        {
+            "DBUTILS_CONFIG_DIR": test_config_dir,
+        },
+    ):
         # Create a test provider registry
         registry = ProviderRegistry()
 
@@ -227,7 +229,7 @@ def setup_multi_database_providers_for_tests():
                 url_template="jdbc:duckdb:{database}",
                 default_user=None,
                 default_password=None,
-            )
+            ),
         ]
 
         for provider in required_providers:
@@ -239,6 +241,7 @@ def setup_multi_database_providers_for_tests():
         # Cleanup: remove test config directory
         try:
             import shutil
+
             if os.path.exists(test_config_dir):
                 shutil.rmtree(test_config_dir)
         except Exception:
@@ -255,19 +258,19 @@ def disable_qt_message_boxes(monkeypatch):
 
         from PySide6.QtWidgets import QFileDialog, QInputDialog, QMessageBox
 
-        monkeypatch.setattr(QMessageBox, 'question', lambda *args, **kwargs: QMessageBox.StandardButton.Yes)
-        monkeypatch.setattr(QMessageBox, 'information', lambda *args, **kwargs: None)
-        monkeypatch.setattr(QMessageBox, 'warning', lambda *args, **kwargs: None)
-        monkeypatch.setattr(QMessageBox, 'critical', lambda *args, **kwargs: None)
+        monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes)
+        monkeypatch.setattr(QMessageBox, "information", lambda *args, **kwargs: None)
+        monkeypatch.setattr(QMessageBox, "warning", lambda *args, **kwargs: None)
+        monkeypatch.setattr(QMessageBox, "critical", lambda *args, **kwargs: None)
 
         # Avoid any blocking native file-open dialogs during tests
-        monkeypatch.setattr(QFileDialog, 'getOpenFileName', lambda *args, **kwargs: ('', ''))
+        monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: ("", ""))
         # Avoid selection dialogs and return no selection by default
-        monkeypatch.setattr(QInputDialog, 'getItem', lambda *args, **kwargs: ('', False))
+        monkeypatch.setattr(QInputDialog, "getItem", lambda *args, **kwargs: ("", False))
         # Prevent tests from launching a real web browser; return False to indicate not opened
-        monkeypatch.setattr(webbrowser, 'open', lambda *args, **kwargs: False)
-        monkeypatch.setattr(webbrowser, 'open_new', lambda *args, **kwargs: False)
-        monkeypatch.setattr(webbrowser, 'open_new_tab', lambda *args, **kwargs: False)
+        monkeypatch.setattr(webbrowser, "open", lambda *args, **kwargs: False)
+        monkeypatch.setattr(webbrowser, "open_new", lambda *args, **kwargs: False)
+        monkeypatch.setattr(webbrowser, "open_new_tab", lambda *args, **kwargs: False)
     except Exception:
         # If Qt bindings aren't available (some test environments), ignore gracefully
         pass
@@ -278,6 +281,7 @@ def disable_qt_message_boxes(monkeypatch):
 def sample_sql_query():
     """Provide sample SQL query for testing."""
     return "SELECT * FROM TEST.TABLE WHERE ID = 123"
+
 
 @pytest.fixture(autouse=True)
 def check_dependencies_and_skip(request):
@@ -301,6 +305,7 @@ def check_dependencies_and_skip(request):
         if "test_provider_config_dialog" in str(request.node.nodeid) or "test_widgets" in str(request.node.nodeid):
             pytest.skip("PySide6 not available for GUI tests")
 
+
 def pytest_collection_modifyitems(items):
     """Modify test collection to skip GUI tests if PySide6 is not available."""
     try:
@@ -309,6 +314,7 @@ def pytest_collection_modifyitems(items):
         for item in items:
             if "gui" in str(item.nodeid).lower() or "widget" in str(item.nodeid).lower():
                 item.add_marker(pytest.mark.skip(reason="PySide6 not available"))
+
 
 def pytest_runtest_setup(item):
     """Setup for each test - check dependencies and environment."""
@@ -324,13 +330,15 @@ def pytest_runtest_setup(item):
         # Check if SQLite provider is configured
         try:
             from dbutils.jdbc_provider import get_registry
+
             registry = get_registry()
             if "SQLite (Test Integration)" not in registry.providers:
                 pytest.skip("SQLite (Test Integration) provider not configured")
         except Exception as e:
             pytest.skip(f"Cannot access provider registry: {e}")
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def multi_database_providers():
     """Provide configurations for all supported test databases."""
     from dbutils.jdbc_provider import JDBCProvider
@@ -376,10 +384,11 @@ def multi_database_providers():
             url_template="jdbc:duckdb:{database}",
             default_user=None,
             default_password=None,
-        )
+        ),
     }
 
     return databases
+
 
 @pytest.fixture
 def database_test_data():
@@ -388,41 +397,32 @@ def database_test_data():
         "schema": {
             "users": ["id", "name", "email", "created_at"],
             "orders": ["id", "user_id", "total_amount", "order_date"],
-            "products": ["id", "name", "price", "category"]
+            "products": ["id", "name", "price", "category"],
         },
         "sample_queries": {
             "count_users": "SELECT COUNT(*) as count FROM users",
             "find_user": "SELECT * FROM users WHERE name LIKE ?",
-            "join_query": "SELECT u.name, o.total_amount FROM users u JOIN orders o ON u.id = o.user_id"
+            "join_query": "SELECT u.name, o.total_amount FROM users u JOIN orders o ON u.id = o.user_id",
         },
-        "expected_results": {
-            "user_count": 2,
-            "product_count": 2,
-            "order_count": 2
-        },
+        "expected_results": {"user_count": 2, "product_count": 2, "order_count": 2},
         "database_specific": {
             "sqlite": {
                 "json_support": "SELECT json_object('key', 'value') as json_result",
-                "date_functions": "SELECT date('now') as current_date"
+                "date_functions": "SELECT date('now') as current_date",
             },
-            "h2": {
-                "sequence_support": "NEXT VALUE FOR SEQUENCE_NAME",
-                "array_support": "ARRAY[1, 2, 3]"
-            },
+            "h2": {"sequence_support": "NEXT VALUE FOR SEQUENCE_NAME", "array_support": "ARRAY[1, 2, 3]"},
             "derby": {
                 "identity_columns": "GENERATED ALWAYS AS IDENTITY",
-                "schema_support": "CREATE SCHEMA TEST_SCHEMA"
+                "schema_support": "CREATE SCHEMA TEST_SCHEMA",
             },
-            "hsqldb": {
-                "text_tables": "CREATE TEXT TABLE",
-                "cached_tables": "CREATE CACHED TABLE"
-            },
+            "hsqldb": {"text_tables": "CREATE TEXT TABLE", "cached_tables": "CREATE CACHED TABLE"},
             "duckdb": {
                 "parquet_support": "SELECT * FROM read_parquet('file.parquet')",
-                "json_functions": "SELECT * FROM json_each('{\"a\":1}')"
-            }
-        }
+                "json_functions": "SELECT * FROM json_each('{\"a\":1}')",
+            },
+        },
     }
+
 
 @pytest.fixture
 def create_test_database(request):
@@ -471,8 +471,7 @@ def create_test_database(request):
         cursor.execute("INSERT INTO users (name, email) VALUES (?, ?)", ("John Doe", "john@example.com"))
         cursor.execute("INSERT INTO users (name, email) VALUES (?, ?)", ("Jane Smith", "jane@example.com"))
         cursor.execute(
-            "INSERT INTO products (name, price, category) VALUES (?, ?, ?)",
-            ("Laptop", 999.99, "Electronics")
+            "INSERT INTO products (name, price, category) VALUES (?, ?, ?)", ("Laptop", 999.99, "Electronics")
         )
         cursor.execute("INSERT INTO products (name, price, category) VALUES (?, ?, ?)", ("Book", 19.99, "Books"))
         cursor.execute("INSERT INTO orders (user_id, total_amount) VALUES (?, ?)", (1, 1019.98))
@@ -490,6 +489,7 @@ def create_test_database(request):
     else:
         # For other databases, yield the database name for JDBC connection
         yield db_name
+
 
 @pytest.fixture
 def database_connection(request, multi_database_providers):
@@ -512,7 +512,7 @@ def database_connection(request, multi_database_providers):
         provider=provider,
         url_params={"database": db_path},
         user=provider.default_user,
-        password=provider.default_password
+        password=provider.default_password,
     )
     conn.connect()
 
@@ -533,13 +533,14 @@ def database_connection(request, multi_database_providers):
         # Check if required database providers are configured
         try:
             from dbutils.jdbc_provider import get_registry
+
             registry = get_registry()
             required_providers = [
                 "SQLite (Test Integration)",
                 "H2 (Test Integration)",
                 "Apache Derby (Test Integration)",
                 "HSQLDB (Test Integration)",
-                "DuckDB (Test Integration)"
+                "DuckDB (Test Integration)",
             ]
 
             missing_providers = [p for p in required_providers if p not in registry.providers]
@@ -548,27 +549,33 @@ def database_connection(request, multi_database_providers):
         except Exception as e:
             pytest.skip(f"Cannot access provider registry: {e}")
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def test_config():
     """Provide centralized test configuration management."""
     from tests.test_config_manager import get_test_config_manager
+
     config_manager = get_test_config_manager()
     return config_manager
+
 
 @pytest.fixture
 def test_db_config(test_config):
     """Provide database configuration from centralized test config."""
     return test_config.get_database_config
 
+
 @pytest.fixture
 def test_network_config(test_config):
     """Provide network configuration from centralized test config."""
     return test_config.get_network_setting
 
+
 @pytest.fixture
 def test_path_config(test_config):
     """Provide path configuration from centralized test config."""
     return test_config.get_path_setting
+
 
 @pytest.fixture
 def test_behavior_config(test_config):

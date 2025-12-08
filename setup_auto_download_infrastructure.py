@@ -12,7 +12,7 @@ import os
 import sys
 
 # Add src to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from dbutils.gui.jdbc_auto_downloader import get_driver_directory
 from dbutils.gui.jdbc_provider_config import ensure_all_drivers_available, setup_auto_download_infrastructure
@@ -31,7 +31,7 @@ def update_configuration_files():
         "setup_multi_database_test.py",
         "tests/database_test_utils.py",
         "conftest.py",
-        "setup_sqlite_test.py"
+        "setup_sqlite_test.py",
     ]
 
     updates_made = 0
@@ -42,7 +42,7 @@ def update_configuration_files():
             continue
 
         try:
-            with open(file_path, 'r') as f:
+            with open(file_path, "r") as f:
                 content = f.read()
 
             original_content = content
@@ -67,7 +67,7 @@ def update_configuration_files():
                     logger.info(f"Updated {file_path}: {old} -> {new}")
 
             if content != original_content:
-                with open(file_path, 'w') as f:
+                with open(file_path, "w") as f:
                     f.write(content)
                 updates_made += 1
 
@@ -76,6 +76,7 @@ def update_configuration_files():
 
     logger.info(f"Updated {updates_made} configuration files")
     return updates_made
+
 
 def setup_downloader_preferences_config():
     """Setup downloader preferences configuration using new URL configuration system."""
@@ -93,7 +94,7 @@ def setup_downloader_preferences_config():
         maven_repos = [
             "https://repo1.maven.org/maven2/",
             "https://repo.maven.apache.org/maven2/",
-            "https://maven.aliyun.com/repository/public"
+            "https://maven.aliyun.com/repository/public",
         ]
 
         # Set Maven repositories using downloader prefs
@@ -114,11 +115,11 @@ def setup_downloader_preferences_config():
     # Use new configuration system
     try:
         # Load repository priority from auto-download config
-        config_file = os.path.join('src', 'dbutils', 'config', 'auto_download_config.json')
+        config_file = os.path.join("src", "dbutils", "config", "auto_download_config.json")
         if os.path.exists(config_file):
-            with open(config_file, 'r') as f:
+            with open(config_file, "r") as f:
                 config_data = json.load(f)
-            repo_priority = config_data.get('repository_management', {}).get('repository_priority', [])
+            repo_priority = config_data.get("repository_management", {}).get("repository_priority", [])
 
             if repo_priority:
                 # Add repositories from priority list
@@ -131,7 +132,7 @@ def setup_downloader_preferences_config():
                 default_repos = [
                     "https://repo1.maven.org/maven2/",
                     "https://repo.maven.apache.org/maven2/",
-                    "https://maven.aliyun.com/repository/central/"
+                    "https://maven.aliyun.com/repository/central/",
                 ]
                 for repo_url in default_repos:
                     if not add_maven_repository(repo_url):
@@ -154,6 +155,7 @@ def setup_downloader_preferences_config():
         logger.error(f"Error setting up new configuration system: {e}")
         # Fallback to old system
         return setup_downloader_preferences_config()
+
 
 def create_auto_download_wrapper():
     """Create a wrapper script for auto-download functionality."""
@@ -199,11 +201,12 @@ if __name__ == "__main__":
 '''
 
     wrapper_path = "auto_download_wrapper.py"
-    with open(wrapper_path, 'w') as f:
+    with open(wrapper_path, "w") as f:
         f.write(wrapper_content)
 
     logger.info(f"Created auto-download wrapper: {wrapper_path}")
     return wrapper_path
+
 
 def main():
     """Main setup function for auto-download infrastructure."""
@@ -224,7 +227,7 @@ def main():
     # Step 3: Setup downloader preferences
     print("\n3. Setting up downloader preferences with repository prioritization...")
     prefs_result = setup_downloader_preferences_config()
-    config_mode = prefs_result.get('mode', 'unknown')
+    config_mode = prefs_result.get("mode", "unknown")
     print(f"   ✓ Downloader preferences configured using {config_mode} configuration system")
 
     # Step 4: Update configuration files
@@ -260,6 +263,7 @@ def main():
     print(f"  DBUTILS_MAVEN_REPOS={os.environ.get('DBUTILS_MAVEN_REPOS', 'default')}")
 
     return True
+
 
 if __name__ == "__main__":
     success = main()

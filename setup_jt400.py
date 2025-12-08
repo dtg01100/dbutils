@@ -11,6 +11,7 @@ from pathlib import Path
 # Add src to path so we can import dbutils
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+
 def setup_jt400_provider():
     """Setup the JT400 provider in the registry."""
     try:
@@ -30,8 +31,8 @@ def setup_jt400_provider():
                 "decimal separator": ".",
                 "translate binary": "true",
                 "package": "default",
-                "lazy close": "true"
-            }
+                "lazy close": "true",
+            },
         )
 
         # Add to registry
@@ -53,6 +54,7 @@ def setup_jt400_provider():
         print(f"✗ Failed to setup JT400 provider: {e}")
         return False
 
+
 def show_config_file():
     """Show the contents of the providers.json file."""
     try:
@@ -60,7 +62,7 @@ def show_config_file():
 
         if os.path.exists(PROVIDERS_JSON):
             print(f"\n=== {PROVIDERS_JSON} ===")
-            with open(PROVIDERS_JSON, 'r') as f:
+            with open(PROVIDERS_JSON, "r") as f:
                 content = f.read()
                 print(content)
         else:
@@ -68,6 +70,7 @@ def show_config_file():
 
     except Exception as e:
         print(f"Error reading config file: {e}")
+
 
 def main():
     """Setup the JT400 provider."""
@@ -88,6 +91,7 @@ def main():
     else:
         print("\n❌ Failed to setup JT400 provider")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

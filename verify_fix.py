@@ -3,11 +3,12 @@
 Test to verify the JDBC configuration manager fix.
 This script tests the specific functionality that was broken.
 """
+
 import os
 import sys
 
 # Add the source directory to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from PySide6.QtWidgets import QApplication
 
@@ -29,7 +30,7 @@ def test_jdbc_config_manager():
         return False
 
     # Test specific methods that were problematic
-    if not hasattr(dialog, 'download_jdbc_driver_gui'):
+    if not hasattr(dialog, "download_jdbc_driver_gui"):
         print("❌ download_jdbc_driver_gui method not found")
         return False
     else:
@@ -38,12 +39,14 @@ def test_jdbc_config_manager():
     # Test that the QInputDialog import fix is working by checking
     # that we can access the method that uses QInputDialog
     import inspect
+
     method_source = inspect.getsource(ProviderConfigDialog.download_jdbc_driver_gui)
-    if 'QInputDialog.getItem' in method_source:
+    if "QInputDialog.getItem" in method_source:
         print("✅ QInputDialog.getItem usage confirmed in source")
 
     # Test that the get_categories fix is working
     from dbutils.enhanced_jdbc_provider import PredefinedProviderTemplates
+
     try:
         categories = PredefinedProviderTemplates.get_categories()
         print(f"✅ get_categories() works, found {len(categories)} categories")
@@ -53,6 +56,7 @@ def test_jdbc_config_manager():
 
     print("🎉 All tests passed! The JDBC configuration manager is fixed!")
     return True
+
 
 if __name__ == "__main__":
     success = test_jdbc_config_manager()

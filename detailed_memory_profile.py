@@ -12,9 +12,10 @@ def test_edit_distance_memory():
     """Test memory usage of edit distance function."""
     distances = []
     for _ in range(5000):
-        dist = edit_distance(f"TABLE_NAME_{_}", f"TABLE_NAME_{_+1}")
+        dist = edit_distance(f"TABLE_NAME_{_}", f"TABLE_NAME_{_ + 1}")
         distances.append(dist)
     return distances
+
 
 @profile
 def test_fuzzy_match_memory():
@@ -23,6 +24,7 @@ def test_fuzzy_match_memory():
     for _ in range(5000):
         fuzzy_match(f"CUSTOMER_ORDER_TABLE_{_}", "CUST")
     return results
+
 
 @profile
 def test_data_loading_memory():
@@ -40,6 +42,7 @@ def test_data_loading_memory():
 
     return all_data, search_indexes
 
+
 def run_memory_profiling():
     """Run all memory profiling tests."""
     print("Running memory profiling tests...")
@@ -55,6 +58,7 @@ def run_memory_profiling():
     # Test data loading
     data, indexes = test_data_loading_memory()
     print(f"Loaded {len(data)} sets of data and built {len(indexes)} search indexes")
+
 
 if __name__ == "__main__":
     run_memory_profiling()

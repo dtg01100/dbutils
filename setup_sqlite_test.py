@@ -11,31 +11,31 @@ from typing import Any, Dict, Optional
 
 def check_dependencies() -> Dict[str, bool]:
     """Check if required dependencies are installed."""
-    dependencies = {
-        'jaydebeapi': False,
-        'jpype1': False,
-        'PySide6': False
-    }
+    dependencies = {"jaydebeapi": False, "jpype1": False, "PySide6": False}
 
     try:
         import jaydebeapi
-        dependencies['jaydebeapi'] = True
+
+        dependencies["jaydebeapi"] = True
     except ImportError:
         pass
 
     try:
         import jpype
-        dependencies['jpype1'] = True
+
+        dependencies["jpype1"] = True
     except ImportError:
         pass
 
     try:
         import PySide6
-        dependencies['PySide6'] = True
+
+        dependencies["PySide6"] = True
     except ImportError:
         pass
 
     return dependencies
+
 
 def install_missing_dependencies() -> bool:
     """Install missing dependencies using pip."""
@@ -49,10 +49,7 @@ def install_missing_dependencies() -> bool:
             return True
 
         print(f"Installing missing dependencies: {', '.join(missing)}")
-        result = subprocess.run([
-            sys.executable, "-m", "pip", "install",
-            *missing
-        ], capture_output=True, text=True)
+        result = subprocess.run([sys.executable, "-m", "pip", "install", *missing], capture_output=True, text=True)
 
         if result.returncode == 0:
             print("Dependencies installed successfully.")
@@ -64,6 +61,7 @@ def install_missing_dependencies() -> bool:
     except Exception as e:
         print(f"Error installing dependencies: {e}")
         return False
+
 
 def create_sample_database() -> str:
     """Create a sample SQLite database with test schema."""
@@ -127,17 +125,21 @@ def create_sample_database() -> str:
     cursor.execute("INSERT INTO orders (customer_id, total_amount) VALUES (?, ?)", (1, 1019.98))
     cursor.execute("INSERT INTO orders (customer_id, total_amount) VALUES (?, ?)", (2, 19.99))
 
-    cursor.execute("INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)",
-                   (1, 1, 1, 999.99))
-    cursor.execute("INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)",
-                   (1, 2, 1, 19.99))
-    cursor.execute("INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)",
-                   (2, 2, 1, 19.99))
+    cursor.execute(
+        "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)", (1, 1, 1, 999.99)
+    )
+    cursor.execute(
+        "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)", (1, 2, 1, 19.99)
+    )
+    cursor.execute(
+        "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)", (2, 2, 1, 19.99)
+    )
 
     conn.commit()
     conn.close()
     print(f"Created sample database: {db_path}")
     return db_path
+
 
 def setup_sqlite_provider(config_dir: Optional[str] = None) -> Dict[str, Any]:
     """Setup SQLite JDBC provider configuration."""
@@ -157,14 +159,14 @@ def setup_sqlite_provider(config_dir: Optional[str] = None) -> Dict[str, Any]:
         "url_template": "jdbc:sqlite:{database}",
         "default_user": None,
         "default_password": None,
-        "extra_properties": {}
+        "extra_properties": {},
     }
 
     # Load existing providers or create new list
     providers = []
     if os.path.exists(providers_file):
         try:
-            with open(providers_file, 'r') as f:
+            with open(providers_file, "r") as f:
                 providers = json.load(f)
         except Exception as e:
             print(f"Error loading existing providers: {e}")
@@ -174,11 +176,12 @@ def setup_sqlite_provider(config_dir: Optional[str] = None) -> Dict[str, Any]:
     providers.append(sqlite_provider)
 
     # Save providers
-    with open(providers_file, 'w') as f:
+    with open(providers_file, "w") as f:
         json.dump(providers, f, indent=2)
 
     print(f"Setup SQLite provider: {providers_file}")
     return sqlite_provider
+
 
 def setup_test_environment() -> Dict[str, str]:
     """Set up environment variables for testing."""
@@ -205,19 +208,18 @@ def setup_test_environment() -> Dict[str, str]:
 
     return env_vars
 
+
 def test_sqlite_connection() -> bool:
     """Test the SQLite JDBC connection."""
     import sys
-    sys.path.insert(0, 'src')
+
+    sys.path.insert(0, "src")
 
     try:
         from dbutils.jdbc_provider import connect
 
         # Test connection
-        conn = connect(
-            "SQLite (Test Integration)",
-            {"database": os.path.abspath("test_sample.db")}
-        )
+        conn = connect("SQLite (Test Integration)", {"database": os.path.abspath("test_sample.db")})
 
         # Test a simple query
         result = conn.query("SELECT name FROM sqlite_master WHERE type='table'")
@@ -237,16 +239,19 @@ def test_sqlite_connection() -> bool:
         print(f"SQLite JDBC connection test failed: {e}")
         return False
 
+
 def cleanup_test_environment():
     """Clean up test environment."""
     test_config_dir = os.path.join(os.path.dirname(__file__), "test_config")
     try:
         if os.path.exists(test_config_dir):
             import shutil
+
             shutil.rmtree(test_config_dir)
             print(f"Cleaned up test config directory: {test_config_dir}")
     except Exception as e:
         print(f"Error cleaning up test environment: {e}")
+
 
 def main():
     """Main setup function."""
@@ -280,19 +285,20 @@ def main():
     success = test_sqlite_connection()
 
     if success:
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("SETUP COMPLETE!")
-        print("="*60)
+        print("=" * 60)
         print("To run tests, use:")
         print("  pytest tests/test_sqlite_integration.py")
         print("\nEnvironment variables are already set for this session.")
         print("If running in a new terminal, set these variables:")
-        print("  export DBUTILS_JDBC_PROVIDER=\"SQLite (Test Integration)\"")
-        print(f"  export DBUTILS_CONFIG_DIR=\"{os.path.abspath('test_config')}\"")
-        print("  export DBUTILS_TEST_MODE=\"1\"")
+        print('  export DBUTILS_JDBC_PROVIDER="SQLite (Test Integration)"')
+        print(f'  export DBUTILS_CONFIG_DIR="{os.path.abspath("test_config")}"')
+        print('  export DBUTILS_TEST_MODE="1"')
     else:
         print("\nSetup failed. Please check the error messages above.")
         cleanup_test_environment()
+
 
 if __name__ == "__main__":
     main()
