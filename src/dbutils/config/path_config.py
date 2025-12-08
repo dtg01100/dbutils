@@ -14,6 +14,7 @@ from typing import Dict, List, Optional
 # Configure logging
 logger = logging.getLogger(__name__)
 
+
 class PathConfig:
     """Manages dynamic path resolution and discovery for JDBC drivers and related files."""
 
@@ -22,11 +23,7 @@ class PathConfig:
 
     def _load_config(self) -> Dict:
         """Load path configuration from environment variables and config files."""
-        config = {
-            'driver_dirs': [],
-            'search_paths': [],
-            'custom_paths': []
-        }
+        config = {"driver_dirs": [], "search_paths": [], "custom_paths": []}
 
         # Load from environment variables
         self._load_from_environment(config)
@@ -41,14 +38,14 @@ class PathConfig:
         # Primary driver directory
         driver_dir = os.environ.get("DBUTILS_DRIVER_DIR")
         if driver_dir:
-            config['driver_dirs'].append(driver_dir)
+            config["driver_dirs"].append(driver_dir)
 
         # Additional search paths
         search_paths = os.environ.get("DBUTILS_JAR_SEARCH_PATHS")
         if search_paths:
-            for path in search_paths.split(':'):
+            for path in search_paths.split(":"):
                 if path.strip():
-                    config['search_paths'].append(path.strip())
+                    config["search_paths"].append(path.strip())
 
         # Custom paths
         custom_paths = os.environ.get("DBUTILS_CUSTOM_JAR_PATHS")
@@ -56,10 +53,10 @@ class PathConfig:
             try:
                 parsed_paths = json.loads(custom_paths)
                 if isinstance(parsed_paths, list):
-                    config['custom_paths'].extend(parsed_paths)
+                    config["custom_paths"].extend(parsed_paths)
             except json.JSONDecodeError:
                 # Fallback to comma-separated
-                config['custom_paths'].extend([p.strip() for p in custom_paths.split(',') if p.strip()])
+                config["custom_paths"].extend([p.strip() for p in custom_paths.split(",") if p.strip()])
 
     def _load_from_config_file(self, config: Dict) -> None:
         """Load path configuration from JSON config file."""
@@ -68,26 +65,26 @@ class PathConfig:
             return
 
         try:
-            with open(config_file, 'r', encoding='utf-8') as f:
+            with open(config_file, "r", encoding="utf-8") as f:
                 file_config = json.load(f)
 
-                if 'driver_dirs' in file_config and isinstance(file_config['driver_dirs'], list):
-                    config['driver_dirs'].extend(file_config['driver_dirs'])
+                if "driver_dirs" in file_config and isinstance(file_config["driver_dirs"], list):
+                    config["driver_dirs"].extend(file_config["driver_dirs"])
 
-                if 'search_paths' in file_config and isinstance(file_config['search_paths'], list):
-                    config['search_paths'].extend(file_config['search_paths'])
+                if "search_paths" in file_config and isinstance(file_config["search_paths"], list):
+                    config["search_paths"].extend(file_config["search_paths"])
 
-                if 'custom_paths' in file_config and isinstance(file_config['custom_paths'], list):
-                    config['custom_paths'].extend(file_config['custom_paths'])
+                if "custom_paths" in file_config and isinstance(file_config["custom_paths"], list):
+                    config["custom_paths"].extend(file_config["custom_paths"])
 
         except Exception as e:
             logger.warning(f"Error loading path config from {config_file}: {e}")
 
     def _get_config_file_path(self) -> Optional[str]:
         """Get the path to the path configuration file."""
-        config_dir = os.environ.get('DBUTILS_CONFIG_DIR', os.path.expanduser('~/.config/dbutils'))
+        config_dir = os.environ.get("DBUTILS_CONFIG_DIR", os.path.expanduser("~/.config/dbutils"))
         os.makedirs(config_dir, exist_ok=True)
-        return os.path.join(config_dir, 'path_config.json')
+        return os.path.join(config_dir, "path_config.json")
 
     def get_driver_directory(self) -> str:
         """Get the primary directory where JDBC drivers should be stored.
@@ -96,8 +93,8 @@ class PathConfig:
             Path to the primary driver directory
         """
         # Use first configured driver directory, or default
-        if self._config['driver_dirs']:
-            driver_dir = self._config['driver_dirs'][0]
+        if self._config["driver_dirs"]:
+            driver_dir = self._config["driver_dirs"][0]
         else:
             driver_dir = os.path.expanduser("~/.config/dbutils/drivers")
 
@@ -114,31 +111,31 @@ class PathConfig:
         paths = []
 
         # Refresh from environment in case tests or runtime changed them dynamically
-        env_driver_dir = os.environ.get('DBUTILS_DRIVER_DIR')
-        if env_driver_dir and env_driver_dir not in self._config['driver_dirs']:
+        env_driver_dir = os.environ.get("DBUTILS_DRIVER_DIR")
+        if env_driver_dir and env_driver_dir not in self._config["driver_dirs"]:
             # Prepend environment driver dir to give it priority
             paths.append(env_driver_dir)
 
         # Add driver directories from loaded config
-        if self._config['driver_dirs']:
-            paths.extend(self._config['driver_dirs'])
+        if self._config["driver_dirs"]:
+            paths.extend(self._config["driver_dirs"])
 
         # Add search paths
-        if self._config['search_paths']:
-            paths.extend(self._config['search_paths'])
+        if self._config["search_paths"]:
+            paths.extend(self._config["search_paths"])
         # Also include environment search paths if set (colon-delimited)
-        env_search_paths = os.environ.get('DBUTILS_JAR_SEARCH_PATHS')
+        env_search_paths = os.environ.get("DBUTILS_JAR_SEARCH_PATHS")
         if env_search_paths:
-            for p in env_search_paths.split(':'):
+            for p in env_search_paths.split(":"):
                 p = p.strip()
                 if p and p not in paths:
                     paths.append(p)
 
         # Add custom paths
-        if self._config['custom_paths']:
-            paths.extend(self._config['custom_paths'])
+        if self._config["custom_paths"]:
+            paths.extend(self._config["custom_paths"])
         # Also include environment custom paths as JSON or comma separated list
-        env_custom_paths = os.environ.get('DBUTILS_CUSTOM_JAR_PATHS')
+        env_custom_paths = os.environ.get("DBUTILS_CUSTOM_JAR_PATHS")
         if env_custom_paths:
             try:
                 parsed = json.loads(env_custom_paths)
@@ -147,7 +144,7 @@ class PathConfig:
                         if p not in paths:
                             paths.append(p)
             except Exception:
-                for p in env_custom_paths.split(','):
+                for p in env_custom_paths.split(","):
                     p = p.strip()
                     if p and p not in paths:
                         paths.append(p)
@@ -159,7 +156,7 @@ class PathConfig:
             os.path.expanduser("~/drivers"),
             os.path.expanduser("~/.m2/repository"),
             "/usr/share/java",
-            "/usr/local/share/java"
+            "/usr/local/share/java",
         ]
 
         # Add defaults that aren't already in the list
@@ -275,11 +272,7 @@ class PathConfig:
             return None
 
         # Simple heuristic: prefer files with version numbers, then alphabetical
-        candidates.sort(key=lambda x: (
-            "latest" not in x.lower(),
-            os.path.getsize(x),
-            x.lower()
-        ), reverse=True)
+        candidates.sort(key=lambda x: ("latest" not in x.lower(), os.path.getsize(x), x.lower()), reverse=True)
 
         return candidates[0] if candidates else None
 
@@ -297,10 +290,10 @@ class PathConfig:
 
         expanded_path = str(Path(path).expanduser().resolve())
 
-        if expanded_path in self._config['custom_paths']:
+        if expanded_path in self._config["custom_paths"]:
             return True
 
-        self._config['custom_paths'].append(expanded_path)
+        self._config["custom_paths"].append(expanded_path)
         return self._save_config()
 
     def _save_config(self) -> bool:
@@ -314,35 +307,45 @@ class PathConfig:
             return False
 
         try:
-            with open(config_file, 'w', encoding='utf-8') as f:
-                json.dump({
-                    'driver_dirs': self._config['driver_dirs'],
-                    'search_paths': self._config['search_paths'],
-                    'custom_paths': self._config['custom_paths']
-                }, f, indent=2)
+            with open(config_file, "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "driver_dirs": self._config["driver_dirs"],
+                        "search_paths": self._config["search_paths"],
+                        "custom_paths": self._config["custom_paths"],
+                    },
+                    f,
+                    indent=2,
+                )
             return True
         except Exception as e:
             logger.error(f"Error saving path config to {config_file}: {e}")
             return False
 
+
 # Global instance for convenience
 path_config = PathConfig()
+
 
 def get_driver_directory() -> str:
     """Get the primary driver directory."""
     return path_config.get_driver_directory()
 
+
 def find_jar_files(pattern: str = "*.jar") -> List[str]:
     """Find JAR files matching a pattern."""
     return path_config.find_jar_files(pattern)
+
 
 def find_driver_jar(database_type: str) -> List[str]:
     """Find JAR files for a specific database type."""
     return path_config.find_driver_jar(database_type)
 
+
 def get_best_driver_path(database_type: str) -> Optional[str]:
     """Get the best driver path for a specific database type."""
     return path_config.get_best_driver_path(database_type)
+
 
 def add_custom_path(path: str) -> bool:
     """Add a custom path to search for JAR files."""

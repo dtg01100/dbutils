@@ -15,6 +15,7 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
+
 class ConfigManager:
     """Flexible configuration manager with multiple sources and fallback mechanisms."""
 
@@ -59,7 +60,7 @@ class ConfigManager:
             return None
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
             logger.error(f"Failed to load config file {file_path}: {e}")
@@ -73,7 +74,7 @@ class ConfigManager:
         # Collect all environment variables with the prefix
         for key, value in os.environ.items():
             if key.startswith(prefix + "_"):
-                env_key = key[len(prefix) + 1:].lower()  # Remove prefix and underscore
+                env_key = key[len(prefix) + 1 :].lower()  # Remove prefix and underscore
                 env_vars[env_key] = value
 
         # Convert to nested structure if needed
@@ -91,11 +92,11 @@ class ConfigManager:
                 return os.environ.get(var_name, match.group(0))
 
             # Replace ${VAR} pattern
-            pattern = re.compile(r'\$\{([^}]+)\}')
+            pattern = re.compile(r"\$\{([^}]+)\}")
             result = pattern.sub(replace_match, value)
 
             # Replace $VAR pattern
-            pattern = re.compile(r'\$([a-zA-Z_][a-zA-Z0-9_]*)')
+            pattern = re.compile(r"\$([a-zA-Z_][a-zA-Z0-9_]*)")
             result = pattern.sub(replace_match, result)
 
             return result
@@ -157,7 +158,7 @@ class ConfigManager:
             os.path.join(os.path.dirname(__file__), "..", "..", "jars", f"{jar_name}.jar"),
             os.path.join(os.path.dirname(__file__), "jars", f"{jar_name}.jar"),
             os.path.join(os.getcwd(), "jars", f"{jar_name}.jar"),
-            os.path.join(os.path.expanduser("~"), ".dbutils", "jars", f"{jar_name}.jar")
+            os.path.join(os.path.expanduser("~"), ".dbutils", "jars", f"{jar_name}.jar"),
         ]
 
         # Add custom JAR search paths from environment
@@ -175,7 +176,7 @@ class ConfigManager:
 
     def get_config(self, key: str, default: Any = None) -> Any:
         """Get a configuration value with fallback to default."""
-        keys = key.split('.')
+        keys = key.split(".")
         current = self.loaded_config
 
         for k in keys:
@@ -198,7 +199,7 @@ class ConfigManager:
             os.path.join(os.path.dirname(__file__), "..", "..", "jars", f"{jar_name}.jar"),
             os.path.join(os.path.dirname(__file__), "jars", f"{jar_name}.jar"),
             os.path.join(os.getcwd(), "jars", f"{jar_name}.jar"),
-            os.path.join(os.path.expanduser("~"), ".dbutils", "jars", f"{jar_name}.jar")
+            os.path.join(os.path.expanduser("~"), ".dbutils", "jars", f"{jar_name}.jar"),
         ]
 
         # Add custom JAR search paths from environment
@@ -213,6 +214,7 @@ class ConfigManager:
                 return path
 
         return None
+
 
 def get_default_config_manager() -> ConfigManager:
     """Create a default configuration manager with standard sources."""
@@ -236,6 +238,7 @@ def get_default_config_manager() -> ConfigManager:
 
     return manager
 
+
 class ConfigurationLoader:
     """High-level configuration loader with comprehensive fallback mechanisms."""
 
@@ -280,26 +283,26 @@ class ConfigurationLoader:
                 "driver_class": "org.postgresql.Driver",
                 "url_template": "jdbc:postgresql://{host}:{port}/{database}",
                 "default_port": 5432,
-                "description": "PostgreSQL database connection"
+                "description": "PostgreSQL database connection",
             },
             "MySQL": {
                 "driver_class": "com.mysql.cj.jdbc.Driver",
                 "url_template": "jdbc:mysql://{host}:{port}/{database}",
                 "default_port": 3306,
-                "description": "MySQL database connection"
+                "description": "MySQL database connection",
             },
             "SQLite": {
                 "driver_class": "org.sqlite.JDBC",
                 "url_template": "jdbc:sqlite:{database}",
                 "default_port": 0,
-                "description": "SQLite file-based database"
+                "description": "SQLite file-based database",
             },
             "Custom": {
                 "driver_class": "",
                 "url_template": "jdbc:{custom}://{host}:{port}/{database}",
                 "default_port": 0,
-                "description": "Custom JDBC provider - configure all parameters manually"
-            }
+                "description": "Custom JDBC provider - configure all parameters manually",
+            },
         }
 
     def _get_default_providers(self) -> Dict[str, Dict]:
@@ -311,7 +314,7 @@ class ConfigurationLoader:
                 "jar_path": "",
                 "url_template": "jdbc:sqlite:{database}",
                 "default_database": "sample.db",
-                "extra_properties": {}
+                "extra_properties": {},
             }
         }
 
@@ -334,7 +337,7 @@ class ConfigurationLoader:
         return {
             "provider_templates": self._get_default_provider_templates(),
             "default_providers": self._get_default_providers(),
-            "fallback_mode": True
+            "fallback_mode": True,
         }
 
     def get_provider_template(self, category: str) -> Optional[Dict]:
@@ -356,7 +359,7 @@ class ConfigurationLoader:
                 "driver_class": "",
                 "url_template": "jdbc:{category}://{host}:{port}/{database}",
                 "default_port": 0,
-                "description": f"{category} database connection"
+                "description": f"{category} database connection",
             }
 
         return template
@@ -378,7 +381,7 @@ class ConfigurationLoader:
             os.path.join(os.path.dirname(__file__), "..", "..", "jars", f"{jar_name}.jar"),
             os.path.join(os.path.dirname(__file__), "jars", f"{jar_name}.jar"),
             os.path.join(os.getcwd(), "jars", f"{jar_name}.jar"),
-            os.path.join(os.path.expanduser("~"), ".dbutils", "jars", f"{jar_name}.jar")
+            os.path.join(os.path.expanduser("~"), ".dbutils", "jars", f"{jar_name}.jar"),
         ]
 
         for location in fallback_locations:
@@ -388,6 +391,7 @@ class ConfigurationLoader:
         # Return empty string as last resort (user will need to configure)
         return ""
 
+
 class ConfigurationLoader:
     """High-level configuration loader with comprehensive fallback mechanisms."""
 
@@ -432,20 +436,20 @@ class ConfigurationLoader:
                 "driver_class": "org.postgresql.Driver",
                 "url_template": "jdbc:postgresql://{host}:{port}/{database}",
                 "default_port": 5432,
-                "description": "PostgreSQL database connection"
+                "description": "PostgreSQL database connection",
             },
             "MySQL": {
                 "driver_class": "com.mysql.cj.jdbc.Driver",
                 "url_template": "jdbc:mysql://{host}:{port}/{database}",
                 "default_port": 3306,
-                "description": "MySQL database connection"
+                "description": "MySQL database connection",
             },
             "SQLite": {
                 "driver_class": "org.sqlite.JDBC",
                 "url_template": "jdbc:sqlite:{database}",
                 "default_port": 0,
-                "description": "SQLite file-based database"
-            }
+                "description": "SQLite file-based database",
+            },
         }
 
     def _get_default_providers(self) -> Dict[str, Dict]:
@@ -457,7 +461,7 @@ class ConfigurationLoader:
                 "jar_path": "",
                 "url_template": "jdbc:sqlite:{database}",
                 "default_database": "sample.db",
-                "extra_properties": {}
+                "extra_properties": {},
             }
         }
 
@@ -480,7 +484,7 @@ class ConfigurationLoader:
         return {
             "provider_templates": self._get_default_provider_templates(),
             "default_providers": self._get_default_providers(),
-            "fallback_mode": True
+            "fallback_mode": True,
         }
 
     def get_provider_template(self, category: str) -> Optional[Dict]:
@@ -502,7 +506,7 @@ class ConfigurationLoader:
                 "driver_class": "",
                 "url_template": "jdbc:{category}://{host}:{port}/{database}",
                 "default_port": 0,
-                "description": f"{category} database connection"
+                "description": f"{category} database connection",
             }
 
         return template
@@ -524,7 +528,7 @@ class ConfigurationLoader:
             os.path.join(os.path.dirname(__file__), "..", "..", "jars", f"{jar_name}.jar"),
             os.path.join(os.path.dirname(__file__), "jars", f"{jar_name}.jar"),
             os.path.join(os.getcwd(), "jars", f"{jar_name}.jar"),
-            os.path.join(os.path.expanduser("~"), ".dbutils", "jars", f"{jar_name}.jar")
+            os.path.join(os.path.expanduser("~"), ".dbutils", "jars", f"{jar_name}.jar"),
         ]
 
         for location in fallback_locations:

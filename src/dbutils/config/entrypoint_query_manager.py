@@ -15,9 +15,11 @@ from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class EntrypointQuerySet:
     """Represents a set of entrypoint queries for a database type."""
+
     identity_query: str = ""
     schema_query: str = ""
     database_info_query: str = ""
@@ -27,17 +29,18 @@ class EntrypointQuerySet:
         return {
             "identity_query": self.identity_query,
             "schema_query": self.schema_query,
-            "database_info_query": self.database_info_query
+            "database_info_query": self.database_info_query,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, str]) -> 'EntrypointQuerySet':
+    def from_dict(cls, data: Dict[str, str]) -> "EntrypointQuerySet":
         """Create from dictionary data."""
         return cls(
             identity_query=data.get("identity_query", ""),
             schema_query=data.get("schema_query", ""),
-            database_info_query=data.get("database_info_query", "")
+            database_info_query=data.get("database_info_query", ""),
         )
+
 
 class EntrypointQueryManager:
     """Manages default and custom entrypoint queries for database types."""
@@ -95,9 +98,7 @@ class EntrypointQueryManager:
         """Load default entrypoint queries from package configuration file."""
         try:
             # Try to load from package config file
-            package_config_path = os.path.join(
-                os.path.dirname(__file__), "entrypoint_queries.json"
-            )
+            package_config_path = os.path.join(os.path.dirname(__file__), "entrypoint_queries.json")
 
             if os.path.exists(package_config_path):
                 with open(package_config_path, "r", encoding="utf-8") as f:
@@ -127,7 +128,7 @@ class EntrypointQueryManager:
                     "SELECT table_schema, table_name FROM information_schema.tables "
                     "WHERE table_schema NOT IN ('pg_catalog', 'information_schema')"
                 ),
-                "database_info_query": "SELECT version() as database_version"
+                "database_info_query": "SELECT version() as database_version",
             },
             "MySQL": {
                 "identity_query": "SELECT NOW() as current_timestamp",
@@ -135,7 +136,7 @@ class EntrypointQueryManager:
                     "SELECT table_schema, table_name FROM information_schema.tables "
                     "WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')"
                 ),
-                "database_info_query": "SELECT VERSION() as database_version"
+                "database_info_query": "SELECT VERSION() as database_version",
             },
             "MariaDB": {
                 "identity_query": "SELECT NOW() as current_timestamp",
@@ -143,18 +144,12 @@ class EntrypointQueryManager:
                     "SELECT table_schema, table_name FROM information_schema.tables "
                     "WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')"
                 ),
-                "database_info_query": "SELECT VERSION() as database_version"
+                "database_info_query": "SELECT VERSION() as database_version",
             },
             "Oracle": {
                 "identity_query": "SELECT SYSTIMESTAMP as current_timestamp FROM dual",
-                "schema_query": (
-                    "SELECT owner, table_name FROM all_tables "
-                    "WHERE owner NOT IN ('SYS', 'SYSTEM')"
-                ),
-                "database_info_query": (
-                    "SELECT banner as database_version FROM v$version "
-                    "WHERE rownum = 1"
-                )
+                "schema_query": ("SELECT owner, table_name FROM all_tables WHERE owner NOT IN ('SYS', 'SYSTEM')"),
+                "database_info_query": ("SELECT banner as database_version FROM v$version WHERE rownum = 1"),
             },
             "SQL Server": {
                 "identity_query": "SELECT GETDATE() as current_timestamp",
@@ -162,7 +157,7 @@ class EntrypointQueryManager:
                     "SELECT table_schema, table_name FROM information_schema.tables "
                     "WHERE table_schema NOT IN ('sys', 'INFORMATION_SCHEMA')"
                 ),
-                "database_info_query": "SELECT @@VERSION as database_version"
+                "database_info_query": "SELECT @@VERSION as database_version",
             },
             "DB2": {
                 "identity_query": "SELECT CURRENT_TIMESTAMP as current_timestamp FROM SYSIBM.SYSDUMMY1",
@@ -170,15 +165,14 @@ class EntrypointQueryManager:
                     "SELECT table_schema, table_name FROM syscat.tables "
                     "WHERE table_schema NOT IN ('SYS', 'SYSCAT', 'SYSTOOLS')"
                 ),
-                "database_info_query": "SELECT service_level as database_version FROM sysibm.sysversions"
+                "database_info_query": "SELECT service_level as database_version FROM sysibm.sysversions",
             },
             "SQLite": {
                 "identity_query": "SELECT datetime('now') as current_timestamp",
                 "schema_query": (
-                    "SELECT name as table_name FROM sqlite_master "
-                    "WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                    "SELECT name as table_name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
                 ),
-                "database_info_query": "SELECT sqlite_version() as database_version"
+                "database_info_query": "SELECT sqlite_version() as database_version",
             },
             "H2": {
                 "identity_query": "SELECT CURRENT_TIMESTAMP as current_timestamp",
@@ -186,8 +180,8 @@ class EntrypointQueryManager:
                     "SELECT table_schema, table_name FROM information_schema.tables "
                     "WHERE table_schema NOT IN ('INFORMATION_SCHEMA', 'PUBLIC')"
                 ),
-                "database_info_query": "SELECT H2VERSION() as database_version"
-            }
+                "database_info_query": "SELECT H2VERSION() as database_version",
+            },
         }
 
         for db_type, queries in hardcoded_defaults.items():
@@ -198,10 +192,7 @@ class EntrypointQueryManager:
     def save_configuration(self) -> None:
         """Save current configuration to file."""
         try:
-            config_data = {
-                "default_entrypoint_queries": {},
-                "custom_entrypoint_queries": {}
-            }
+            config_data = {"default_entrypoint_queries": {}, "custom_entrypoint_queries": {}}
 
             # Save default queries
             for db_type, query_set in self.default_queries.items():
@@ -261,7 +252,7 @@ class EntrypointQueryManager:
         generic_set = EntrypointQuerySet(
             identity_query="SELECT CURRENT_TIMESTAMP as current_timestamp",
             schema_query="SELECT table_schema, table_name FROM information_schema.tables",
-            database_info_query="SELECT version() as database_version"
+            database_info_query="SELECT version() as database_version",
         )
 
         logger.warning(f"No entrypoint queries found for database type '{db_type}', using generic fallback")
@@ -342,6 +333,7 @@ class EntrypointQueryManager:
         """Get the database info query for a database type."""
         query_set = self.get_query_set_or_default(db_type, custom_name)
         return query_set.database_info_query
+
 
 def get_default_entrypoint_query_manager() -> EntrypointQueryManager:
     """Get the default entrypoint query manager instance."""

@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Tuple
 # Configure logging
 logger = logging.getLogger(__name__)
 
+
 class URLConfig:
     """Manages dynamic URL configuration for Maven repositories and download sources."""
 
@@ -22,12 +23,7 @@ class URLConfig:
 
     def _load_config(self) -> Dict:
         """Load URL configuration from environment variables and config files."""
-        config = {
-            'maven_repos': [],
-            'custom_repos': [],
-            'url_patterns': {},
-            'download_sources': {}
-        }
+        config = {"maven_repos": [], "custom_repos": [], "url_patterns": {}, "download_sources": {}}
 
         # Load from environment variables
         self._load_from_environment(config)
@@ -48,10 +44,10 @@ class URLConfig:
             try:
                 parsed_repos = json.loads(maven_repos)
                 if isinstance(parsed_repos, list):
-                    config['maven_repos'].extend(parsed_repos)
+                    config["maven_repos"].extend(parsed_repos)
             except json.JSONDecodeError:
                 # Fallback to comma-separated
-                config['maven_repos'].extend([r.strip() for r in maven_repos.split(',') if r.strip()])
+                config["maven_repos"].extend([r.strip() for r in maven_repos.split(",") if r.strip()])
 
         # Custom repositories
         custom_repos = os.environ.get("DBUTILS_CUSTOM_REPOS")
@@ -59,9 +55,9 @@ class URLConfig:
             try:
                 parsed_repos = json.loads(custom_repos)
                 if isinstance(parsed_repos, list):
-                    config['custom_repos'].extend(parsed_repos)
+                    config["custom_repos"].extend(parsed_repos)
             except json.JSONDecodeError:
-                config['custom_repos'].extend([r.strip() for r in custom_repos.split(',') if r.strip()])
+                config["custom_repos"].extend([r.strip() for r in custom_repos.split(",") if r.strip()])
 
     def _load_from_config_file(self, config: Dict) -> None:
         """Load URL configuration from JSON config file."""
@@ -70,20 +66,20 @@ class URLConfig:
             return
 
         try:
-            with open(config_file, 'r', encoding='utf-8') as f:
+            with open(config_file, "r", encoding="utf-8") as f:
                 file_config = json.load(f)
 
-                if 'maven_repos' in file_config and isinstance(file_config['maven_repos'], list):
-                    config['maven_repos'].extend(file_config['maven_repos'])
+                if "maven_repos" in file_config and isinstance(file_config["maven_repos"], list):
+                    config["maven_repos"].extend(file_config["maven_repos"])
 
-                if 'custom_repos' in file_config and isinstance(file_config['custom_repos'], list):
-                    config['custom_repos'].extend(file_config['custom_repos'])
+                if "custom_repos" in file_config and isinstance(file_config["custom_repos"], list):
+                    config["custom_repos"].extend(file_config["custom_repos"])
 
-                if 'url_patterns' in file_config and isinstance(file_config['url_patterns'], dict):
-                    config['url_patterns'].update(file_config['url_patterns'])
+                if "url_patterns" in file_config and isinstance(file_config["url_patterns"], dict):
+                    config["url_patterns"].update(file_config["url_patterns"])
 
-                if 'download_sources' in file_config and isinstance(file_config['download_sources'], dict):
-                    config['download_sources'].update(file_config['download_sources'])
+                if "download_sources" in file_config and isinstance(file_config["download_sources"], dict):
+                    config["download_sources"].update(file_config["download_sources"])
 
         except Exception as e:
             logger.warning(f"Error loading URL config from {config_file}: {e}")
@@ -94,19 +90,19 @@ class URLConfig:
             "https://repo1.maven.org/maven2/",
             "https://repo.maven.apache.org/maven2/",
             "https://maven.aliyun.com/repository/central/",
-            "https://maven.google.com/"
+            "https://maven.google.com/",
         ]
 
         # Add defaults that aren't already in the list
         for repo in default_repos:
-            if repo not in config['maven_repos']:
-                config['maven_repos'].append(repo)
+            if repo not in config["maven_repos"]:
+                config["maven_repos"].append(repo)
 
     def _get_config_file_path(self) -> Optional[str]:
         """Get the path to the URL configuration file."""
-        config_dir = os.environ.get('DBUTILS_CONFIG_DIR', os.path.expanduser('~/.config/dbutils'))
+        config_dir = os.environ.get("DBUTILS_CONFIG_DIR", os.path.expanduser("~/.config/dbutils"))
         os.makedirs(config_dir, exist_ok=True)
-        return os.path.join(config_dir, 'url_config.json')
+        return os.path.join(config_dir, "url_config.json")
 
     def get_maven_repositories(self) -> List[str]:
         """Get all configured Maven repository URLs.
@@ -117,10 +113,10 @@ class URLConfig:
         repos = []
 
         # Add custom repos first (highest priority)
-        repos.extend(self._config['custom_repos'])
+        repos.extend(self._config["custom_repos"])
 
         # Add configured Maven repos
-        repos.extend(self._config['maven_repos'])
+        repos.extend(self._config["maven_repos"])
 
         # Remove duplicates while preserving order
         seen = set()
@@ -159,15 +155,15 @@ class URLConfig:
             return False
 
         # Basic URL validation
-        if not (url.startswith('http://') or url.startswith('https://')):
+        if not (url.startswith("http://") or url.startswith("https://")):
             return False
 
-        normalized_url = url.rstrip('/')
+        normalized_url = url.rstrip("/")
 
-        if normalized_url in self._config['maven_repos']:
+        if normalized_url in self._config["maven_repos"]:
             return True
 
-        self._config['maven_repos'].append(normalized_url)
+        self._config["maven_repos"].append(normalized_url)
         return self._save_config()
 
     def add_custom_repository(self, url: str) -> bool:
@@ -183,15 +179,15 @@ class URLConfig:
             return False
 
         # Basic URL validation
-        if not (url.startswith('http://') or url.startswith('https://')):
+        if not (url.startswith("http://") or url.startswith("https://")):
             return False
 
-        normalized_url = url.rstrip('/')
+        normalized_url = url.rstrip("/")
 
-        if normalized_url in self._config['custom_repos']:
+        if normalized_url in self._config["custom_repos"]:
             return True
 
-        self._config['custom_repos'].append(normalized_url)
+        self._config["custom_repos"].append(normalized_url)
         return self._save_config()
 
     def get_url_pattern(self, pattern_name: str) -> Optional[str]:
@@ -203,7 +199,7 @@ class URLConfig:
         Returns:
             URL pattern string or None if not found
         """
-        return self._config['url_patterns'].get(pattern_name)
+        return self._config["url_patterns"].get(pattern_name)
 
     def set_url_pattern(self, pattern_name: str, pattern: str) -> bool:
         """Set a URL pattern in the configuration.
@@ -218,7 +214,7 @@ class URLConfig:
         if not pattern_name or not pattern:
             return False
 
-        self._config['url_patterns'][pattern_name] = pattern
+        self._config["url_patterns"][pattern_name] = pattern
         return self._save_config()
 
     def get_download_source(self, source_name: str) -> Optional[Dict]:
@@ -230,7 +226,7 @@ class URLConfig:
         Returns:
             Download source configuration dict or None if not found
         """
-        return self._config['download_sources'].get(source_name)
+        return self._config["download_sources"].get(source_name)
 
     def set_download_source(self, source_name: str, source_config: Dict) -> bool:
         """Set a download source configuration.
@@ -245,16 +241,11 @@ class URLConfig:
         if not source_name or not source_config:
             return False
 
-        self._config['download_sources'][source_name] = source_config
+        self._config["download_sources"][source_name] = source_config
         return self._save_config()
 
     def construct_maven_artifact_url(
-        self,
-        group_id: str,
-        artifact_id: str,
-        version: str,
-        repo_index: int = 0,
-        packaging: str = "jar"
+        self, group_id: str, artifact_id: str, version: str, repo_index: int = 0, packaging: str = "jar"
     ) -> Optional[str]:
         """Construct a Maven artifact URL from coordinates.
 
@@ -273,7 +264,7 @@ class URLConfig:
             return None
 
         # Normalize group ID (replace dots with slashes)
-        group_path = group_id.replace('.', '/')
+        group_path = group_id.replace(".", "/")
 
         # Construct the artifact URL
         filename = f"{artifact_id}-{version}.{packaging}"
@@ -297,7 +288,7 @@ class URLConfig:
             return None
 
         # Normalize group ID (replace dots with slashes)
-        group_path = group_id.replace('.', '/')
+        group_path = group_id.replace(".", "/")
 
         # Construct the metadata URL
         metadata_url = f"{repo_url.rstrip('/')}/{group_path}/{artifact_id}/maven-metadata.xml"
@@ -321,7 +312,7 @@ class URLConfig:
             if not result.scheme or not result.netloc:
                 return False, "Invalid URL format"
 
-            if result.scheme not in ('http', 'https'):
+            if result.scheme not in ("http", "https"):
                 return False, "URL must use http:// or https://"
 
             return True, "URL format is valid"
@@ -340,50 +331,58 @@ class URLConfig:
             return False
 
         try:
-            with open(config_file, 'w', encoding='utf-8') as f:
-                json.dump({
-                    'maven_repos': self._config['maven_repos'],
-                    'custom_repos': self._config['custom_repos'],
-                    'url_patterns': self._config['url_patterns'],
-                    'download_sources': self._config['download_sources']
-                }, f, indent=2)
+            with open(config_file, "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "maven_repos": self._config["maven_repos"],
+                        "custom_repos": self._config["custom_repos"],
+                        "url_patterns": self._config["url_patterns"],
+                        "download_sources": self._config["download_sources"],
+                    },
+                    f,
+                    indent=2,
+                )
             return True
         except Exception as e:
             logger.error(f"Error saving URL config to {config_file}: {e}")
             return False
 
+
 # Global instance for convenience
 url_config = URLConfig()
+
 
 def get_maven_repositories() -> List[str]:
     """Get all configured Maven repository URLs."""
     return url_config.get_maven_repositories()
 
+
 def get_repository_url(repo_index: int = 0) -> Optional[str]:
     """Get a specific Maven repository URL by index."""
     return url_config.get_repository_url(repo_index)
+
 
 def add_maven_repository(url: str) -> bool:
     """Add a Maven repository URL."""
     return url_config.add_maven_repository(url)
 
+
 def add_custom_repository(url: str) -> bool:
     """Add a custom repository URL."""
     return url_config.add_custom_repository(url)
 
+
 def construct_maven_artifact_url(
-    group_id: str,
-    artifact_id: str,
-    version: str,
-    repo_index: int = 0,
-    packaging: str = "jar"
+    group_id: str, artifact_id: str, version: str, repo_index: int = 0, packaging: str = "jar"
 ) -> Optional[str]:
     """Construct a Maven artifact URL from coordinates."""
     return url_config.construct_maven_artifact_url(group_id, artifact_id, version, repo_index, packaging)
 
+
 def construct_metadata_url(group_id: str, artifact_id: str, repo_index: int = 0) -> Optional[str]:
     """Construct a Maven metadata URL."""
     return url_config.construct_metadata_url(group_id, artifact_id, repo_index)
+
 
 def validate_url(url: str) -> Tuple[bool, str]:
     """Validate a URL format and basic connectivity."""
