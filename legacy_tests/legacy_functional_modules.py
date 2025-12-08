@@ -2,6 +2,7 @@
 """
 Functional test suite for key dbutils modules
 """
+
 import sys
 from pathlib import Path
 
@@ -12,20 +13,21 @@ src_path = Path(__file__).parent / "src"
 sys.path.insert(0, str(src_path))
 
 
-
 class TestUtilsModule:
     """Test the utils module functionality."""
 
     def test_utils_import(self):
         """Test that utils module can be imported."""
         import dbutils.utils
+
         assert dbutils.utils is not None
 
     def test_query_runner_exists(self):
         """Test that query_runner function exists (the key function)."""
         import dbutils.utils
+
         # The query_runner function is the main export
-        assert hasattr(dbutils.utils, 'query_runner')
+        assert hasattr(dbutils.utils, "query_runner")
         assert callable(dbutils.utils.query_runner)
 
 
@@ -35,10 +37,11 @@ class TestDBBrowserModule:
     def test_db_browser_import(self):
         """Test that db_browser module can be imported."""
         import dbutils.db_browser
+
         assert dbutils.db_browser is not None
 
         # Check for key functions
-        assert hasattr(dbutils.db_browser, 'query_runner')
+        assert hasattr(dbutils.db_browser, "query_runner")
         assert callable(dbutils.db_browser.query_runner)
 
 
@@ -53,15 +56,15 @@ class TestJDBCAutoDownloader:
         assert len(JDBC_DRIVER_COORDINATES) > 0
 
         # Check that some expected database types are present
-        expected_dbs = ['postgresql', 'mysql', 'mariadb', 'sqlserver', 'sqlite', 'h2']
+        expected_dbs = ["postgresql", "mysql", "mariadb", "sqlserver", "sqlite", "h2"]
         for db in expected_dbs:
             assert db in JDBC_DRIVER_COORDINATES, f"Missing {db} in coordinates"
 
             # Check structure of each coordinate entry
             coords = JDBC_DRIVER_COORDINATES[db]
-            assert 'group_id' in coords
-            assert 'artifact_id' in coords
-            assert 'metadata_url' in coords
+            assert "group_id" in coords
+            assert "artifact_id" in coords
+            assert "metadata_url" in coords
 
 
 class TestJDBCProviderModule:
@@ -72,8 +75,9 @@ class TestJDBCProviderModule:
         # Import the module to check basic functionality
         try:
             from dbutils import jdbc_provider
+
             # Basic import test
-            assert hasattr(jdbc_provider, 'JDBCProvider')
+            assert hasattr(jdbc_provider, "JDBCProvider")
         except ImportError as e:
             # This might fail due to JVM/jaydebeapi requirements, which is acceptable
             print(f"JDBC provider import skipped: {e}")
@@ -88,15 +92,15 @@ class TestMainComponents:
         import dbutils.main_launcher
 
         # Check for the main function
-        assert hasattr(dbutils.main_launcher, 'main')
+        assert hasattr(dbutils.main_launcher, "main")
         assert callable(dbutils.main_launcher.main)
 
         # Check for utility functions
-        assert hasattr(dbutils.main_launcher, 'check_gui_availability')
+        assert hasattr(dbutils.main_launcher, "check_gui_availability")
         assert callable(dbutils.main_launcher.check_gui_availability)
 
         # Check for launch function
-        assert hasattr(dbutils.main_launcher, 'launch_qt_interface')
+        assert hasattr(dbutils.main_launcher, "launch_qt_interface")
         assert callable(dbutils.main_launcher.launch_qt_interface)
 
 
@@ -113,7 +117,7 @@ class TestDataClasses:
             category="Test",
             driver_class="com.test.Driver",
             jar_path="/path/to/test.jar",
-            url_template="jdbc:test://localhost:5432/testdb"
+            url_template="jdbc:test://localhost:5432/testdb",
         )
 
         # Verify the attributes are set correctly

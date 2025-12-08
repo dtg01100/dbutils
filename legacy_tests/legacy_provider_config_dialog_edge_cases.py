@@ -3,6 +3,7 @@
 Comprehensive Pytest-Qt tests for ProviderConfigDialog functionality
 including edge cases, worst case scenarios, and user interaction simulation.
 """
+
 import sys
 from pathlib import Path
 
@@ -84,6 +85,7 @@ class TestProviderConfigDialogComprehensive:
         # Add a fake provider to the list (but not in registry)
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import QListWidgetItem
+
         fake_item = QListWidgetItem("Fake:NonExistentProvider")
         fake_item.setData(Qt.ItemDataRole.UserRole, "NonExistentProvider")
         dialog.provider_list.addItem(fake_item)
@@ -221,7 +223,7 @@ class TestProviderConfigDialogComprehensive:
         assert dialog.provider_list.count() == initial_count + 1
 
         # Mock the QMessageBox.question to automatically return 'Yes' to avoid popup
-        with unittest.mock.patch.object(QMessageBox, 'question', return_value=QMessageBox.StandardButton.Yes):
+        with unittest.mock.patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes):
             # The new provider should be selected, so delete it
             dialog.delete_selected()
 

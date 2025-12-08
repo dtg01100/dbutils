@@ -32,6 +32,7 @@ def test_jpype_basic():
 
     # If we reach here the JVM is available and basic checks passed
 
+
 def test_jt400_classpath():
     """Test loading JT400 with classpath."""
     print("\n=== JT400 Classpath Test ===")
@@ -75,6 +76,7 @@ def test_jt400_classpath():
         print(f"✗ Failed to load JT400 driver: {e}")
         return False
 
+
 def main():
     """Run tests."""
     print("Testing JT400 with Python 3.12\n")
@@ -89,6 +91,7 @@ def main():
 
     print("\n🎉 All tests passed!")
     return 0
+
 
 if __name__ == "__main__":
     exit(main())

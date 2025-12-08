@@ -67,6 +67,7 @@ def test_correctness():
 
     return all_passed
 
+
 def test_performance():
     """Test performance improvement."""
     print("\nTesting performance improvement...")
@@ -87,9 +88,10 @@ def test_performance():
     optimized_time = time.time() - start_time
 
     print(f"Optimized function completed {iterations * len(test_pairs)} calculations in {optimized_time:.3f}s")
-    print(f"Average time per calculation: {optimized_time/(iterations * len(test_pairs)):.6f}s")
+    print(f"Average time per calculation: {optimized_time / (iterations * len(test_pairs)):.6f}s")
 
     return optimized_time
+
 
 if __name__ == "__main__":
     correctness_ok = test_correctness()

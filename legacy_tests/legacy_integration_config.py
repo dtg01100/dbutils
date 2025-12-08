@@ -7,7 +7,7 @@ import os
 import sys
 
 # Add the src directory to the path so we can import the modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from dbutils.config_manager import ConfigurationLoader, get_default_config_manager
 from dbutils.enhanced_jdbc_provider import EnhancedProviderRegistry, PredefinedProviderTemplates
@@ -46,6 +46,7 @@ def test_enhanced_provider_integration():
 
     return True
 
+
 def test_jdbc_provider_integration():
     """Test that the basic JDBC provider works with the new configuration system."""
     print("\nTesting ProviderRegistry integration...")
@@ -67,6 +68,7 @@ def test_jdbc_provider_integration():
     print(f"✅ ProviderRegistry loaded {len(providers)} providers: {providers}")
 
     return True
+
 
 def test_environment_override_integration():
     """Test environment variable overrides work with the provider system."""
@@ -107,6 +109,7 @@ def test_environment_override_integration():
 
     return True
 
+
 def test_fallback_mechanisms_integration():
     """Test that fallback mechanisms work in the provider system."""
     print("\nTesting fallback mechanisms integration...")
@@ -130,6 +133,7 @@ def test_fallback_mechanisms_integration():
         print("❌ Fallback provider creation failed")
 
     return True
+
 
 def test_configuration_consistency():
     """Test that configuration is consistent across different loading mechanisms."""
@@ -164,6 +168,7 @@ def test_configuration_consistency():
 
     return True
 
+
 def main():
     """Run all integration tests."""
     print("Starting integration tests for refactored configuration system...")
@@ -186,8 +191,10 @@ def main():
     except Exception as e:
         print(f"\n❌ Integration test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

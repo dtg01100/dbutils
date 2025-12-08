@@ -12,7 +12,7 @@ import os
 import sys
 
 # Add src to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -38,10 +38,12 @@ from dbutils.gui.license_store import accept_license, is_license_accepted
 try:
     from dbutils.config.dbutils_config import get_maven_repositories as get_new_maven_repos
     from dbutils.config.url_config import get_maven_repositories as get_url_maven_repos
+
     NEW_CONFIG_AVAILABLE = True
 except ImportError:
     NEW_CONFIG_AVAILABLE = False
     print("New configuration system not available, using fallback")
+
 
 def test_auto_download_infrastructure():
     """Test the complete auto-download infrastructure."""
@@ -54,7 +56,7 @@ def test_auto_download_infrastructure():
 
     for file_path in config_files:
         if os.path.exists(file_path):
-            with open(file_path, 'r') as f:
+            with open(file_path, "r") as f:
                 content = f.read()
             if "AUTO_DOWNLOAD_" in content:
                 print(f"   ✓ {file_path} updated with auto-download references")
@@ -136,7 +138,7 @@ def test_auto_download_infrastructure():
         provider = get_configured_provider(db_type)
         if provider:
             print(f"   ✓ {db_type} provider: {provider.get('name', 'Unknown')}")
-            if 'jar_path' in provider and provider['jar_path']:
+            if "jar_path" in provider and provider["jar_path"]:
                 print(f"     JAR path: {provider['jar_path']}")
             else:
                 print("     No JAR path available")
@@ -161,12 +163,12 @@ def test_auto_download_infrastructure():
     print("\n9. Testing configuration file creation...")
     config_file = os.path.join(config.config_dir, "providers.json")
     if os.path.exists(config_file):
-        with open(config_file, 'r') as f:
+        with open(config_file, "r") as f:
             providers_data = json.load(f)
         print(f"   ✓ Providers configuration file created with {len(providers_data)} providers")
 
         # Check for auto-download providers
-        auto_download_providers = [p for p in providers_data if p.get('auto_download', False)]
+        auto_download_providers = [p for p in providers_data if p.get("auto_download", False)]
         print(f"   ✓ Found {len(auto_download_providers)} auto-download providers")
     else:
         print("   ✗ Providers configuration file not found")
@@ -220,6 +222,7 @@ def test_auto_download_infrastructure():
 
     return True
 
+
 def test_manual_download_with_licenses():
     """Test manual download functionality with licenses accepted."""
     print("\nTesting Manual Download with Licenses Accepted")
@@ -234,9 +237,7 @@ def test_manual_download_with_licenses():
     # Test downloading a specific driver
     print("\nTesting download for sqlite...")
     result = download_jdbc_driver(
-        db_type="sqlite",
-        version="recommended",
-        on_status=lambda msg: print(f"  Status: {msg}")
+        db_type="sqlite", version="recommended", on_status=lambda msg: print(f"  Status: {msg}")
     )
 
     if result:
@@ -245,6 +246,7 @@ def test_manual_download_with_licenses():
         print("✗ Failed to download sqlite driver")
 
     return result is not None
+
 
 def main():
     """Run all tests."""
@@ -267,6 +269,7 @@ def main():
     else:
         print("\n❌ Some tests failed. Please check the output above.")
         return False
+
 
 if __name__ == "__main__":
     success = main()

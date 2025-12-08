@@ -17,20 +17,11 @@ def test_jpype_alternative():
     # Try different JVM startup approaches
     approaches = [
         # Approach 1: Basic with classpath
-        {
-            "name": "Basic with classpath",
-            "args": ["-Djava.class.path=" + str(jar_path)]
-        },
+        {"name": "Basic with classpath", "args": ["-Djava.class.path=" + str(jar_path)]},
         # Approach 2: With explicit classpath
-        {
-            "name": "With explicit classpath",
-            "args": ["-classpath", str(jar_path)]
-        },
+        {"name": "With explicit classpath", "args": ["-classpath", str(jar_path)]},
         # Approach 3: Minimal
-        {
-            "name": "Minimal startup",
-            "args": []
-        }
+        {"name": "Minimal startup", "args": []},
     ]
 
     for approach in approaches:
@@ -44,7 +35,7 @@ def test_jpype_alternative():
 
             # Start JVM with this approach
             print(f"Starting JVM with args: {approach['args']}")
-            jpype.startJVM(*approach['args'])
+            jpype.startJVM(*approach["args"])
             print("✓ JVM started successfully")
 
             # Test basic Java functionality
@@ -52,7 +43,7 @@ def test_jpype_alternative():
             print(f"✓ Java System class: {java_system.getProperty('java.version')}")
 
             # Try to load JT400 if classpath was provided
-            if "class" in str(approach['args']):
+            if "class" in str(approach["args"]):
                 try:
                     driver_class = jpype.JClass("com.ibm.as400.access.AS400JDBCDriver")
                     print("✓ JT400 driver class loaded")
@@ -77,6 +68,7 @@ def test_jpype_alternative():
 
     return False
 
+
 def test_direct_jar():
     """Test direct JAR access."""
     print("\n=== Direct JAR Test ===")
@@ -89,15 +81,16 @@ def test_direct_jar():
 
         # Try to read JAR manifest
         import zipfile
+
         try:
-            with zipfile.ZipFile(jar_path, 'r') as jar:
-                manifest = jar.read('META-INF/MANIFEST.MF').decode('utf-8')
+            with zipfile.ZipFile(jar_path, "r") as jar:
+                manifest = jar.read("META-INF/MANIFEST.MF").decode("utf-8")
                 print("✓ JAR manifest readable")
 
                 # Look for key entries
                 driver_found = False
                 for name in jar.namelist():
-                    if 'AS400JDBCDriver' in name:
+                    if "AS400JDBCDriver" in name:
                         driver_found = True
                         print(f"✓ Found driver class: {name}")
                         break
@@ -115,6 +108,7 @@ def test_direct_jar():
 
     return True
 
+
 def main():
     """Run tests."""
     print("Testing JT400 with alternative approaches\n")
@@ -131,6 +125,7 @@ def main():
     else:
         print("\n❌ All approaches failed")
         return 1
+
 
 if __name__ == "__main__":
     exit(main())

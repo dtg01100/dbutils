@@ -20,10 +20,11 @@ def test_jt400_jar_exists():
         print(f"✗ JT400 JAR not found at: {jar_path.absolute()}")
         return False, None
 
+
 def inspect_jar_structure(jar_path):
     """Inspect the JAR file structure to verify it contains JT400 classes."""
     try:
-        with zipfile.ZipFile(jar_path, 'r') as jar:
+        with zipfile.ZipFile(jar_path, "r") as jar:
             files = jar.namelist()
 
             # Look for key JT400 classes
@@ -48,10 +49,10 @@ def inspect_jar_structure(jar_path):
                 # Read and display key manifest info
                 try:
                     with jar.open(manifest) as mf:
-                        content = mf.read().decode('utf-8')
-                        lines = [line.strip() for line in content.split('\n') if line.strip()]
+                        content = mf.read().decode("utf-8")
+                        lines = [line.strip() for line in content.split("\n") if line.strip()]
                         for line in lines[:10]:  # Show first 10 lines
-                            if any(key in line for key in ['Manifest-Version', 'Implementation-Version', 'Main-Class']):
+                            if any(key in line for key in ["Manifest-Version", "Implementation-Version", "Main-Class"]):
                                 print(f"  {line}")
                 except Exception as e:
                     print(f"  Could not read manifest: {e}")
@@ -61,8 +62,8 @@ def inspect_jar_structure(jar_path):
             # Show some package structure
             packages = set()
             for file in files:
-                if '/' in file and file.endswith('.class'):
-                    pkg = file.split('/')[0]
+                if "/" in file and file.endswith(".class"):
+                    pkg = file.split("/")[0]
                     packages.add(pkg)
 
             print(f"✓ Found {len(packages)} main packages:")
@@ -80,6 +81,7 @@ def inspect_jar_structure(jar_path):
         print(f"✗ Error reading JAR file: {e}")
         return False
 
+
 def create_provider_config():
     """Create the provider configuration for JT400."""
     config = {
@@ -95,8 +97,8 @@ def create_provider_config():
             "decimal separator": ".",
             "translate binary": "true",
             "package": "default",
-            "lazy close": "true"
-        }
+            "lazy close": "true",
+        },
     }
 
     print("\n=== JT400 Provider Configuration ===")
@@ -104,9 +106,11 @@ def create_provider_config():
     print()
 
     import json
+
     print(json.dumps(config, indent=2))
 
     return config
+
 
 def show_usage_examples():
     """Show examples of how to use the JT400 provider."""
@@ -148,6 +152,7 @@ finally:
     print('  - With libraries: "jdbc:as400://{host}:{port};libraries=LIB1,LIB2; naming=1"')
     print('  - With date format: "jdbc:as400://{host}:{port}/{database};date format=iso;time format=iso"')
 
+
 def show_troubleshooting():
     """Show troubleshooting tips."""
     print("\n=== Troubleshooting ===")
@@ -168,6 +173,7 @@ def show_troubleshooting():
     print("   - Database parameter is usually the library/schema name")
     print("   - Use naming=1 for SQL naming (recommended)")
     print("   - Use naming=0 for system naming (*LIB/FILE)")
+
 
 def main():
     """Run all tests and show configuration."""
@@ -206,6 +212,7 @@ def main():
     else:
         print("\n❌ JAR file has issues. Check the output above.")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

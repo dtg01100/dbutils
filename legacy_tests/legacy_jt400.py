@@ -10,6 +10,7 @@ from pathlib import Path
 # Add src to path so we can import dbutils
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+
 def test_jt400_jar_exists():
     """Test that the jt400.jar file exists in the jars directory."""
     jar_path = Path("jars/jt400.jar")
@@ -21,16 +22,19 @@ def test_jt400_jar_exists():
         print(f"✗ JT400 JAR not found at: {jar_path.absolute()}")
         return False
 
+
 def test_jdbc_dependencies():
     """Test that JDBC dependencies are available."""
     try:
         import jaydebeapi
         import jpype
+
         print("✓ JDBC dependencies (JayDeBeApi, JPype) are available")
         return True
     except ImportError as e:
         print(f"✗ JDBC dependencies not available: {e}")
         return False
+
 
 def create_jt400_provider():
     """Create a JT400 provider configuration."""
@@ -43,11 +47,7 @@ def create_jt400_provider():
         url_template="jdbc:as400://{host}:{port}/{database};naming=1;errors=full",
         default_user=None,
         default_password=None,
-        extra_properties={
-            "date format": "iso",
-            "time format": "iso",
-            "decimal separator": "."
-        }
+        extra_properties={"date format": "iso", "time format": "iso", "decimal separator": "."},
     )
 
     # Add to registry
@@ -60,6 +60,7 @@ def create_jt400_provider():
     print(f"  URL Template: {provider.url_template}")
 
     return provider
+
 
 def test_jt400_driver_load():
     """Test that the JT400 driver can be loaded via JPype."""
@@ -89,6 +90,7 @@ def test_jt400_driver_load():
         print(f"✗ Failed to load JT400 driver: {e}")
         return False
 
+
 def test_connection_parameters():
     """Show example connection parameters for JT400."""
     print("\nExample connection parameters for JT400:")
@@ -98,12 +100,13 @@ def test_connection_parameters():
     print('export DBUTILS_JDBC_USER="your-user"')
     print('export DBUTILS_JDBC_PASSWORD="your-password"')
     print("\nOr use in code:")
-    print('conn = dbutils.jdbc_provider.connect(')
+    print("conn = dbutils.jdbc_provider.connect(")
     print('    "IBM i (JT400)",')
     print('    {"host": "your-as400", "port": 446, "database": "your-lib"},')
     print('    user="your-user",')
     print('    password="your-password"')
-    print(')')
+    print(")")
+
 
 def main():
     """Run all tests."""
@@ -153,6 +156,7 @@ def main():
     else:
         print("\n❌ Some tests failed. Check the output above.")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

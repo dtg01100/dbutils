@@ -7,7 +7,8 @@ import os
 import sys
 
 # Add src to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+
 
 def test_configuration_loading():
     """Test that the new configuration system loads correctly."""
@@ -39,7 +40,7 @@ def test_configuration_loading():
         maven_repos = get_maven_repositories()
         print(f"✓ Loaded {len(maven_repos)} Maven repositories")
         for i, repo in enumerate(maven_repos):
-            print(f"  {i+1}. {repo}")
+            print(f"  {i + 1}. {repo}")
 
         # Test version resolution
         version_strategy = config.get_version_resolution_strategy()
@@ -60,8 +61,10 @@ def test_configuration_loading():
     except Exception as e:
         print(f"✗ Configuration test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 def test_environment_variable_overrides():
     """Test environment variable override functionality."""
@@ -102,6 +105,7 @@ def test_environment_variable_overrides():
         os.environ.pop("DBUTILS_SQLITE_VERSION", None)
         os.environ.pop("DBUTILS_H2_VERSION", None)
 
+
 def test_backward_compatibility():
     """Test that the new system maintains backward compatibility."""
     print("\nTesting backward compatibility...")
@@ -128,16 +132,13 @@ def test_backward_compatibility():
         print(f"✗ Backward compatibility test failed: {e}")
         return False
 
+
 def main():
     """Run all tests."""
     print("Testing New Auto-Download Configuration System")
     print("=" * 50)
 
-    tests = [
-        test_configuration_loading,
-        test_environment_variable_overrides,
-        test_backward_compatibility
-    ]
+    tests = [test_configuration_loading, test_environment_variable_overrides, test_backward_compatibility]
 
     passed = 0
     total = len(tests)
@@ -155,6 +156,7 @@ def main():
     else:
         print("❌ Some tests failed. Please check the implementation.")
         return False
+
 
 if __name__ == "__main__":
     success = main()

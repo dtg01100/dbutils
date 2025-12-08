@@ -13,7 +13,7 @@ import os
 import sys
 
 # Add the src directory to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from dbutils.config_manager import ConfigManager, ConfigurationLoader, get_default_config_manager
 from dbutils.jdbc_provider import ProviderRegistry
@@ -24,10 +24,7 @@ def test_refactoring_goal_1():
     print("🔍 Testing Goal 1: External configuration files...")
 
     # Verify configuration files exist
-    config_files = [
-        "src/dbutils/config/jdbc_templates.json",
-        "src/dbutils/config/jdbc_config.json"
-    ]
+    config_files = ["src/dbutils/config/jdbc_templates.json", "src/dbutils/config/jdbc_config.json"]
 
     for file_path in config_files:
         if os.path.exists(file_path):
@@ -54,6 +51,7 @@ def test_refactoring_goal_1():
 
     return True
 
+
 def test_refactoring_goal_2():
     """Test Goal 2: Hardcoded JAR paths replaced with dynamic resolution."""
     print("\n🔍 Testing Goal 2: Dynamic JAR path resolution...")
@@ -65,7 +63,7 @@ def test_refactoring_goal_2():
         ("h2", "H2 database"),
         ("sqlite-jdbc", "SQLite JDBC driver"),
         ("postgresql", "PostgreSQL driver"),
-        ("nonexistent-driver", "Non-existent driver (should return None)")
+        ("nonexistent-driver", "Non-existent driver (should return None)"),
     ]
 
     for jar_name, description in test_cases:
@@ -85,6 +83,7 @@ def test_refactoring_goal_2():
         return False
 
     return True
+
 
 def test_refactoring_goal_3():
     """Test Goal 3: URL templates and driver classes made configurable."""
@@ -140,6 +139,7 @@ def test_refactoring_goal_3():
 
     return True
 
+
 def test_refactoring_goal_4():
     """Test Goal 4: Flexible configuration system with proper fallback mechanisms."""
     print("\n🔍 Testing Goal 4: Flexible configuration with fallback mechanisms...")
@@ -181,6 +181,7 @@ def test_refactoring_goal_4():
 
     return True
 
+
 def test_integration_with_existing_system():
     """Test that the refactored system integrates properly with existing JDBC providers."""
     print("\n🔍 Testing integration with existing JDBC provider system...")
@@ -210,6 +211,7 @@ def test_integration_with_existing_system():
 
     return True
 
+
 def test_environment_variable_features():
     """Test environment variable features."""
     print("\n🔍 Testing environment variable features...")
@@ -219,12 +221,7 @@ def test_environment_variable_features():
     os.environ["DBUTILS_NESTED_VAR"] = "nested_value"
 
     manager = ConfigManager()
-    test_config = {
-        "simple": "${DBUTILS_TEST_VAR}",
-        "nested": {
-            "var": "$DBUTILS_NESTED_VAR"
-        }
-    }
+    test_config = {"simple": "${DBUTILS_TEST_VAR}", "nested": {"var": "$DBUTILS_NESTED_VAR"}}
 
     expanded = manager._expand_environment_variables(test_config)
 
@@ -241,6 +238,7 @@ def test_environment_variable_features():
         return False
 
     return True
+
 
 def main():
     """Run all verification tests."""
@@ -273,8 +271,10 @@ def main():
     except Exception as e:
         print(f"\n❌ Verification failed with exception: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -2,6 +2,7 @@
 """
 Comprehensive test suite for the entire dbutils project
 """
+
 import importlib.util
 import sys
 from pathlib import Path
@@ -11,7 +12,6 @@ import pytest
 # Add the src directory to Python path
 src_path = Path(__file__).parent / "src"
 sys.path.insert(0, str(src_path))
-
 
 
 def import_module_from_path(module_name, file_path):
@@ -102,7 +102,7 @@ class TestCoreFunctionality:
         from dbutils import utils
 
         # Test that query_runner functions exist (though they need environment to run)
-        assert hasattr(utils, 'query_runner')  # This is a key function
+        assert hasattr(utils, "query_runner")  # This is a key function
 
         # Check for other utility functions
         print("Utils module loaded with basic functionality")
@@ -116,6 +116,7 @@ class TestGUIComponents:
         try:
             # Just test that we can import the module without errors
             from dbutils.gui.qt_app import QtDBBrowser
+
             assert QtDBBrowser is not None
         except ImportError as e:
             # Some dependencies might not be available
@@ -125,6 +126,7 @@ class TestGUIComponents:
     def test_enhanced_widgets(self):
         """Test enhanced widgets module."""
         from dbutils.gui.widgets.enhanced_widgets import BusyOverlay
+
         assert BusyOverlay is not None
 
     def test_jdbc_auto_downloader(self):
@@ -170,24 +172,21 @@ class TestMainLauncher:
     def test_main_launcher_import(self):
         """Test that main launcher can be imported."""
         import dbutils.main_launcher
+
         assert dbutils.main_launcher is not None
 
         # Test that main function exists
-        assert hasattr(dbutils.main_launcher, 'main')
+        assert hasattr(dbutils.main_launcher, "main")
         assert callable(dbutils.main_launcher.main)
 
         # Test utility functions
-        assert hasattr(dbutils.main_launcher, 'check_gui_availability')
+        assert hasattr(dbutils.main_launcher, "check_gui_availability")
 
 
 def pytest_configure(config):
     """Configure pytest settings."""
-    config.addinivalue_line(
-        "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
-    )
-    config.addinivalue_line(
-        "markers", "integration: marks tests as integration tests"
-    )
+    config.addinivalue_line("markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')")
+    config.addinivalue_line("markers", "integration: marks tests as integration tests")
 
 
 if __name__ == "__main__":

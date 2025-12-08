@@ -76,6 +76,7 @@ def main():
 
     except Exception as e:
         import traceback
+
         print(f"✗ SQLite JDBC smoke test failed: {e}")
         print("Traceback:")
         traceback.print_exc()
@@ -90,5 +91,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

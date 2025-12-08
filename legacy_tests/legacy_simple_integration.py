@@ -7,7 +7,7 @@ import os
 import sys
 
 # Add the src directory to the path so we can import the modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from dbutils.config_manager import ConfigManager, ConfigurationLoader, get_default_config_manager
 from dbutils.jdbc_provider import ProviderRegistry
@@ -31,6 +31,7 @@ def test_config_manager_basic():
 
     return True
 
+
 def test_jar_path_resolution():
     """Test JAR path resolution functionality."""
     print("\nTesting JAR path resolution...")
@@ -52,6 +53,7 @@ def test_jar_path_resolution():
     assert test_path == "/test/path/test.jar", "Environment variable override failed"
 
     return True
+
 
 def test_configuration_loader():
     """Test ConfigurationLoader with fallback mechanisms."""
@@ -76,6 +78,7 @@ def test_configuration_loader():
 
     return True
 
+
 def test_environment_variable_expansion():
     """Test environment variable expansion."""
     print("\nTesting environment variable expansion...")
@@ -88,12 +91,7 @@ def test_environment_variable_expansion():
     manager.add_config_source("DBUTILS", "env")
 
     # Test expansion
-    test_config = {
-        "simple": "${DBUTILS_TEST_VAR}",
-        "nested": {
-            "var": "$DBUTILS_NESTED_TEST_VAR"
-        }
-    }
+    test_config = {"simple": "${DBUTILS_TEST_VAR}", "nested": {"var": "$DBUTILS_NESTED_TEST_VAR"}}
 
     expanded = manager._expand_environment_variables(test_config)
 
@@ -103,6 +101,7 @@ def test_environment_variable_expansion():
     print("✅ Environment variable expansion working correctly")
 
     return True
+
 
 def test_provider_registry_integration():
     """Test that ProviderRegistry works with the new config system."""
@@ -122,6 +121,7 @@ def test_provider_registry_integration():
 
     return True
 
+
 def test_fallback_mechanisms():
     """Test fallback mechanisms."""
     print("\nTesting fallback mechanisms...")
@@ -138,6 +138,7 @@ def test_fallback_mechanisms():
     print("✅ Fallback mechanisms working correctly")
 
     return True
+
 
 def main():
     """Run all tests."""
@@ -158,8 +159,10 @@ def main():
     except Exception as e:
         print(f"\n❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -10,6 +10,7 @@ from pathlib import Path
 # Add src to path so we can import dbutils
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+
 def mock_jt400_test():
     """Mock test showing how JT400 integration would work."""
     print("=== Mock JT400 Integration Test ===\n")
@@ -37,11 +38,12 @@ def mock_jt400_test():
             "decimal separator": ".",
             "translate binary": "true",
             "package": "default",
-            "lazy close": "true"
-        }
+            "lazy close": "true",
+        },
     }
 
     import json
+
     print("   Configuration:")
     print(json.dumps(config, indent=6))
 
@@ -61,7 +63,7 @@ def mock_jt400_test():
     mock_results = [
         {"TABLE_SCHEMA": "QSYS2", "TABLE_NAME": "SYSTABLES", "TABLE_TYPE": "SYSTEM VIEW"},
         {"TABLE_SCHEMA": "QSYS2", "TABLE_NAME": "SYSCOLUMNS", "TABLE_TYPE": "SYSTEM VIEW"},
-        {"TABLE_SCHEMA": "QSYS2", "TABLE_NAME": "SYSINDEXES", "TABLE_TYPE": "SYSTEM VIEW"}
+        {"TABLE_SCHEMA": "QSYS2", "TABLE_NAME": "SYSINDEXES", "TABLE_TYPE": "SYSTEM VIEW"},
     ]
 
     print("   Results:")
@@ -77,6 +79,7 @@ def mock_jt400_test():
     print("   ✓ CLI Integration: db-browser-gui with JDBC env vars")
 
     return True
+
 
 def show_next_steps():
     """Show next steps for actual implementation."""
@@ -94,7 +97,7 @@ def show_next_steps():
 
     print("3. Test Connection:")
     print("   export DBUTILS_JDBC_PROVIDER='IBM i (JT400)'")
-    print("   export DBUTILS_JDBC_URL_PARAMS='{\"host\":\"your-as400\",\"port\":446,\"database\":\"your-lib\"}'")
+    print('   export DBUTILS_JDBC_URL_PARAMS=\'{"host":"your-as400","port":446,"database":"your-lib"}\'')
     print("   export DBUTILS_JDBC_USER='your-user'")
     print("   export DBUTILS_JDBC_PASSWORD='your-password'")
     print("   python -m dbutils.gui.qt_app")
@@ -114,6 +117,7 @@ def show_next_steps():
     print("   - Multiple libs: jdbc:as400://{host}:{port};libraries=LIB1,LIB2;naming=1")
     print("   - Date format: jdbc:as400://{host}:{port}/{database};date format=iso;time format=iso")
 
+
 def main():
     """Run the mock test."""
     success = mock_jt400_test()
@@ -126,6 +130,7 @@ def main():
     else:
         print("\n❌ Mock test failed")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())
