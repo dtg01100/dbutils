@@ -5,8 +5,11 @@ Similar to DBeaver's approach with simple defaults and advanced options hidden i
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 # Try to import Qt components
 try:
@@ -613,6 +616,8 @@ if QT_BINDINGS:
             from .jdbc_auto_downloader import find_existing_drivers
 
             category = self.category_input.currentText()
+            # Normalize category to lowercase for download manager (expects 'postgresql', 'mysql', etc.)
+            category_lower = category.lower() if category else ""
             if not category or category == "Generic":
                 # Try to guess from driver class field if category is generic
                 driver_class = self.driver_class_input.text().strip().lower()
@@ -642,6 +647,7 @@ if QT_BINDINGS:
 
                 if detected_category:
                     category = detected_category
+                    category_lower = detected_category.lower()
                     QMessageBox.information(
                         self, "Driver Detected", f"Automatically detected {category} driver based on driver class."
                     )
@@ -660,9 +666,12 @@ if QT_BINDINGS:
                         suggestion_msg + "\nPlease select a database category or update the driver class field.",
                     )
                     return
+            else:
+                # Use lowercase version for download manager
+                category_lower = category.lower()
 
             # Check if driver already exists
-            existing_drivers = find_existing_drivers(category)
+            existing_drivers = find_existing_drivers(category_lower)
             if existing_drivers:
                 reply = QMessageBox.question(
                     self,
@@ -690,7 +699,7 @@ if QT_BINDINGS:
                     return
 
             # Build dialog (use helper so tests can inspect controls)
-            dialog, download_btn, manual_btn, license_checkbox, _, _, _, _ = self.create_download_dialog(category)
+            dialog, download_btn, manual_btn, license_checkbox, _, _, _, _ = self.create_download_dialog(category_lower)
 
             # If running under test mode, avoid blocking GUI; return the dialog and controls so tests
             # can interact with the returned widgets directly without opening a native modal dialog.
@@ -706,7 +715,7 @@ if QT_BINDINGS:
                     version = None
                     if hasattr(self, "_pending_download_options"):
                         version = self._pending_download_options.get("version")
-                    self.perform_jdbc_download(category, version=version)
+                    self.perform_jdbc_download(category_lower, version=version)
             except Exception as e:
                 QMessageBox.critical(self, "Download Dialog Error", f"Failed to open download dialog: {e}")
             finally:
@@ -1037,3 +1046,109 @@ if QT_BINDINGS:
                 self.download_progress.setVisible(False)
                 if hasattr(self, "download_status_label") and self.download_status_label is not None:
                     self.download_status_label.setVisible(False)
+
+
+def handle_missing_jdbc_driver_auto_download(provider_name: str, parent_widget=None) -> bool:
+    """
+    Attempt to automatically download a missing JDBC driver and update the provider registry.
+
+    This is called when a connection attempt fails with MissingJDBCDriverError.
+    Shows a download dialog and updates the provider configuration if successful.
+
+    Args:
+        provider_name: The name of the provider (e.g., 'SQLite (Test Integration)')
+        parent_widget: Qt parent widget for the download dialog
+
+    Returns:
+        True if download was successful, False otherwise
+    """
+    if not QT_BINDINGS:
+        logger.error("Qt bindings not available, cannot handle missing JDBC driver")
+        return False
+
+    try:
+        from dbutils.enhanced_jdbc_provider import EnhancedProviderRegistry
+
+        registry = EnhancedProviderRegistry()
+        provider = registry.get_provider(provider_name)
+        if not provider:
+            logger.error(f"Provider '{provider_name}' not found in registry")
+            return False
+
+        # Map provider driver_class to lowercase download category
+        # Expected by download manager: 'postgresql', 'mysql', 'sqlite', 'oracle', 'h2', etc.
+        category = None
+        if "sqlite" in provider.driver_class.lower():
+            category = "sqlite"
+        elif "h2" in provider.driver_class.lower():
+            category = "h2"
+        elif "postgres" in provider.driver_class.lower():
+            category = "postgresql"
+        elif "mysql" in provider.driver_class.lower():
+            category = "mysql"
+        elif "oracle" in provider.driver_class.lower():
+            category = "oracle"
+        elif "sqlserver" in provider.driver_class.lower() or "mssql" in provider.driver_class.lower():
+            category = "sqlserver"
+        elif "db2" in provider.driver_class.lower():
+            category = "db2"
+        elif "mariadb" in provider.driver_class.lower():
+            category = "mariadb"
+
+        if not category:
+            logger.warning(f"Cannot determine download category for {provider_name} with driver class {provider.driver_class}")
+            return False
+
+        # Create a temporary provider config dialog to use its download logic
+        dialog = ProviderConfigDialog(parent_widget)
+
+        # Show the download in progress
+        QMessageBox.information(
+            parent_widget or dialog,
+            "Downloading JDBC Driver",
+            f"Downloading JDBC driver for {provider_name}...",
+        )
+
+        # Perform the download
+        try:
+            from dbutils.gui.jdbc_driver_manager import download_jdbc_driver as download_auto
+
+            result = download_auto(category, version="latest")
+            if result:
+                # Update the provider with the downloaded jar path
+                if isinstance(result, list):
+                    first = result[0] if result else ""
+                    provider.jar_path = first
+                else:
+                    provider.jar_path = result
+
+                # Save the updated provider configuration
+                registry.update_provider(provider)
+
+                QMessageBox.information(
+                    parent_widget or dialog,
+                    "Download Complete",
+                    f"Successfully downloaded JDBC driver for {provider_name}.\n"
+                    f"Path: {os.path.basename(provider.jar_path)}",
+                )
+                return True
+            else:
+                QMessageBox.warning(
+                    parent_widget or dialog,
+                    "Download Failed",
+                    f"Could not automatically download JDBC driver for {provider_name}.\n"
+                    f"Please download it manually from the official source.",
+                )
+                return False
+        except Exception as e:
+            QMessageBox.critical(
+                parent_widget or dialog,
+                "Download Error",
+                f"Error downloading JDBC driver: {e}",
+            )
+            logger.error(f"Error downloading JDBC driver for {provider_name}: {e}")
+            return False
+    except Exception as e:
+        logger.error(f"Error in handle_missing_jdbc_driver_auto_download: {e}")
+        return False
+

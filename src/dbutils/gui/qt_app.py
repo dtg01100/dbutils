@@ -19,9 +19,12 @@ import sys
 import asyncio
 import json
 import csv
+import logging
 from typing import Dict, List, Optional, Any
 import html
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 try:
     # Prefer importing the modules and mapping names explicitly so we don't
@@ -1180,6 +1183,7 @@ class DataLoaderWorker(QObject):
     data_loaded = Signal(object, object, object)  # (tables, columns, all_schemas)
     chunk_loaded = Signal(object, object, int, int)  # (tables_chunk, columns_chunk, loaded, total_est)
     error_occurred = Signal(str)
+    missing_driver_detected = Signal(str)  # Emits provider_name when missing JDBC driver is detected
     progress_updated = Signal(str)
     progress_value = Signal(int, int)  # (current, total)
 
@@ -1268,7 +1272,13 @@ class DataLoaderWorker(QObject):
             self.progress_value.emit(3, 3)
             self.data_loaded.emit([], [], all_schemas)
         except Exception as e:
-            self.error_occurred.emit(str(e))
+            # Check if this is a missing JDBC driver error
+            if e.__class__.__name__ == "MissingJDBCDriverError":
+                # Extract provider name from the exception if possible
+                provider_name = getattr(e, "provider_name", "Unknown Provider")
+                self.missing_driver_detected.emit(provider_name)
+            else:
+                self.error_occurred.emit(str(e))
 
 
 class DataLoaderProcess(QObject):
@@ -2263,6 +2273,7 @@ class QtDBBrowser(QMainWindow):
         self.data_loader_worker.data_loaded.connect(self.on_data_loaded)
         self.data_loader_worker.chunk_loaded.connect(self.on_data_chunk)
         self.data_loader_worker.error_occurred.connect(self.on_data_load_error)
+        self.data_loader_worker.missing_driver_detected.connect(self.on_missing_jdbc_driver)
         self.data_loader_worker.progress_updated.connect(self.status_label.setText)
         self.data_loader_worker.progress_value.connect(self.on_data_progress)
         self.data_loader_thread.started.connect(
@@ -2411,6 +2422,49 @@ class QtDBBrowser(QMainWindow):
             except Exception:
                 pass
             self.data_loader_proc = None
+
+    def on_missing_jdbc_driver(self, provider_name: str):
+        """Handle missing JDBC driver by triggering automatic download."""
+        self.status_label.setText(f"Downloading JDBC driver for {provider_name}…")
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, 0)  # Indeterminate progress
+
+        try:
+            # Import the auto-download handler
+            from dbutils.gui.provider_config_dialog import handle_missing_jdbc_driver_auto_download
+
+            # Attempt to download the driver
+            success = handle_missing_jdbc_driver_auto_download(provider_name, parent_widget=self)
+
+            if success:
+                self.status_label.setText(f"JDBC driver downloaded for {provider_name}. Retrying connection…")
+                # Retry the data load
+                QTimer.singleShot(500, self.load_data)
+            else:
+                self.status_label.setText(f"Failed to download JDBC driver for {provider_name}. Please download it manually.")
+                self.progress_bar.setVisible(False)
+
+                # Hide overlays and re-enable inputs
+                try:
+                    if getattr(self, "tables_overlay", None):
+                        self.tables_overlay.hide()
+                    if getattr(self, "columns_overlay", None):
+                        self.columns_overlay.hide()
+                    self.search_input.setEnabled(True)
+                    self.schema_combo.setEnabled(True)
+                except Exception:
+                    pass
+
+                # Clean up thread
+                if self.data_loader_thread:
+                    self.data_loader_thread.quit()
+                    self.data_loader_thread.deleteLater()
+                    self.data_loader_thread = None
+                    self.data_loader_worker = None
+        except Exception as e:
+            logger.error(f"Error handling missing JDBC driver: {e}")
+            self.status_label.setText(f"Error downloading JDBC driver: {e}")
+            self.progress_bar.setVisible(False)
 
     def on_data_chunk(self, tables_chunk, columns_chunk, loaded: int, total_est: int):
         """Handle streaming chunk of tables/columns loaded in background."""

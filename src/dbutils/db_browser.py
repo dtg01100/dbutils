@@ -240,7 +240,7 @@ def query_runner(sql: str, timeout: int = 30) -> List[Dict]:
         raise RuntimeError("DBUTILS_JDBC_PROVIDER environment variable not set")
 
     try:
-        from dbutils.jdbc_provider import connect as _jdbc_connect
+        from dbutils.jdbc_provider import connect as _jdbc_connect, MissingJDBCDriverError
 
         url_params_raw = os.environ.get("DBUTILS_JDBC_URL_PARAMS", "{}")
         try:
@@ -255,6 +255,9 @@ def query_runner(sql: str, timeout: int = 30) -> List[Dict]:
         finally:
             conn.close()
     except Exception as e:
+        # Let MissingJDBCDriverError pass through without wrapping so the Qt app can handle it
+        if e.__class__.__name__ == "MissingJDBCDriverError":
+            raise
         raise RuntimeError(f"JDBC query failed: {e}") from e
 
 

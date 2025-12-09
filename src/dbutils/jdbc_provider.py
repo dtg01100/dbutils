@@ -35,6 +35,17 @@ except Exception as _exc:
     logger.warning("JDBC bridge libraries not available: %s", _exc)
 
 
+class MissingJDBCDriverError(Exception):
+    """Raised when JDBC driver JAR is missing and needs to be downloaded."""
+
+    def __init__(self, provider_name: str, jar_path: str):
+        self.provider_name = provider_name
+        self.jar_path = jar_path
+        super().__init__(
+            f"JDBC driver missing for '{provider_name}'. Expected at: {jar_path}. Please download it."
+        )
+
+
 DEFAULT_CONFIG_DIR = os.environ.get("DBUTILS_CONFIG_DIR", os.path.expanduser("~/.config/dbutils"))
 DEFAULT_PROVIDERS_JSON = os.path.join(DEFAULT_CONFIG_DIR, "providers.json")
 # Backwards-compat: module level names for older imports
@@ -217,6 +228,10 @@ class JDBCConnection:
                 raise RuntimeError(f"Failed to start JVM: {e}") from e
 
     def connect(self):
+        # Check if jar_path is missing before attempting to connect
+        if not self.provider.jar_path or not os.path.isfile(self.provider.jar_path):
+            raise MissingJDBCDriverError(self.provider.name, self.provider.jar_path or "<not set>")
+
         self._ensure_jvm()
         try:
             self._conn = jaydebeapi.connect(

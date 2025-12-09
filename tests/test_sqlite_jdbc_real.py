@@ -151,16 +151,21 @@ def jdbc_connection(sqlite_jdbc_env) -> Iterator[tuple]:
 
 
 def test_real_jdbc_crud(jdbc_connection):
-    conn, _ = jdbc_connection
+    conn, db_path = jdbc_connection
+    print(f"\n[CRUD Test] Using SQLite DB: {db_path}")
+    print(f"[CRUD Test] DB file exists: {os.path.exists(db_path)}")
+    print(f"[CRUD Test] DB file size: {os.path.getsize(db_path)} bytes")
     cur = conn.cursor()
 
     # Create
     cur.execute("INSERT INTO users (name, email) VALUES (?, ?)", ("Carol", "c@example.com"))
     conn.commit()
+    print(f"[CRUD Test] Inserted Carol; file size now: {os.path.getsize(db_path)} bytes")
 
     # Read
     cur.execute("SELECT name, email FROM users ORDER BY id")
     rows = cur.fetchall()
+    print(f"[CRUD Test] Selected users: {rows}")
     assert len(rows) == 3
     assert rows[0][0] == "Alice"
 
@@ -168,44 +173,55 @@ def test_real_jdbc_crud(jdbc_connection):
     cur.execute("UPDATE users SET name = ? WHERE email = ?", ("Bobbert", "b@example.com"))
     conn.commit()
     cur.execute("SELECT name FROM users WHERE email = ?", ("b@example.com",))
-    assert cur.fetchall()[0][0] == "Bobbert"
+    result = cur.fetchall()[0][0]
+    print(f"[CRUD Test] Updated Bob to: {result}")
+    assert result == "Bobbert"
 
     # Delete
     cur.execute("DELETE FROM users WHERE email = ?", ("c@example.com",))
     conn.commit()
     cur.execute("SELECT COUNT(*) FROM users")
-    assert cur.fetchall()[0][0] == 2
+    final_count = cur.fetchall()[0][0]
+    print(f"[CRUD Test] After delete, user count: {final_count}")
+    assert final_count == 2
 
 
 def test_real_jdbc_transactions_and_rollback(jdbc_connection):
-    conn, _ = jdbc_connection
+    conn, db_path = jdbc_connection
+    print(f"\n[Rollback Test] Using SQLite DB: {db_path}")
     cur = conn.cursor()
 
     # With autocommit disabled, each connection starts a transaction implicitly
     cur.execute("INSERT INTO orders (user_id, total) VALUES (?, ?)", (1, 99.99))
     cur.execute("SELECT COUNT(*) FROM orders")
     before = cur.fetchall()[0][0]
+    print(f"[Rollback Test] Before rollback, order count: {before}")
     conn.rollback()
     cur.execute("SELECT COUNT(*) FROM orders")
     after = cur.fetchall()[0][0]
+    print(f"[Rollback Test] After rollback, order count: {after}")
     assert before - 1 == after
 
 
 def test_real_jdbc_parameter_types_and_blob(jdbc_connection):
-    conn, _ = jdbc_connection
+    conn, db_path = jdbc_connection
+    print(f"\n[Blob Test] Using SQLite DB: {db_path}")
     cur = conn.cursor()
 
     blob_data = b"\x00\x01\x02BLOB"
     cur.execute("CREATE TABLE files (id INTEGER PRIMARY KEY, name TEXT, data BLOB)")
     cur.execute("INSERT INTO files (name, data) VALUES (?, ?)", ("payload", blob_data))
     conn.commit()
+    print(f"[Blob Test] Inserted blob data: {blob_data}")
 
     cur.execute("SELECT name, data FROM files WHERE name = ?", ("payload",))
     name, data = cur.fetchall()[0]
+    print(f"[Blob Test] Retrieved name: {name}, data type: {type(data)}")
     assert name == "payload"
     # jaydebeapi returns memoryview for blobs; normalize
     if isinstance(data, memoryview):
         data = data.tobytes()
+    print(f"[Blob Test] Retrieved blob data: {data}")
     assert data == blob_data
 
 
