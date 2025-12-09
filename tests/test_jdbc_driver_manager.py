@@ -50,6 +50,9 @@ def test_download_single_file(monkeypatch, tmp_path):
     # Simulate a small JAR download stream
     content = b"0123456789"
 
+    # Allow HTTP downloads in test mode
+    monkeypatch.setenv("DBUTILS_ALLOW_INSECURE_DOWNLOADS", "1")
+
     class FakeResp:
         def __init__(self, data):
             self._data = data
@@ -81,6 +84,7 @@ def test_download_single_file(monkeypatch, tmp_path):
 
 def test_download_driver_sqlite(monkeypatch, tmp_path):
     # Simulate download_jdbc_driver for a maven-backed sqlite
+    monkeypatch.setenv("DBUTILS_ALLOW_INSECURE_DOWNLOADS", "1")
     monkeypatch.setenv("DBUTILS_DRIVER_DIR", str(tmp_path))
     content = b"JAR" * 10
 
@@ -116,6 +120,7 @@ def test_download_driver_sqlite(monkeypatch, tmp_path):
 
 def test_download_driver_multi_artifact(monkeypatch, tmp_path):
     # Simulate a driver_info with multiple maven artifacts (DB2 or complex drivers)
+    monkeypatch.setenv("DBUTILS_ALLOW_INSECURE_DOWNLOADS", "1")
     monkeypatch.setenv("DBUTILS_DRIVER_DIR", str(tmp_path))
     content = b"JAR" * 10
 

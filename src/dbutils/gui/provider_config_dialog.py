@@ -746,6 +746,12 @@ if QT_BINDINGS:
             self.download_progress.setVisible(False)
             layout.addWidget(self.download_progress)
 
+            # Status label for inline feedback (download messages, warnings)
+            self.download_status_label = QLabel()
+            self.download_status_label.setWordWrap(True)
+            self.download_status_label.setVisible(False)
+            layout.addWidget(self.download_status_label)
+
             # License acceptance (if required)
             license_checkbox = None
             driver_info = JDBCDriverRegistry.get_driver_info(category)
@@ -978,6 +984,9 @@ if QT_BINDINGS:
             # Show progress
             self.download_progress.setVisible(True)
             self.download_progress.setRange(0, 0)  # Indeterminate progress
+            if hasattr(self, "download_status_label") and self.download_status_label is not None:
+                self.download_status_label.setVisible(True)
+                self.download_status_label.setText("Preparing download...")
             QApplication.processEvents()  # Update UI
 
             def progress_callback(downloaded, total):
@@ -987,7 +996,9 @@ if QT_BINDINGS:
                 QApplication.processEvents()
 
             def status_callback(message):
-                self.download_status_label.setText(message)
+                if hasattr(self, "download_status_label") and self.download_status_label is not None:
+                    self.download_status_label.setVisible(True)
+                    self.download_status_label.setText(message)
                 QApplication.processEvents()
 
             try:
@@ -1024,3 +1035,5 @@ if QT_BINDINGS:
                 QMessageBox.critical(self, "Download Error", f"Error downloading JDBC driver: {e}")
             finally:
                 self.download_progress.setVisible(False)
+                if hasattr(self, "download_status_label") and self.download_status_label is not None:
+                    self.download_status_label.setVisible(False)

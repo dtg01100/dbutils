@@ -21,6 +21,31 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "tests"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 
+@pytest.fixture(scope="session")
+def qapp():
+    """Create a QApplication instance for Qt GUI tests.
+    
+    This fixture is session-scoped because QApplication should only be
+    created once per test session.
+    """
+    try:
+        from PySide6.QtWidgets import QApplication
+    except ImportError:
+        try:
+            from PyQt6.QtWidgets import QApplication
+        except ImportError:
+            pytest.skip("Qt not available, skipping Qt GUI tests")
+    
+    # Check if QApplication already exists
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+    
+    yield app
+    
+    # No cleanup needed - QApplication will be destroyed at session end
+
+
 @pytest.fixture
 def mock_jdbc_connection():
     """Mock JDBC connection for testing without actual database."""

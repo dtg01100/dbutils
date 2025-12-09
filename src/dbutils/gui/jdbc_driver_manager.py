@@ -14,7 +14,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple, Union
 
 # Import needed items from jdbc_driver_downloader
 from .jdbc_driver_downloader import JDBCDriverRegistry
@@ -42,6 +42,9 @@ DEFAULT_MAVEN_REPOS = [
     "https://repo.maven.apache.org/maven2/",
 ]
 
+# Maximum allowed download size (bytes). Can be overridden for constrained environments.
+MAX_DOWNLOAD_BYTES = int(os.environ.get("DBUTILS_MAX_DOWNLOAD_BYTES", 250 * 1024 * 1024))
+
 
 class JDBCDriverDownloader:
     """Handles downloading JDBC drivers from official sources."""
@@ -53,6 +56,9 @@ class JDBCDriverDownloader:
 
     def _url_exists(self, url: str, timeout: int = 10) -> Tuple[bool, str]:
         """Check if a URL exists with detailed status (supports HEAD with GET fallback)."""
+        # Block obviously unsafe schemes early
+        if not self._is_url_allowed(url):
+            return False, "Blocked insecure or unsupported URL"
         # NOTE: In tests, `urllib.request.urlopen` may be monkeypatched with a stub
         # that doesn't accept a `timeout` kwarg. We first attempt to call with
         # `timeout` and fall back to `urlopen(req)` if TypeError is raised. In some
@@ -143,6 +149,29 @@ class JDBCDriverDownloader:
             return False, f"URL check failed: {str(e)}"
         return False, "URL check failed"
 
+    def _allow_insecure_downloads(self) -> bool:
+        """Return True if insecure (HTTP) downloads are permitted."""
+        if os.environ.get("DBUTILS_ALLOW_INSECURE_DOWNLOADS"):
+            return True
+        if os.environ.get("DBUTILS_TEST_MODE"):
+            return True
+        return False
+
+    def _is_url_allowed(self, url: str) -> bool:
+        """Validate scheme and host before attempting download."""
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in {"http", "https"}:
+            return False
+        if parsed.scheme == "https":
+            return True
+
+        # Allow localhost HTTP by default to support dev/test
+        if parsed.hostname in {"localhost", "127.0.0.1", "::1"}:
+            return True
+
+        # Non-HTTPS is blocked unless explicitly allowed
+        return self._allow_insecure_downloads()
+
     def _get_driver_directory(self) -> str:
         """Get the directory where JDBC drivers should be stored."""
         # Use dynamic path resolution
@@ -177,7 +206,7 @@ class JDBCDriverDownloader:
         on_progress: Optional[Callable[[int, int], None]] = None,
         version: str = "recommended",
         on_status: Optional[Callable[[str], None]] = None,
-    ) -> Optional[str]:
+    ) -> Optional[Union[str, List[str]]]:
         """
         Download a JDBC driver JAR file for the specified database type with enhanced error handling.
 
@@ -188,7 +217,8 @@ class JDBCDriverDownloader:
             on_status: Optional callback for status messages (enhanced user feedback)
 
         Returns:
-            Path to downloaded JAR file, or None if download failed
+            Path to downloaded JAR file (or list of paths when multiple artifacts are required),
+            or None if download failed
         """
         driver_info = JDBCDriverRegistry.DRIVERS.get(database_type)
         if not driver_info:
@@ -296,8 +326,27 @@ class JDBCDriverDownloader:
                 on_status(f"Download failed: {str(e)}")
             return None
 
-    def _get_download_url_for_version(self, driver_info, version: str) -> Optional[str]:
+    def _get_download_url_for_version(self, driver_info, version: str) -> Optional[Union[str, List[str]]]:
         """Get the appropriate download URL for a specific version."""
+
+        database_type = driver_info.name.lower()
+        if "sqlite" in database_type:
+            database_type = "sqlite"
+
+        # Special-case: SQLite JDBC requires slf4j dependencies. Build a list of URLs.
+        if database_type == "sqlite":
+            repos = self._get_maven_repos()
+            sqlite_ver = driver_info.recommended_version if version in {"recommended", "latest"} else version
+            slf4j_ver = os.environ.get("DBUTILS_SLF4J_VERSION", "2.0.13")
+
+            urls = []
+            for repo in repos:
+                base = repo.rstrip("/")
+                urls.append(f"{base}/org/xerial/sqlite-jdbc/{sqlite_ver}/sqlite-jdbc-{sqlite_ver}.jar")
+                urls.append(f"{base}/org/slf4j/slf4j-api/{slf4j_ver}/slf4j-api-{slf4j_ver}.jar")
+                urls.append(f"{base}/org/slf4j/slf4j-simple/{slf4j_ver}/slf4j-simple-{slf4j_ver}.jar")
+                break  # use first repo only to avoid duplicates
+            return urls
         # If the driver defines maven_artifacts, prefer constructing maven artifact URLs
         if getattr(driver_info, "maven_artifacts", None):
             # Get maven repositories from environment or defaults
@@ -405,6 +454,39 @@ class JDBCDriverDownloader:
         parsed = urllib.parse.urlparse(url)
         return parsed.path.lower().endswith(".jar")
 
+    def _validate_content_headers(self, response, on_status: Optional[Callable[[str], None]] = None) -> bool:
+        """Validate content-type and size before writing to disk."""
+        # Size guard
+        try:
+            content_length_header = response.headers.get("Content-Length") if hasattr(response, "headers") else None
+            if content_length_header is not None:
+                try:
+                    content_length = int(content_length_header)
+                except (TypeError, ValueError):
+                    content_length = None
+                if content_length and content_length > MAX_DOWNLOAD_BYTES:
+                    if on_status:
+                        on_status(
+                            f"Download blocked: file is {content_length / (1024*1024):.1f}MB, exceeds limit "
+                            f"of {MAX_DOWNLOAD_BYTES / (1024*1024):.0f}MB"
+                        )
+                    return False
+        except Exception:
+            # If headers missing or malformed, continue with download
+            pass
+
+        # Content-Type guard
+        try:
+            content_type = response.headers.get("Content-Type", "").lower() if hasattr(response, "headers") else ""
+            if content_type and any(ct in content_type for ct in ["text/html", "text/plain"]):
+                if on_status:
+                    on_status("Download blocked: response appears to be HTML/text, not a JAR")
+                return False
+        except Exception:
+            pass
+
+        return True
+
     def _download_single_file(
         self,
         url: str,
@@ -415,6 +497,14 @@ class JDBCDriverDownloader:
         """Download a single JAR file from a direct URL with enhanced error handling."""
         temp_path = None
         try:
+            if not self._is_url_allowed(url):
+                if on_status:
+                    on_status(
+                        "Download blocked: insecure or unsupported URL. "
+                        "Set DBUTILS_ALLOW_INSECURE_DOWNLOADS=1 to allow HTTP sources."
+                    )
+                return None
+
             # Create a temporary file for download
             temp_fd, temp_path = tempfile.mkstemp(suffix=".jar", dir=self.downloads_dir)
 
@@ -425,7 +515,17 @@ class JDBCDriverDownloader:
 
                 # Open the URL
                 with urllib.request.urlopen(req) as response:
-                    total_size = int(response.headers.get("Content-Length", 0))
+                    if not self._validate_content_headers(response, on_status):
+                        try:
+                            if temp_path and os.path.exists(temp_path):
+                                os.unlink(temp_path)
+                        finally:
+                            return None
+
+                    try:
+                        total_size = int(response.headers.get("Content-Length", 0))
+                    except Exception:
+                        total_size = 0
                     downloaded = 0
 
                     # Download in chunks
@@ -559,7 +659,7 @@ def download_jdbc_driver(
     version: str = "recommended",
     on_status: Optional[Callable[[str], None]] = None,
     background: bool = False,
-) -> Optional[str]:
+) -> Optional[Union[str, List[str]]]:
     """
     Convenience function to download a JDBC driver with enhanced feedback and background support.
 
@@ -571,7 +671,8 @@ def download_jdbc_driver(
         background: If True, run download in background thread
 
     Returns:
-        Path to downloaded JAR file, or None if failed
+        Path to downloaded JAR file (or list of paths when multiple artifacts are required),
+        or None if failed
     """
     downloader = JDBCDriverDownloader()
     if background:

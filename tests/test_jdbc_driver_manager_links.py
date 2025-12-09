@@ -120,10 +120,12 @@ def test_sqlite_downloads(tmp_path, monkeypatch):
     monkeypatch.setattr(JDBCDriverDownloader, "_url_exists", lambda self, u, timeout=10: True)
     downloader = JDBCDriverDownloader()
     res = downloader.download_driver("sqlite", version="3.42.0.0")
-    # Should be a path and file should exist
+    # Should be path(s) and files should exist
     assert res is not None
-    assert Path(res).exists()
-    # And the downloaded file should be in our driver_dir
-    assert Path(res).parent == driver_dir
+    paths = res if isinstance(res, list) else [res]
+    assert all(Path(p).exists() for p in paths)
+    # All downloaded files should be in our driver_dir
+    assert all(Path(p).parent == driver_dir for p in paths)
     # Clean up
-    Path(res).unlink()
+    for p in paths:
+        Path(p).unlink()
