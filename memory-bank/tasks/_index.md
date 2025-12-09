@@ -1,13 +1,13 @@
 # Tasks Index
 
 ## In Progress
-- [TASK001] Homebrew tap distribution - Adding formula and docs for tap installation
+- None
 
 ## Pending
 - None
 
 ## Completed
-- None
+- [TASK001] Homebrew tap distribution - Completed on 2025-12-09
 
 ## Abandoned
 - None

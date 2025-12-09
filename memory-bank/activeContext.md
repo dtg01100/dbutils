@@ -1,14 +1,16 @@
 # Active Context
 
-## Current Focus (Dec 9, 2025)
-- Add Homebrew tap support so the project can be installed via `brew tap` + `brew install`.
-- Create baseline Memory Bank files for continuity.
+## Current Status (Dec 9, 2025)
+- **COMPLETED**: Homebrew tap distribution is ready. Users can now install via `brew tap dtg01100/dbutils && brew install dbutils`.
 
-## Recent Notes
-- No Git tags/releases present; pyproject version is 0.1.0.
-- Need a Formula that can install from a source tarball (likely GitHub archive); may require updating once a tagged release exists.
+## Work Summary
+- Created v0.1.0 release tag pointing to current commit.
+- Built Homebrew tap formula in `homebrew-dbutils/` using Python 3.13 virtualenv helper.
+- Formula URL: `https://github.com/dtg01100/dbutils/archive/v0.1.0.tar.gz`
+- SHA256: `ab8466e147e9d9c668bb983696d1ab98943c53b7e7d65dc552bbe46d3037770c`
+- Updated main README with tap installation as primary distribution method.
 
-## Next Steps
-- Author a Homebrew formula (`Formula/dbutils.rb`) using Python virtualenv helper.
-- Document tap usage in README.
-- Consider publishing a tagged release to provide stable tarball/sha256 for the formula.
+## Next Steps (Future)
+- Push `homebrew-dbutils/` to separate public repo (dtg01100/homebrew-dbutils) for users to tap from.
+- Monitor for formula refinements (e.g., if Homebrew-core compliance requires changes).
+- For each new version, update sha256 and URL in the formula.
