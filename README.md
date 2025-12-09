@@ -69,11 +69,20 @@ uvx . db-browser --search "customer" --limit 20
 
 ## Installation and Usage
 
-This project is designed to be installed as a Python package.
+### macOS / Homebrew (Recommended)
 
-### Running with `uvx`
+The easiest way to install `dbutils` on macOS is via Homebrew:
 
-The recommended way to run the tools is with `uvx`, which will handle the installation and virtual environment automatically.
+```bash
+brew tap dtg01100/dbutils
+brew install dbutils
+```
+
+This installs the `db-browser` and `db-browser-gui` tools to your PATH.
+
+### Using `uvx` (Development / Source)
+
+Alternatively, you can run the tools directly from the repository using `uvx`, which will handle the installation and virtual environment automatically.
 
 From the root of the project, you can run any of the scripts like this:
 
