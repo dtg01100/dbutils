@@ -359,6 +359,8 @@ if QT_BINDINGS:
             has_selection = len(self.provider_list.selectedItems()) > 0
             self.edit_btn.setEnabled(has_selection)
             self.delete_btn.setEnabled(has_selection)
+            # Enable download button if a provider is selected
+            self.jar_download_btn.setEnabled(has_selection)
 
         def on_inputs_changed(self):
             """Handle input changes to enable save functionality."""
@@ -696,14 +698,20 @@ if QT_BINDINGS:
                 # Return controls for inspection by tests
                 return dialog, download_btn, manual_btn, license_checkbox
 
-            # Show modal dialog otherwise
-            if dialog.exec() == QDialog.DialogCode.Accepted:
-                # User chose to download automatically
-                # Read any pending options captured when Download/Manual was clicked
-                version = None
-                if hasattr(self, "_pending_download_options"):
-                    version = self._pending_download_options.get("version")
-                self.perform_jdbc_download(category, version=version)
+            # Show modal dialog otherwise with proper error handling
+            try:
+                if dialog.exec() == QDialog.DialogCode.Accepted:
+                    # User chose to download automatically
+                    # Read any pending options captured when Download/Manual was clicked
+                    version = None
+                    if hasattr(self, "_pending_download_options"):
+                        version = self._pending_download_options.get("version")
+                    self.perform_jdbc_download(category, version=version)
+            except Exception as e:
+                QMessageBox.critical(self, "Download Dialog Error", f"Failed to open download dialog: {e}")
+            finally:
+                # Clean up dialog resources
+                dialog.deleteLater()
 
         def create_download_dialog(self, category: str):
             """Create and return a download dialog and the main widgets for inspection/testing.
@@ -713,8 +721,8 @@ if QT_BINDINGS:
             from .jdbc_driver_downloader import JDBCDriverRegistry
 
             dialog = QDialog(self)
-            # Make dialog non-modal by default to avoid blocking test runners or non-modal use cases
-            dialog.setModal(False)
+            # Set as modal dialog with proper parent window for Qt lifecycle management
+            dialog.setModal(True)
             dialog.setWindowTitle(f"Download {category} JDBC Driver")
             dialog.resize(500, 400)
 

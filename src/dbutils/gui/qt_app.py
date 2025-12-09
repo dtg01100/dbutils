@@ -1000,15 +1000,58 @@ class TableContentsWorker(QObject):
         column_filter: Optional[str] = None,
         value: Optional[str] = None,
         where_clause: Optional[str] = None,
+        use_mock: bool = False,
+        table_columns: Optional[Dict] = None,
+        db_file: Optional[str] = None,
     ):
         """Perform a fetch and emit results_ready(columns, rows).
 
         - If where_clause is provided it is used verbatim (caller responsibility).
         - Otherwise, if column_filter and value are provided, a WHERE clause is constructed
           using heuristic quoting based on column types.
+        - If use_mock is True, generates mock row data instead of querying database.
+        - If db_file is provided, queries SQLite database instead of DB2.
         """
         try:
             self._cancelled = False
+
+            # Handle SQLite database
+            if db_file:
+                import sqlite3
+                
+                conn = sqlite3.connect(db_file)
+                conn.row_factory = sqlite3.Row  # Enable column name access
+                cursor = conn.cursor()
+                
+                # Build WHERE clause
+                where = ""
+                if where_clause:
+                    where = f" WHERE {where_clause}"
+                elif column_filter and (value is not None):
+                    # SQLite handles quoting more simply
+                    safe_val = str(value).replace("'", "''")
+                    where = f" WHERE {column_filter} = '{safe_val}'"
+                
+                # Build query with LIMIT and OFFSET
+                sql = f"SELECT * FROM {table}{where} LIMIT {int(limit)} OFFSET {int(start_offset)}"
+                
+                cursor.execute(sql)
+                rows_data = cursor.fetchall()
+                
+                # Convert to list of dicts
+                columns = [desc[0] for desc in cursor.description] if cursor.description else []
+                rows = []
+                for row in rows_data:
+                    row_dict = {col: row[col] for col in columns}
+                    rows.append(row_dict)
+                
+                conn.close()
+                
+                if self._cancelled:
+                    return
+                
+                self.results_ready.emit(columns, rows)
+                return
 
             # Import here so worker can be used in tests without heavy imports at module load
             from dbutils.db_browser import query_runner
@@ -1087,9 +1130,31 @@ class TableContentsWorker(QObject):
             try:
                 rows = query_runner(sql) or []
             except Exception as e:
-                # Bubble to error emission
-                self.error_occurred.emit(str(e))
-                return
+                # If in mock mode, generate mock data instead of failing
+                if use_mock and table_columns:
+                    rows = []
+                    for row_id in range(int(start_offset), int(start_offset) + int(limit)):
+                        row_data = {}
+                        for i, col in enumerate(table_columns):
+                            col_name = col.name
+                            # Generate mock data based on column type
+                            if "INT" in (col.typename or "").upper():
+                                row_data[col_name] = row_id * 100 + i
+                            elif "DECIMAL" in (col.typename or "").upper() or "FLOAT" in (col.typename or "").upper():
+                                row_data[col_name] = float(row_id) * 10.5 + float(i)
+                            elif "DATE" in (col.typename or "").upper():
+                                # Generate dates with rotation
+                                day = (row_id % 28) + 1
+                                month = ((row_id // 28) % 12) + 1
+                                row_data[col_name] = f"2024-{month:02d}-{day:02d}"
+                            else:
+                                # String/default
+                                row_data[col_name] = f"{table}.{col_name}.row{row_id}"
+                        rows.append(row_data)
+                else:
+                    # Bubble to error emission
+                    self.error_occurred.emit(str(e))
+                    return
 
             # Try to infer columns
             columns = []
@@ -1121,7 +1186,7 @@ class DataLoaderWorker(QObject):
     def __init__(self):
         super().__init__()
 
-    def load_data(self, schema_filter: Optional[str], use_mock: bool, start_offset: int = 0):
+    def load_data(self, schema_filter: Optional[str], use_mock: bool, start_offset: int = 0, use_heavy_mock: bool = False, db_file: Optional[str] = None):
         """Load database data in background thread with granular progress updates and chunked streaming."""
         try:
             # Prefer async loader with pagination to avoid huge initial transfer
@@ -1146,7 +1211,7 @@ class DataLoaderWorker(QObject):
                 tables, columns = cached
             else:
                 tables, columns = get_all_tables_and_columns(
-                    schema_filter, use_mock, use_cache=True, limit=initial_limit, offset=int(start_offset)
+                    schema_filter, use_mock, use_cache=True, limit=initial_limit, offset=int(start_offset), use_heavy_mock=use_heavy_mock, db_file=db_file
                 )
 
             loaded_total += len(tables)
@@ -1176,7 +1241,7 @@ class DataLoaderWorker(QObject):
                     t_chunk, c_chunk = cached
                 else:
                     t_chunk, c_chunk = get_all_tables_and_columns(
-                        schema_filter, use_mock, use_cache=True, limit=batch_size, offset=offset
+                        schema_filter, use_mock, use_cache=True, limit=batch_size, offset=offset, db_file=db_file
                     )
 
                 if not t_chunk:
@@ -1262,6 +1327,27 @@ class DataLoaderProcess(QObject):
             args = ["uv", "run", "python", "-m", "dbutils.gui.data_loader_process"]
             self._proc.start("uv", args[1:])
         else:
+            # Set up environment with proper Python path
+            try:
+                from PySide6.QtCore import QProcessEnvironment
+            except ImportError:
+                try:
+                    from PyQt6.QtCore import QProcessEnvironment
+                except ImportError:
+                    QProcessEnvironment = None
+
+            if QProcessEnvironment:
+                env = QProcessEnvironment.systemEnvironment()
+                # Add the src directory to Python path
+                src_path = os.path.join(os.path.dirname(__file__), "..", "..")
+                python_path = env.value("PYTHONPATH", "")
+                if python_path:
+                    python_path = f"{src_path}:{python_path}"
+                else:
+                    python_path = src_path
+                env.insert("PYTHONPATH", python_path)
+                self._proc.setProcessEnvironment(env)
+
             args = [python_exe, "-m", "dbutils.gui.data_loader_process"]
             self._proc.start(args[0], args[1:])
 
@@ -1415,7 +1501,7 @@ def humanize_schema_name(raw: str) -> str:
 class QtDBBrowser(QMainWindow):
     """Main Qt Database Browser application."""
 
-    def __init__(self, schema_filter: Optional[str] = None, use_mock: bool = False):
+    def __init__(self, schema_filter: Optional[str] = None, use_mock: bool = False, use_heavy_mock: bool = False, db_file: Optional[str] = None):
         super().__init__()
 
         if not QT_AVAILABLE:
@@ -1428,6 +1514,8 @@ class QtDBBrowser(QMainWindow):
 
         self.schema_filter = schema_filter
         self.use_mock = use_mock
+        self.use_heavy_mock = use_heavy_mock
+        self.db_file = db_file
         self.tables: List[TableInfo] = []
         self.columns: List[ColumnInfo] = []
         self.table_columns: Dict[str, List[ColumnInfo]] = {}
@@ -2169,34 +2257,18 @@ class QtDBBrowser(QMainWindow):
         # results while the loader continues from where it left off.
         start_offset = len(self.tables) if getattr(self, "tables", None) else 0
 
-        # Prefer subprocess to avoid GIL/UI contention
-        if self.use_subprocess_loader and QT_AVAILABLE:
-            self.data_loader_proc = DataLoaderProcess()
-            self.data_loader_proc.data_loaded.connect(self.on_data_loaded)
-            self.data_loader_proc.chunk_loaded.connect(self.on_data_chunk)
-            self.data_loader_proc.error_occurred.connect(self.on_data_load_error)
-            self.data_loader_proc.progress_updated.connect(self.status_label.setText)
-            self.data_loader_proc.progress_value.connect(self.on_data_progress)
-            self.data_loader_proc.start(
-                self.schema_filter,
-                self.use_mock,
-                initial_limit=200,
-                batch_size=500,
-                start_offset=start_offset,
-            )
-        else:
-            # Fallback to thread-based worker
-            self.data_loader_worker = DataLoaderWorker()
-            self.data_loader_thread = QThread()
-            self.data_loader_worker.data_loaded.connect(self.on_data_loaded)
-            self.data_loader_worker.chunk_loaded.connect(self.on_data_chunk)
-            self.data_loader_worker.error_occurred.connect(self.on_data_load_error)
-            self.data_loader_worker.progress_updated.connect(self.status_label.setText)
-            self.data_loader_worker.progress_value.connect(self.on_data_progress)
-            self.data_loader_thread.started.connect(
-                lambda: self.data_loader_worker.load_data(self.schema_filter, self.use_mock, start_offset=start_offset)
-            )
-            self.data_loader_thread.start()
+        # Use thread-based worker (disable subprocess for now due to path issues)
+        self.data_loader_worker = DataLoaderWorker()
+        self.data_loader_thread = QThread()
+        self.data_loader_worker.data_loaded.connect(self.on_data_loaded)
+        self.data_loader_worker.chunk_loaded.connect(self.on_data_chunk)
+        self.data_loader_worker.error_occurred.connect(self.on_data_load_error)
+        self.data_loader_worker.progress_updated.connect(self.status_label.setText)
+        self.data_loader_worker.progress_value.connect(self.on_data_progress)
+        self.data_loader_thread.started.connect(
+            lambda: self.data_loader_worker.load_data(self.schema_filter, self.use_mock, start_offset=start_offset, use_heavy_mock=self.use_heavy_mock, db_file=self.db_file)
+        )
+        self.data_loader_thread.start()
 
     def on_data_progress(self, current: int, total: int):
         """Handle data loading progress updates."""
@@ -2543,9 +2615,18 @@ class QtDBBrowser(QMainWindow):
             self.search_worker.cancel_search()
 
         if self.search_thread:
-            self.search_thread.quit()
-            # Don't block with wait() - let it finish async
-            self.search_thread.deleteLater()
+            try:
+                # Check if thread is still valid and running
+                if hasattr(self.search_thread, 'isRunning') and self.search_thread.isRunning():
+                    self.search_thread.quit()
+                    # Don't block with wait() - let it finish async
+                    self.search_thread.deleteLater()
+                else:
+                    # Thread is not running, safe to clean up
+                    self.search_thread.deleteLater()
+            except Exception:
+                # Thread may already be deleted or invalid, ignore gracefully
+                pass
 
         if not text.strip():
             # Clear search and clear cache
@@ -2589,10 +2670,19 @@ class QtDBBrowser(QMainWindow):
         if self.search_worker:
             self.search_worker.cancel_search()
 
-        if self.search_thread and self.search_thread.isRunning():
-            self.search_thread.quit()
-            # Don't block UI - let it quit asynchronously
-            self.search_thread.requestInterruption()
+        if self.search_thread:
+            try:
+                # Check if thread is still valid and running
+                if hasattr(self.search_thread, 'isRunning') and self.search_thread.isRunning():
+                    self.search_thread.quit()
+                    # Don't block UI - let it quit asynchronously
+                    self.search_thread.requestInterruption()
+                else:
+                    # Thread is not running, safe to clean up
+                    self.search_thread.deleteLater()
+            except Exception:
+                # Thread may already be deleted or invalid, ignore gracefully
+                pass
 
         # Create worker and thread
         self.search_worker = SearchWorker()
@@ -2621,10 +2711,19 @@ class QtDBBrowser(QMainWindow):
         if self.search_worker:
             self.search_worker.cancel_search()
 
-        if self.search_thread and self.search_thread.isRunning():
-            self.search_thread.quit()
-            # Don't block - let it finish asynchronously
-            self.search_thread.requestInterruption()
+        if self.search_thread:
+            try:
+                # Check if thread is still valid and running
+                if hasattr(self.search_thread, 'isRunning') and self.search_thread.isRunning():
+                    self.search_thread.quit()
+                    # Don't block - let it finish asynchronously
+                    self.search_thread.requestInterruption()
+                else:
+                    # Thread is not running, safe to clean up
+                    self.search_thread.deleteLater()
+            except Exception:
+                # Thread may already be deleted or invalid, ignore gracefully
+                pass
 
         # Create worker and thread
         self.search_worker = SearchWorker()
@@ -3087,10 +3186,37 @@ class QtDBBrowser(QMainWindow):
             rows = []
             try:
                 rows = query_runner(sql)
-            except Exception:
-                # If query_runner fails, try a more tolerant variant
-                # (tests can monkeypatch query_runner to return mock rows)
-                rows = []
+            except Exception as e:
+                # If query_runner fails, check if we're in mock mode and generate mock data
+                if getattr(self, "use_mock", False):
+                    # Generate mock row data for the selected table
+                    try:
+                        cols = self.table_columns.get(table_key, [])
+                        if cols:
+                            # Generate mock rows based on column count and types
+                            rows = []
+                            for row_id in range(int(start_offset), int(start_offset) + int(limit)):
+                                row_data = {}
+                                for i, col in enumerate(cols):
+                                    col_name = col.name
+                                    # Generate mock data based on column type
+                                    if "INT" in (col.typename or "").upper():
+                                        row_data[col_name] = row_id * 100 + i
+                                    elif "DECIMAL" in (col.typename or "").upper() or "FLOAT" in (col.typename or "").upper():
+                                        row_data[col_name] = float(row_id) * 10.5 + float(i)
+                                    elif "DATE" in (col.typename or "").upper():
+                                        # Generate dates
+                                        day = (row_id % 28) + 1
+                                        month = ((row_id // 28) % 12) + 1
+                                        row_data[col_name] = f"2024-{month:02d}-{day:02d}"
+                                    else:
+                                        # String/default
+                                        row_data[col_name] = f"{table}.{col_name}.row{row_id}"
+                                rows.append(row_data)
+                    except Exception:
+                        rows = []
+                else:
+                    rows = []
 
             # Fallback synchronous path follows (for tests or when Qt not available)
             # Normalize to list of dicts
@@ -3255,6 +3381,9 @@ class QtDBBrowser(QMainWindow):
                     column_filter=column_filter,
                     value=value,
                     where_clause=where_clause,
+                    use_mock=self.use_mock,
+                    table_columns=self.table_columns.get(f"{schema}.{table}", []),
+                    db_file=self.db_file,
                 )
             )
 
@@ -3941,9 +4070,17 @@ class QtDBBrowser(QMainWindow):
         if self.search_worker:
             self.search_worker.cancel_search()
 
-        if self.search_thread and self.search_thread.isRunning():
-            self.search_thread.quit()
-            self.search_thread.wait(3000)  # Wait up to 3 seconds
+        if self.search_thread:
+            try:
+                # Check if thread is still valid and running
+                if hasattr(self.search_thread, 'isRunning') and self.search_thread.isRunning():
+                    self.search_thread.quit()
+                    self.search_thread.wait(3000)  # Wait up to 3 seconds
+                # Clean up the thread reference
+                self.search_thread.deleteLater()
+            except Exception:
+                # Thread may already be deleted or invalid, ignore gracefully
+                pass
 
         # Cancel table contents worker if running
         if hasattr(self, "contents_worker") and self.contents_worker:
@@ -3972,32 +4109,70 @@ class QtDBBrowser(QMainWindow):
         event.accept()
 
 
-def main():
+def main(args=None):
     """Main entry point for Qt application."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Experimental Qt Database Browser")
-    parser.add_argument("--schema", help="Filter by specific schema")
-    parser.add_argument("--mock", action="store_true", help="Use mock data for testing")
-    parser.add_argument("--no-streaming", action="store_true", help="Disable streaming search")
+    if args is None:
+        # Parse arguments from command line if not provided
+        parser = argparse.ArgumentParser(description="Experimental Qt Database Browser")
+        parser.add_argument("--schema", help="Filter by specific schema")
+        parser.add_argument("--mock", action="store_true", help="Use mock data for testing")
+        parser.add_argument("--heavy-mock", action="store_true", 
+                           help="Use heavy mock data for stress testing (5 schemas, 50 tables each, 20 columns each)")
+        parser.add_argument("--no-streaming", action="store_true", help="Disable streaming search")
+        parser.add_argument("--db-file", help="SQLite database file to open")
 
-    args = parser.parse_args()
+        args = parser.parse_args()
+    else:
+        # Args passed from caller, ensure they have required attributes
+        if not hasattr(args, 'schema'):
+            args.schema = None
+        if not hasattr(args, 'mock'):
+            args.mock = False
+        if not hasattr(args, 'heavy_mock'):
+            args.heavy_mock = False
+        if not hasattr(args, 'no_streaming'):
+            args.no_streaming = False
+        if not hasattr(args, 'db_file'):
+            args.db_file = None
 
-    # Create Qt application
-    app = QApplication(sys.argv)
-    app.setApplicationName("DB Browser")
-    app.setOrganizationName("DBUtils")
+    # Check if QApplication instance already exists
+    try:
+        from PySide6.QtCore import QCoreApplication
+    except ImportError:
+        try:
+            from PyQt6.QtCore import QCoreApplication
+        except ImportError:
+            QCoreApplication = None
+
+    app = QCoreApplication.instance() if QCoreApplication else None
+    if app is None:
+        # Create new Qt application
+        app = QApplication(sys.argv)
+        app.setApplicationName("DB Browser")
+        app.setOrganizationName("DBUtils")
+    else:
+        # Use existing application instance
+        print("Using existing QApplication instance")
 
     # Create main window
-    browser = QtDBBrowser(schema_filter=args.schema, use_mock=args.mock)
+    # Use heavy mock if requested, otherwise use regular mock if requested
+    use_mock = args.heavy_mock or args.mock
+    browser = QtDBBrowser(schema_filter=args.schema, use_mock=use_mock, use_heavy_mock=args.heavy_mock, db_file=args.db_file)
     if args.no_streaming:
         browser.streaming_enabled = False
-        browser.streaming_check.setChecked(False)
+        if hasattr(browser, 'streaming_check'):
+            browser.streaming_check.setChecked(False)
 
     browser.show()
 
-    # Run event loop
-    sys.exit(app.exec())
+    # Run event loop only if we created the app
+    if QApplication.instance() is not None:
+        sys.exit(app.exec())
+    else:
+        print("QApplication instance not available, cannot start event loop")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

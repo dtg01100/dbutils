@@ -421,6 +421,94 @@ def mock_get_columns() -> List[ColumnInfo]:
     ]
 
 
+def mock_get_tables_heavy(num_schemas: int = 5, tables_per_schema: int = 50) -> List[TableInfo]:
+    """Generate heavy mock data for stress testing.
+    
+    Args:
+        num_schemas: Number of schemas to generate (default 5)
+        tables_per_schema: Number of tables per schema (default 50)
+    
+    Returns:
+        List of TableInfo objects representing a large dataset.
+    """
+    tables = []
+    schema_names = [f"SCHEMA_{i:03d}" for i in range(num_schemas)]
+    table_types = ["USER", "ORDER", "PRODUCT", "INVOICE", "CUSTOMER", "TRANSACTION", 
+                   "ACCOUNT", "HISTORY", "LOG", "ARCHIVE"]
+    
+    for schema_idx, schema in enumerate(schema_names):
+        for table_idx in range(tables_per_schema):
+            table_type = table_types[table_idx % len(table_types)]
+            table_name = f"{table_type}_{table_idx:04d}"
+            tables.append(
+                TableInfo(
+                    schema=schema,
+                    name=table_name,
+                    remarks=f"Stress test table {table_idx} in {schema} - Type: {table_type}"
+                )
+            )
+    
+    return tables
+
+
+def mock_get_columns_heavy(num_schemas: int = 5, tables_per_schema: int = 50, 
+                           columns_per_table: int = 20) -> List[ColumnInfo]:
+    """Generate heavy mock data for stress testing.
+    
+    Args:
+        num_schemas: Number of schemas (default 5)
+        tables_per_schema: Number of tables per schema (default 50)
+        columns_per_table: Number of columns per table (default 20)
+    
+    Returns:
+        List of ColumnInfo objects representing a large dataset.
+    """
+    columns = []
+    schema_names = [f"SCHEMA_{i:03d}" for i in range(num_schemas)]
+    table_types = ["USER", "ORDER", "PRODUCT", "INVOICE", "CUSTOMER", "TRANSACTION",
+                   "ACCOUNT", "HISTORY", "LOG", "ARCHIVE"]
+    column_types = ["INTEGER", "VARCHAR", "DATE", "TIMESTAMP", "DECIMAL", "BOOLEAN",
+                    "BIGINT", "SMALLINT", "REAL", "DOUBLE", "CHAR", "TEXT", "CLOB",
+                    "BLOB", "JSON", "UUID", "TIME", "INTERVAL"]
+    
+    for schema_idx, schema in enumerate(schema_names):
+        for table_idx in range(tables_per_schema):
+            table_type = table_types[table_idx % len(table_types)]
+            table_name = f"{table_type}_{table_idx:04d}"
+            
+            for col_idx in range(columns_per_table):
+                col_type = column_types[col_idx % len(column_types)]
+                is_nullable = col_idx > 0  # First column is non-nullable (usually PK)
+                
+                # Realistic column sizing based on type
+                length = 10
+                scale = 0
+                if col_type == "VARCHAR":
+                    length = 100 + (col_idx * 5)
+                elif col_type == "DECIMAL":
+                    length = 15
+                    scale = 2
+                elif col_type in ["DATE", "TIME"]:
+                    length = 10
+                elif col_type == "TIMESTAMP":
+                    length = 26
+                
+                columns.append(
+                    ColumnInfo(
+                        schema=schema,
+                        table=table_name,
+                        name=f"COL_{col_idx:03d}",
+                        typename=col_type,
+                        length=length,
+                        scale=scale,
+                        nulls="Y" if is_nullable else "N",
+                        remarks=f"Column {col_idx} ({col_type}) in {table_name}"
+                    )
+                )
+    
+    return columns
+
+
 # Cache configuration
 CACHE_DIR = Path.home() / ".cache" / "dbutils"
 CACHE_FILE = CACHE_DIR / "schema_cache.pkl.gz"
@@ -651,11 +739,23 @@ async def get_all_tables_and_columns_async(
     use_cache: bool = True,
     limit: Optional[int] = None,
     offset: Optional[int] = None,
+    use_heavy_mock: bool = False,
+    db_file: Optional[str] = None,
 ) -> tuple[List[TableInfo], List[ColumnInfo]]:
     """Async version that can run queries in parallel."""
+    # For SQLite, use sync implementation (SQLite doesn't benefit from async here)
+    if db_file:
+        return _get_all_tables_and_columns_sync(schema_filter, use_mock, use_cache, limit, offset, use_heavy_mock, db_file)
+    
     if use_mock:
-        tables = mock_get_tables()
-        columns = mock_get_columns()
+        if use_heavy_mock:
+            # Heavy mock for stress testing: 5 schemas, 50 tables each, 20 columns each
+            tables = mock_get_tables_heavy(num_schemas=5, tables_per_schema=50)
+            columns = mock_get_columns_heavy(num_schemas=5, tables_per_schema=50, columns_per_table=20)
+        else:
+            # Regular mock data
+            tables = mock_get_tables()
+            columns = mock_get_columns()
 
         # Apply schema filter to mock data if needed
         if schema_filter:
@@ -820,6 +920,8 @@ def get_all_tables_and_columns(
     use_cache: bool = True,
     limit: Optional[int] = None,
     offset: Optional[int] = None,
+    use_heavy_mock: bool = False,
+    db_file: Optional[str] = None,
 ) -> tuple[List[TableInfo], List[ColumnInfo]]:
     """Synchronous wrapper for get_all_tables_and_columns_async."""
     import asyncio
@@ -828,13 +930,13 @@ def get_all_tables_and_columns(
         # Check if there's already a running event loop
         asyncio.get_running_loop()
         # If we're in an async context, fall back to sync implementation
-        return _get_all_tables_and_columns_sync(schema_filter, use_mock, use_cache, limit, offset)
+        return _get_all_tables_and_columns_sync(schema_filter, use_mock, use_cache, limit, offset, use_heavy_mock, db_file)
     except RuntimeError:
         # No running loop, we can create one
         pass
 
     # Create new event loop (preferred way in Python 3.10+)
-    return asyncio.run(get_all_tables_and_columns_async(schema_filter, use_mock, use_cache, limit, offset))
+    return asyncio.run(get_all_tables_and_columns_async(schema_filter, use_mock, use_cache, limit, offset, use_heavy_mock, db_file))
 
 
 def _get_all_tables_and_columns_sync(
@@ -843,11 +945,79 @@ def _get_all_tables_and_columns_sync(
     use_cache: bool = True,
     limit: Optional[int] = None,
     offset: Optional[int] = None,
+    use_heavy_mock: bool = False,
+    db_file: Optional[str] = None,
 ) -> tuple[List[TableInfo], List[ColumnInfo]]:
     """Synchronous fallback implementation with query optimizations."""
+    # Handle SQLite database file if provided
+    if db_file:
+        import sqlite3
+        
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        
+        # Get list of tables
+        cursor.execute("""
+            SELECT name, type 
+            FROM sqlite_master 
+            WHERE type IN ('table', 'view')
+            AND name NOT LIKE 'sqlite_%'
+            ORDER BY name
+        """)
+        
+        tables = []
+        columns = []
+        
+        for row in cursor.fetchall():
+            table_name = row[0]
+            table_type = row[1]
+            
+            # Create TableInfo (SQLite doesn't have schemas, use 'main')
+            table_info = TableInfo(
+                schema='main',
+                name=table_name,
+                remarks=f"SQLite {table_type}"
+            )
+            tables.append(table_info)
+            
+            # Get columns for this table
+            cursor.execute(f"PRAGMA table_info({table_name})")
+            col_rows = cursor.fetchall()
+            
+            for col_row in col_rows:
+                col_info = ColumnInfo(
+                    schema='main',
+                    table=table_name,
+                    name=col_row[1],  # name
+                    typename=col_row[2],  # type
+                    length=None,
+                    scale=None,
+                    nulls='Y' if col_row[3] == 0 else 'N',  # notnull
+                    remarks=f"{'PRIMARY KEY' if col_row[5] else ''}"  # pk
+                )
+                columns.append(col_info)
+        
+        conn.close()
+        
+        # Apply pagination if requested
+        if limit is not None:
+            start = offset or 0
+            tables = tables[start:start + limit]
+            # Filter columns to only include those for paginated tables
+            table_names = {t.name for t in tables}
+            columns = [c for c in columns if c.table in table_names]
+        
+        return tables, columns
+    
     if use_mock:
-        tables = mock_get_tables()
-        columns = mock_get_columns()
+        if use_heavy_mock:
+            # Heavy mock for stress testing: 5 schemas, 50 tables each, 20 columns each
+            tables = mock_get_tables_heavy(num_schemas=5, tables_per_schema=50)
+            columns = mock_get_columns_heavy(num_schemas=5, tables_per_schema=50, columns_per_table=20)
+        else:
+            # Regular mock data
+            tables = mock_get_tables()
+            columns = mock_get_columns()
 
         # Apply schema filter to mock data if needed
         if schema_filter:

@@ -62,6 +62,7 @@ def get_all_tables_and_columns(
     use_cache: bool = True,
     limit: Optional[int] = None,
     offset: Optional[int] = None,
+    use_heavy_mock: bool = False,
 ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """Get both tables and columns in a single call.
 
@@ -74,6 +75,7 @@ def get_all_tables_and_columns(
         use_cache: Use cached results if True
         limit: Optional limit for number of results
         offset: Optional offset for pagination
+        use_heavy_mock: Use heavy mock data for stress testing if True
 
     Returns:
         Tuple of (tables, columns)
@@ -81,7 +83,7 @@ def get_all_tables_and_columns(
     """
     from .db_browser import get_all_tables_and_columns as browser_func
 
-    return browser_func(schema_filter, use_mock, use_cache, limit, offset)
+    return browser_func(schema_filter, use_mock, use_cache, limit, offset, use_heavy_mock)
 
 
 def get_columns(schema: Optional[str] = None, table: Optional[str] = None, mock: bool = False) -> List[Dict[str, Any]]:

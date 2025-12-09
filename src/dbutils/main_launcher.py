@@ -27,6 +27,7 @@ def main():
 Examples:
   %(prog)s               # Launch Qt GUI interface
   %(prog)s --mock      # Launch with mock data for testing
+  %(prog)s --heavy-mock # Launch with heavy mock data (stress test)
   %(prog)s --schema MYLIB # Launch with specific schema filter
         """,
     )
@@ -38,6 +39,8 @@ Examples:
     # Standard options (passed through to interface)
     parser.add_argument("--schema", help="Filter by specific schema (default: DACDATA)", default="DACDATA")
     parser.add_argument("--mock", action="store_true", help="Use mock data for testing")
+    parser.add_argument("--heavy-mock", action="store_true", 
+                       help="Use heavy mock data for stress testing (5 schemas, 50 tables each, 20 cols)")
     parser.add_argument("--install-deps", action="store_true", help="Show required Qt dependencies")
 
     args = parser.parse_args()
@@ -72,7 +75,7 @@ def launch_qt_interface(args) -> None:
             pass
 
         print("🖥️  Launching Qt GUI interface with JDBC support...")
-        qt_main()
+        qt_main(args)
     except ImportError as e:
         print("❌ Error: Qt libraries not available")
         print(f"   {e}")

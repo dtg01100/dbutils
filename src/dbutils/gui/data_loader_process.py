@@ -379,6 +379,15 @@ def main():  # noqa: C901
         sys.stderr.flush()
 
         # Import from absolute paths since this runs as __main__
+        # Ensure the src directory is in the Python path for subprocess
+        import sys
+        import os
+
+        # Add the src directory to Python path if not already there
+        src_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "src")
+        if src_path not in sys.path:
+            sys.path.insert(0, src_path)
+
         from dbutils import db_browser
 
         # Track all loaded tables to build schema list and save to cache
