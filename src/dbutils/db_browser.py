@@ -6,13 +6,18 @@ Provides data structures and methods used by the Qt GUI browser.
 """
 
 import asyncio
+import gzip
 import json
+import logging
 import os
 import pickle
+import time
 from pathlib import Path
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 from typing import Set
+
+logger = logging.getLogger(__name__)
 
 # Import rich for TUI
 try:
@@ -542,8 +547,6 @@ def load_from_cache(
 
     try:
         if is_gzip:
-            import gzip
-
             with gzip.open(cache_path, "rb") as f:
                 cache_data = pickle.load(f)
         else:
@@ -556,8 +559,6 @@ def load_from_cache(
 
         cached_item = cache_data[cache_key]
         # Check if cache is less than 1 hour old
-        import time
-
         if time.time() - cached_item["timestamp"] > 3600:
             return None
 
@@ -582,22 +583,16 @@ def save_to_cache(
         cache_data = {}
         if CACHE_FILE.exists():
             try:
-                import gzip
-
                 with gzip.open(CACHE_FILE, "rb") as f:
                     cache_data = pickle.load(f)
             except Exception:
                 cache_data = {}
 
         # Update cache
-        import time
-
         cache_key = get_cache_key(schema_filter, limit, offset)
         cache_data[cache_key] = {"timestamp": time.time(), "tables": tables, "columns": columns}
 
         # Save cache compressed
-        import gzip
-
         with gzip.open(CACHE_FILE, "wb", compresslevel=5) as f:
             pickle.dump(cache_data, f)
     except Exception:
@@ -642,7 +637,7 @@ def get_available_schemas(use_mock: bool = False) -> List[SchemaInfo]:
             schemas.append(SchemaInfo(name=row.get("TABLE_SCHEMA", ""), table_count=int(row.get("TABLE_COUNT", 0))))
     except Exception as exc:
         # If query fails, return empty list
-        print(f"Warning: Could not fetch schemas: {exc}")
+        logger.warning(f"Could not fetch schemas: {exc}")
 
     return schemas
 
@@ -689,7 +684,7 @@ async def get_available_schemas_async(use_mock: bool = False) -> List[SchemaInfo
             schemas.append(SchemaInfo(name=row.get("TABLE_SCHEMA", ""), table_count=int(row.get("TABLE_COUNT", 0))))
     except Exception as exc:
         # If query fails, return empty list
-        print(f"Warning: Could not fetch schemas: {exc}")
+        logger.warning(f"Could not fetch schemas: {exc}")
 
     return schemas
 
@@ -904,7 +899,7 @@ async def get_all_tables_and_columns_async(
 
     except Exception as e:
         # If query fails, return empty list (graceful degradation)
-        print(f"Warning: Could not fetch tables/columns: {e}")
+        logger.warning(f"Could not fetch tables/columns: {e}")
         tables, columns = [], []
 
     # Save to cache if we got data
@@ -1152,7 +1147,7 @@ def _get_all_tables_and_columns_sync(
             )
     except Exception as e:
         # If query fails, return empty list (graceful degradation)
-        print(f"Warning: Could not fetch tables/columns: {e}")
+        logger.warning(f"Could not fetch tables/columns: {e}")
         tables, columns = [], []
 
     # Save to cache if we got data
@@ -1222,7 +1217,7 @@ def _get_all_tables_and_columns_sync(
             )
     except Exception as e:
         # If query fails, return empty list (graceful degradation)
-        print(f"Warning: Could not fetch tables: {e}")
+        logger.warning(f"Could not fetch tables: {e}")
 
     # Query for columns (DB2 for i uses QSYS2.SYSCOLUMNS instead of SYSCAT.COLUMNS)
     # Only load columns for tables that were actually loaded (important for pagination)
@@ -1298,7 +1293,7 @@ def _get_all_tables_and_columns_sync(
             )
     except Exception as e:
         # If query fails, return what we have so far
-        print(f"Warning: Could not fetch columns: {e}")
+        logger.warning(f"Could not fetch columns: {e}")
 
     # Save to cache if we got data
     if use_cache and (tables or columns):

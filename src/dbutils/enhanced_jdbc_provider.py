@@ -419,7 +419,7 @@ class EnhancedProviderRegistry(QObject):
                         self.providers[name] = provider
         except Exception as e:
             # If config loading fails, initialize with empty providers
-            print(f"Warning: Could not load JDBC providers from {self.config_path}: {e}")
+            logger.warning(f"Could not load JDBC providers from {self.config_path}: {e}")
             self._initialize_default_providers()
 
     def _initialize_default_providers(self):

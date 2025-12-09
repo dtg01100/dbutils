@@ -16,6 +16,18 @@ wheels/
 .pytest_cache/
 .coverage
 htmlcov/
+coverage.xml
+
+# Test databases
+*.db
+*.sqlite
+
+# Profiling files
+*.lprof
+*.prof
+*.svg
+intensive_ops_profile.html
+intensive_ops_profile.json
 
 # Virtual environments
 .venv/
