@@ -34,7 +34,9 @@ STANDARD_CATEGORIES = [
     "MariaDB",
     "Oracle",
     "SQL Server",
-    "DB2",
+    "DB2 LUW",
+    "DB2 z/OS",
+    "DB2 for i",
     "SQLite",
     "H2",
     "Apache Derby",
@@ -127,11 +129,23 @@ class PredefinedProviderTemplates:
                 "default_port": 1433,
                 "description": "Microsoft SQL Server connection",
             },
-            "DB2": {
+            "DB2 LUW": {
                 "driver_class": "com.ibm.db2.jcc.DB2Driver",
                 "url_template": "jdbc:db2://{host}:{port}/{database}",
                 "default_port": 50000,
-                "description": "IBM DB2 database connection",
+                "description": "IBM DB2 for Linux/Unix/Windows",
+            },
+            "DB2 z/OS": {
+                "driver_class": "com.ibm.db2.jcc.DB2Driver",
+                "url_template": "jdbc:db2://{host}:{port}/{database}",
+                "default_port": 446,
+                "description": "IBM DB2 for z/OS (Mainframe)",
+            },
+            "DB2 for i": {
+                "driver_class": "com.ibm.as400.access.AS400JDBCDriver",
+                "url_template": "jdbc:as400://{host}/{database}",
+                "default_port": 0,
+                "description": "IBM DB2 for i (AS/400, iSeries)",
             },
             "SQLite": {
                 "driver_class": "org.sqlite.JDBC",

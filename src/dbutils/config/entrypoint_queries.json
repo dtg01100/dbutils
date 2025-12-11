@@ -25,11 +25,6 @@
       "schema_query": "SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema NOT IN ('sys', 'INFORMATION_SCHEMA')",
       "database_info_query": "SELECT @@VERSION as database_version"
     },
-    "DB2": {
-      "identity_query": "SELECT CURRENT_TIMESTAMP as current_timestamp FROM SYSIBM.SYSDUMMY1",
-      "schema_query": "SELECT table_schema, table_name FROM syscat.tables WHERE table_schema NOT IN ('SYS', 'SYSCAT', 'SYSTOOLS')",
-      "database_info_query": "SELECT service_level as database_version FROM sysibm.sysversions"
-    },
     "SQLite": {
       "identity_query": "SELECT datetime('now') as current_timestamp",
       "schema_query": "SELECT name as table_name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
@@ -39,6 +34,21 @@
       "identity_query": "SELECT CURRENT_TIMESTAMP as current_timestamp",
       "schema_query": "SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema NOT IN ('INFORMATION_SCHEMA', 'PUBLIC')",
       "database_info_query": "SELECT H2VERSION() as database_version"
+    },
+    "DB2 LUW": {
+      "identity_query": "SELECT CURRENT_TIMESTAMP as current_timestamp FROM SYSIBM.SYSDUMMY1",
+      "schema_query": "SELECT table_schema, table_name FROM syscat.tables WHERE table_schema NOT IN ('SYS', 'SYSCAT', 'SYSTOOLS')",
+      "database_info_query": "SELECT service_level as database_version FROM sysibm.sysversions"
+    },
+    "DB2 z/OS": {
+      "identity_query": "SELECT CURRENT_TIMESTAMP as current_timestamp FROM SYSIBM.SYSDUMMY1",
+      "schema_query": "SELECT table_schema, table_name FROM syscat.tables WHERE table_schema NOT IN ('SYS', 'SYSCAT', 'SYSTOOLS')",
+      "database_info_query": "SELECT service_level as database_version FROM sysibm.sysversions"
+    },
+    "DB2 for i": {
+      "identity_query": "SELECT CURRENT_TIMESTAMP as current_timestamp FROM SYSIBM.SYSDUMMY1",
+      "schema_query": "SELECT table_schema, table_name FROM INFORMATION_SCHEMA.TABLES WHERE table_schema NOT IN ('QSYS', 'QSYS2', 'QSYSIBM')",
+      "database_info_query": "SELECT 'DB2 for i' as database_version"
     }
   },
   "custom_entrypoint_queries": {
