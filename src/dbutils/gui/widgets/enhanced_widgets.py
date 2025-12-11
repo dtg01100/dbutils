@@ -1,56 +1,35 @@
 """Custom Qt widgets for enhanced database browser interface.
 
 Notes for maintainers:
-- Some bindings (PySide6 vs PyQt6) expose QEvent/Qt enums differently. This
-    module includes a compatibility shim to expose ``Qt.EventType`` values if not
-    present. Tests that mock GUI events can reference ``Qt.EventType.Resize``.
 - The ``BusyOverlay`` widget exposes a protected factory method ``_create_painter``
     that can be overridden in unit tests to inject a mock ``QPainter``. This
     avoids dependencies on a paint engine during headless testing.
 """
 
+# Import PySide6 directly
+from PySide6.QtCore import QEasingCurve, QEvent, QObject, QPoint, QPropertyAnimation, QRect, Qt, QTimer
+from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPalette, QPen
+from PySide6.QtWidgets import (
+    QFrame,
+    QGraphicsOpacityEffect,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
+
+# Ensure a QApplication exists for widgets created during tests or module import
 try:
-    from PySide6.QtCore import QEasingCurve, QEvent, QObject, QPoint, QPropertyAnimation, QRect, Qt, QTimer
-    from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPalette, QPen
-    from PySide6.QtWidgets import (
-        QFrame,
-        QGraphicsOpacityEffect,
-        QHBoxLayout,
-        QLabel,
-        QPushButton,
-        QSizePolicy,
-        QVBoxLayout,
-        QWidget,
-    )
+    from PySide6.QtWidgets import QApplication
 
-    # Ensure a QApplication exists for widgets created during tests or module import
-    try:
-        from PySide6.QtWidgets import QApplication
+    if QApplication.instance() is None:
+        _QT_APP = QApplication([])
+except Exception:
+    pass
 
-        if QApplication.instance() is None:
-            _QT_APP = QApplication([])
-    except Exception:
-        pass
-
-    QT_AVAILABLE = True
-except ImportError:
-    try:
-        from PyQt6.QtCore import QEasingCurve, QEvent, QObject, QPoint, QPropertyAnimation, QRect, Qt, QTimer
-        from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPalette, QPen
-        from PyQt6.QtWidgets import (
-            QFrame,
-            QGraphicsOpacityEffect,
-            QHBoxLayout,
-            QLabel,
-            QPushButton,
-            QSizePolicy,
-            QVBoxLayout,
-            QWidget,
-        )
-
-        QT_AVAILABLE = True
-    except ImportError:
-        QT_AVAILABLE = False
+QT_AVAILABLE = True
 
 # Provide minimal stubs when Qt is not available so imports during tests don't fail
 if not QT_AVAILABLE:

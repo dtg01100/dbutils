@@ -31,10 +31,7 @@ def qapp():
     try:
         from PySide6.QtWidgets import QApplication
     except ImportError:
-        try:
-            from PyQt6.QtWidgets import QApplication
-        except ImportError:
-            pytest.skip("Qt not available, skipping Qt GUI tests")
+        pytest.skip("Qt not available, skipping Qt GUI tests")
     
     # Check if QApplication already exists
     app = QApplication.instance()

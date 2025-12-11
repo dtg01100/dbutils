@@ -13,7 +13,7 @@ except Exception:  # ImportError or Qt not available
 
     def qt_gui_main(*args, **kwargs):  # type: ignore
         raise ImportError(
-            "Qt GUI is not available. Install PySide6 or PyQt6 to use db-browser GUI (pip install PySide6).",
+            "Qt GUI is not available. Install PySide6 to use db-browser GUI (pip install PySide6).",
         )
 
 

@@ -24,22 +24,12 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-# Try to import Qt components for accessibility features
-try:
-    from PySide6.QtCore import QObject, Qt, Signal
-    from PySide6.QtGui import QAccessible, QAccessibleEvent, QAccessibleInterface
-    from PySide6.QtWidgets import QApplication, QWidget
+# Import Qt components for accessibility features
+from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtGui import QAccessible, QAccessibleEvent, QAccessibleInterface
+from PySide6.QtWidgets import QApplication, QWidget
 
-    QT_AVAILABLE = True
-except ImportError:
-    try:
-        from PyQt6.QtCore import QObject, Qt, Signal
-        from PyQt6.QtGui import QAccessible, QAccessibleEvent, QAccessibleInterface
-        from PyQt6.QtWidgets import QApplication, QWidget
-
-        QT_AVAILABLE = True
-    except ImportError:
-        QT_AVAILABLE = False
+QT_AVAILABLE = True
 
 
 class AccessibilityLevel(Enum):

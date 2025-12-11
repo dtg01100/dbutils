@@ -17,54 +17,28 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
-# Try to import Qt components
-try:
-    from PySide6.QtCore import QSize, Qt, Signal, Slot
-    from PySide6.QtGui import QColor, QFont, QIcon, QPalette
-    from PySide6.QtWidgets import (
-        QAction,
-        QCheckBox,
-        QComboBox,
-        QFrame,
-        QHBoxLayout,
-        QLabel,
-        QLineEdit,
-        QMenu,
-        QProgressBar,
-        QPushButton,
-        QSizePolicy,
-        QSpacerItem,
-        QToolButton,
-        QVBoxLayout,
-        QWidget,
-    )
+# Import Qt components
+from PySide6.QtCore import QSize, Qt, Signal, Slot
+from PySide6.QtGui import QColor, QFont, QIcon, QPalette
+from PySide6.QtWidgets import (
+    QAction,
+    QCheckBox,
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMenu,
+    QProgressBar,
+    QPushButton,
+    QSizePolicy,
+    QSpacerItem,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
-    QT_AVAILABLE = True
-except ImportError:
-    try:
-        from PyQt6.QtCore import QSize, Qt, Signal, Slot
-        from PyQt6.QtGui import QColor, QFont, QIcon, QPalette
-        from PyQt6.QtWidgets import (
-            QAction,
-            QCheckBox,
-            QComboBox,
-            QFrame,
-            QHBoxLayout,
-            QLabel,
-            QLineEdit,
-            QMenu,
-            QProgressBar,
-            QPushButton,
-            QSizePolicy,
-            QSpacerItem,
-            QToolButton,
-            QVBoxLayout,
-            QWidget,
-        )
-
-        QT_AVAILABLE = True
-    except ImportError:
-        QT_AVAILABLE = False
+QT_AVAILABLE = True
 
 if QT_AVAILABLE:
 

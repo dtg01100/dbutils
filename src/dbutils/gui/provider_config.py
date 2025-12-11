@@ -7,19 +7,10 @@ from __future__ import annotations
 # ruff: noqa
 # type: ignore
 
-try:
-    import PySide6.QtWidgets as _QtWidgets
-    import PySide6.QtCore as _QtCore
+import PySide6.QtWidgets as _QtWidgets
+import PySide6.QtCore as _QtCore
 
-    QT_AVAILABLE = True
-except Exception:
-    try:
-        import PyQt6.QtWidgets as _QtWidgets
-        import PyQt6.QtCore as _QtCore
-
-        QT_AVAILABLE = True
-    except Exception:
-        QT_AVAILABLE = False
+QT_AVAILABLE = True
 
 from dbutils.jdbc_provider import ProviderRegistry, JDBCProvider
 

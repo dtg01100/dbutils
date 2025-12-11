@@ -26,20 +26,11 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-# Try to import Qt components for theme detection
-try:
-    from PySide6.QtCore import QSettings
-    from PySide6.QtGui import QColor, QPalette
+# Import Qt components for theme detection
+from PySide6.QtCore import QSettings
+from PySide6.QtGui import QColor, QPalette
 
-    QT_AVAILABLE = True
-except ImportError:
-    try:
-        from PyQt6.QtCore import QSettings
-        from PyQt6.QtGui import QColor, QPalette
-
-        QT_AVAILABLE = True
-    except ImportError:
-        QT_AVAILABLE = False
+QT_AVAILABLE = True
 
 
 class ThemeMode(Enum):

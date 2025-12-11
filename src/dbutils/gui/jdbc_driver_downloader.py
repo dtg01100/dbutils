@@ -34,10 +34,10 @@ class JDBCDriverRegistry:
         "postgresql": JDBCDriverInfo(
             name="PostgreSQL JDBC Driver",
             driver_class="org.postgresql.Driver",
-            download_url="https://jdbc.postgresql.org/download.html",
+            download_url="https://github.com/pgjdbc/pgjdbc/releases",
             alternative_urls=[
                 "https://repo1.maven.org/maven2/org/postgresql/postgresql/",
-                "https://github.com/pgjdbc/pgjdbc/releases",
+                "https://jdbc.postgresql.org/download.html",
             ],
             license="BSD-2-Clause",
             min_java_version="8",
@@ -132,11 +132,11 @@ class JDBCDriverRegistry:
         "jt400": JDBCDriverInfo(
             name="IBM Toolbox for Java (JT400) - AS400/IBM i",
             driver_class="com.ibm.as400.access.AS400JDBCDriver",
-            download_url="https://www.ibm.com/support/pages/node/1524689",  # IBM i Access Client Solutions page
+            download_url="https://github.com/IBM/JTOpen/releases",
             alternative_urls=[
                 "https://repo1.maven.org/maven2/com/ibm/jtopen/jtopen/",
-                "https://github.com/IBM/JTOpen/releases",
                 "https://sourceforge.net/projects/jt400/",
+                "https://www.ibm.com/support/pages/node/1524689",
             ],
             license="IBM Public License",
             min_java_version="8",
@@ -192,11 +192,14 @@ class JDBCDriverRegistry:
         "generic": JDBCDriverInfo(
             name="Generic JDBC Driver",
             driver_class="com.example.Driver",
-            download_url="https://example.com/jdbc-drivers",
-            alternative_urls=[],
+            download_url="https://repo1.maven.org/maven2/",
+            alternative_urls=[
+                "https://search.maven.org/",
+                "https://mvnrepository.com/",
+            ],
             license="N/A",
             min_java_version="8",
-            description="Generic JDBC driver template",
+            description="Generic JDBC driver template - search Maven Central Repository",
             recommended_version="x.x.x",
         ),
     }
@@ -224,14 +227,18 @@ class JDBCDriverRegistry:
             or "sql server" in normalized_type.replace("_", " ")
         ):
             return cls.DRIVERS.get("sqlserver")
-        elif "db2" in normalized_type.lower():
-            return cls.DRIVERS.get("db2")
         elif (
-            "jt400" in normalized_type.lower()
+            # Check for DB2 for i (AS/400) before generic DB2
+            "db2fori" in normalized_type
+            or "jt400" in normalized_type.lower()
             or "as400" in normalized_type.lower()
+            or "ibmi" in normalized_type.lower()
             or "ibm i" in normalized_type.replace("_", " ")
         ):
             return cls.DRIVERS.get("jt400")
+        elif "db2" in normalized_type.lower():
+            # This handles "DB2 LUW" and "DB2 z/OS"
+            return cls.DRIVERS.get("db2")
         elif "sqlite" in normalized_type:
             return cls.DRIVERS.get("sqlite")
         elif "h2" in normalized_type:

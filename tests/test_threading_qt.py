@@ -19,11 +19,7 @@ try:
     from PySide6.QtCore import QCoreApplication, QObject, QThread, Signal
     QT_AVAILABLE = True
 except ImportError:
-    try:
-        from PyQt6.QtCore import QCoreApplication, QObject, QThread, pyqtSignal as Signal
-        QT_AVAILABLE = True
-    except ImportError:
-        pass
+    pass
 
 if not QT_AVAILABLE:
     pytest.skip("No Qt binding available", allow_module_level=True)

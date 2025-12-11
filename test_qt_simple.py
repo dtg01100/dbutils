@@ -13,28 +13,13 @@ sys.path.insert(0, src_path)
 def main():
     """Test basic Qt functionality."""
     try:
-        # Try to import Qt modules
-        try:
-            from PySide6.QtWidgets import QApplication, QMainWindow, QLabel
-            from PySide6.QtCore import Qt
-            print("PySide6 imported successfully")
-        except ImportError:
-            try:
-                from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel
-                from PyQt6.QtCore import Qt
-                print("PyQt6 imported successfully")
-            except ImportError as e:
-                print(f"Cannot import Qt libraries: {e}")
-                return
+        # Import Qt modules
+        from PySide6.QtWidgets import QApplication, QMainWindow, QLabel
+        from PySide6.QtCore import Qt, QTimer
+        print("PySide6 imported successfully")
 
         # Check if QApplication instance already exists
-        try:
-            from PySide6.QtCore import QCoreApplication
-        except ImportError:
-            try:
-                from PyQt6.QtCore import QCoreApplication
-            except ImportError:
-                QCoreApplication = None
+        from PySide6.QtCore import QCoreApplication
 
         app = QCoreApplication.instance() if QCoreApplication else None
         if app is None:
@@ -58,6 +43,21 @@ def main():
 
         window.show()
         print("Window shown")
+
+        # Add automatic close timer for test environments
+        # This ensures the test doesn't hang and closes automatically
+        def close_window():
+            print("Closing window automatically...")
+            window.close()
+            # Force quit the application to ensure cleanup
+            app.quit()
+
+        # Set timer to close window after 2 seconds (2000 ms)
+        # This is long enough to verify the window opens but short enough for tests
+        timer = QTimer()
+        timer.setSingleShot(True)
+        timer.timeout.connect(close_window)
+        timer.start(2000)  # 2 seconds
 
         # Run event loop
         sys.exit(app.exec())

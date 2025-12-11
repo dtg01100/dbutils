@@ -23,10 +23,7 @@ import pytest
 try:
     from PySide6.QtWidgets import QApplication
 except ImportError:
-    try:
-        from PyQt6.QtWidgets import QApplication
-    except ImportError:
-        QApplication = None
+    QApplication = None
 
 
 @pytest.fixture(scope="module")
@@ -411,7 +408,7 @@ def test_e2e_complex_joins_and_aggregation(e2e_sqlite_env, e2e_database):
     conn.close()
 
 
-@pytest.mark.skipif(QApplication is None, reason="PySide6/PyQt6 not available")
+@pytest.mark.skipif(QApplication is None, reason="PySide6 not available")
 def test_e2e_gui_table_loading(e2e_sqlite_env, e2e_database):
     """Test GUI loads and displays table data from the database."""
     db_path = e2e_database

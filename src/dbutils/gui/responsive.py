@@ -25,22 +25,12 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-# Try to import Qt components for responsive design
-try:
-    from PySide6.QtCore import QObject, QRect, QSize, Qt, Signal
-    from PySide6.QtGui import QGuiApplication, QScreen
-    from PySide6.QtWidgets import QApplication, QDesktopWidget, QWidget
+# Import Qt components for responsive design
+from PySide6.QtCore import QObject, QRect, QSize, Qt, Signal
+from PySide6.QtGui import QGuiApplication, QScreen
+from PySide6.QtWidgets import QApplication, QDesktopWidget, QWidget
 
-    QT_AVAILABLE = True
-except ImportError:
-    try:
-        from PyQt6.QtCore import QObject, QRect, QSize, Qt, Signal
-        from PyQt6.QtGui import QGuiApplication, QScreen
-        from PyQt6.QtWidgets import QApplication, QDesktopWidget, QWidget
-
-        QT_AVAILABLE = True
-    except ImportError:
-        QT_AVAILABLE = False
+QT_AVAILABLE = True
 
 
 class Breakpoint(Enum):

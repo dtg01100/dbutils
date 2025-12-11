@@ -18,12 +18,7 @@ try:
     from PySide6.QtTest import QTest
     from PySide6.QtCore import Qt
 except ImportError:
-    try:
-        from PyQt6.QtWidgets import QApplication
-        from PyQt6.QtTest import QTest
-        from PyQt6.QtCore import Qt
-    except ImportError:
-        QApplication = None
+    QApplication = None
 
 
 @pytest.fixture(scope="module")
@@ -174,7 +169,7 @@ def gui_test_database(gui_e2e_env) -> str:
 
 
 @pytest.mark.skipif(
-    QApplication is None, reason="PySide6/PyQt6 not available"
+    QApplication is None, reason="PySide6 not available"
 )
 def test_gui_browser_launch_and_table_list(gui_test_database):
     """Test that the GUI browser launches and shows table list."""
@@ -211,7 +206,7 @@ def test_gui_browser_launch_and_table_list(gui_test_database):
 
 
 @pytest.mark.skipif(
-    QApplication is None, reason="PySide6/PyQt6 not available"
+    QApplication is None, reason="PySide6 not available"
 )
 def test_gui_database_info_extraction(gui_test_database):
     """Test extracting database schema information via GUI."""

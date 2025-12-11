@@ -11,50 +11,16 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Try to import Qt components
-try:
-    from PySide6.QtCore import *
-    from PySide6.QtGui import *
-    from PySide6.QtWidgets import *
+# Import Qt components
+from PySide6.QtCore import *
+from PySide6.QtGui import *
+from PySide6.QtWidgets import *
 
-    QT_BINDINGS = "PySide6"
-except ImportError:
-    try:
-        from PyQt6.QtCore import *
-        from PyQt6.QtGui import *
-        from PyQt6.QtWidgets import *
-
-        QT_BINDINGS = "PyQt6"
-    except ImportError:
-        # If no Qt bindings available, create dummy classes for documentation
-        QT_BINDINGS = None
-        QWidget = object
-        QVBoxLayout = object
-        QHBoxLayout = object
-        QFormLayout = object
-        QGroupBox = object
-        QListWidget = object
-        QComboBox = object
-        QLineEdit = object
-        QSpinBox = object
-        QTextEdit = object
-        QPushButton = object
-        QDialog = object
-        QSplitter = object
-        QScrollArea = object
-        QTableWidget = object
-        QTableWidgetItem = object
-        QMessageBox = object
-        QFileDialog = object
-        QInputDialog = object
-        QCheckBox = object
+QT_BINDINGS = "PySide6"
 
 
 if QT_BINDINGS:
-    if QT_BINDINGS == "PySide6":
-        from PySide6.QtWidgets import QInputDialog
-    else:  # PyQt6
-        from PyQt6.QtWidgets import QInputDialog
+    from PySide6.QtWidgets import QInputDialog
 
     from dbutils.enhanced_jdbc_provider import EnhancedProviderRegistry, JDBCProvider, PredefinedProviderTemplates
 
