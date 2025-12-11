@@ -15,7 +15,7 @@ def check_gui_availability() -> bool:
     # import linter warnings and reduces startup cost.
     from importlib import util as _util
 
-    return bool(_util.find_spec("PySide6") or _util.find_spec("PyQt6"))
+    return bool(_util.find_spec("PySide6"))
 
 
 def main():
@@ -50,8 +50,6 @@ Examples:
         print("📦 Qt DB Browser Dependencies:")
         print("\n🖥️  Qt GUI Mode (Required):")
         print("   pip install PySide6")
-        print("   # or")
-        print("   pip install PyQt6")
         print("\n🔌 JDBC Support (Required):")
         print("   pip install JPype1 JayDeBeApi")
         print("\n📊 Rich Formatting (Optional):")
@@ -81,8 +79,6 @@ def launch_qt_interface(args) -> None:
         print(f"   {e}")
         print("\n💡 To install Qt support:")
         print("   pip install PySide6")
-        print("   # or")
-        print("   pip install PyQt6")
         sys.exit(1)
 
 

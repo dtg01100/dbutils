@@ -5,10 +5,8 @@ A modern Qt interface for database schema browsing with advanced features
 including streaming search, visualizations, and enhanced user experience.
 """
 
-# This file contains the Qt GUI for the database browser and requires one of
-# the supported Qt bindings (PySide6 or PyQt6) at runtime. The module maps
-# bindings to a common set of symbols so the rest of the application code can
-# reference Qt classes uniformly.
+# This file contains the Qt GUI for the database browser and requires PySide6
+# at runtime. The module provides a clean interface for Qt classes.
 # ruff: noqa
 # type: ignore
 
@@ -26,122 +24,60 @@ from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
-try:
-    # Prefer importing the modules and mapping names explicitly so we don't
-    # define the same names multiple times which confuses static analysis.
-    import PySide6.QtWidgets as _QtWidgets
-    import PySide6.QtCore as _QtCore
-    import PySide6.QtGui as _QtGui
+# Import PySide6 directly
+import PySide6.QtWidgets as _QtWidgets
+import PySide6.QtCore as _QtCore
+import PySide6.QtGui as _QtGui
 
-    QApplication = _QtWidgets.QApplication
-    QMainWindow = _QtWidgets.QMainWindow
-    QWidget = _QtWidgets.QWidget
-    QVBoxLayout = _QtWidgets.QVBoxLayout
-    QHBoxLayout = _QtWidgets.QHBoxLayout
-    QSplitter = _QtWidgets.QSplitter
-    QTableView = _QtWidgets.QTableView
-    QLineEdit = _QtWidgets.QLineEdit
-    QPushButton = _QtWidgets.QPushButton
-    QLabel = _QtWidgets.QLabel
-    QComboBox = _QtWidgets.QComboBox
-    QCheckBox = _QtWidgets.QCheckBox
-    QGroupBox = _QtWidgets.QGroupBox
-    QStatusBar = _QtWidgets.QStatusBar
-    QMenuBar = _QtWidgets.QMenuBar
-    QMenu = _QtWidgets.QMenu
-    QProgressBar = _QtWidgets.QProgressBar
-    QTextEdit = _QtWidgets.QTextEdit
-    QAbstractItemView = _QtWidgets.QAbstractItemView
-    QHeaderView = _QtWidgets.QHeaderView
-    QMessageBox = _QtWidgets.QMessageBox
-    QSizePolicy = _QtWidgets.QSizePolicy
-    QDockWidget = _QtWidgets.QDockWidget
-    QFileDialog = _QtWidgets.QFileDialog
-    QProgressDialog = _QtWidgets.QProgressDialog
-    QStyledItemDelegate = _QtWidgets.QStyledItemDelegate
-    QStyleOptionViewItem = _QtWidgets.QStyleOptionViewItem
+QApplication = _QtWidgets.QApplication
+QMainWindow = _QtWidgets.QMainWindow
+QWidget = _QtWidgets.QWidget
+QVBoxLayout = _QtWidgets.QVBoxLayout
+QHBoxLayout = _QtWidgets.QHBoxLayout
+QSplitter = _QtWidgets.QSplitter
+QTableView = _QtWidgets.QTableView
+QLineEdit = _QtWidgets.QLineEdit
+QPushButton = _QtWidgets.QPushButton
+QLabel = _QtWidgets.QLabel
+QComboBox = _QtWidgets.QComboBox
+QCheckBox = _QtWidgets.QCheckBox
+QGroupBox = _QtWidgets.QGroupBox
+QStatusBar = _QtWidgets.QStatusBar
+QMenuBar = _QtWidgets.QMenuBar
+QMenu = _QtWidgets.QMenu
+QProgressBar = _QtWidgets.QProgressBar
+QTextEdit = _QtWidgets.QTextEdit
+QAbstractItemView = _QtWidgets.QAbstractItemView
+QHeaderView = _QtWidgets.QHeaderView
+QMessageBox = _QtWidgets.QMessageBox
+QSizePolicy = _QtWidgets.QSizePolicy
+QDockWidget = _QtWidgets.QDockWidget
+QFileDialog = _QtWidgets.QFileDialog
+QProgressDialog = _QtWidgets.QProgressDialog
+QStyledItemDelegate = _QtWidgets.QStyledItemDelegate
+QStyleOptionViewItem = _QtWidgets.QStyleOptionViewItem
 
-    Qt = _QtCore.Qt
-    QTimer = _QtCore.QTimer
-    QThread = _QtCore.QThread
-    Signal = getattr(_QtCore, "Signal", getattr(_QtCore, "pyqtSignal", None))
-    QObject = _QtCore.QObject
-    QAbstractTableModel = _QtCore.QAbstractTableModel
-    QModelIndex = _QtCore.QModelIndex
-    QSortFilterProxyModel = _QtCore.QSortFilterProxyModel
-    QSize = _QtCore.QSize
-    QProcess = _QtCore.QProcess
+Qt = _QtCore.Qt
+QTimer = _QtCore.QTimer
+QThread = _QtCore.QThread
+Signal = _QtCore.Signal
+QObject = _QtCore.QObject
+QAbstractTableModel = _QtCore.QAbstractTableModel
+QModelIndex = _QtCore.QModelIndex
+QSortFilterProxyModel = _QtCore.QSortFilterProxyModel
+QSize = _QtCore.QSize
+QProcess = _QtCore.QProcess
 
-    QIcon = _QtGui.QIcon
-    QFont = _QtGui.QFont
-    QPixmap = _QtGui.QPixmap
-    QAction = _QtGui.QAction
-    # Rich text rendering helpers used by highlight delegate
-    QTextDocument = _QtGui.QTextDocument
-    QAbstractTextDocumentLayout = _QtGui.QAbstractTextDocumentLayout
-    QPalette = _QtGui.QPalette
+QIcon = _QtGui.QIcon
+QFont = _QtGui.QFont
+QPixmap = _QtGui.QPixmap
+QAction = _QtGui.QAction
+# Rich text rendering helpers used by highlight delegate
+QTextDocument = _QtGui.QTextDocument
+QAbstractTextDocumentLayout = _QtGui.QAbstractTextDocumentLayout
+QPalette = _QtGui.QPalette
 
-    QT_AVAILABLE = True
-except ImportError:
-    try:
-        import PyQt6.QtWidgets as _QtWidgets
-        import PyQt6.QtCore as _QtCore
-        import PyQt6.QtGui as _QtGui
-
-        QApplication = _QtWidgets.QApplication
-        QMainWindow = _QtWidgets.QMainWindow
-        QWidget = _QtWidgets.QWidget
-        QVBoxLayout = _QtWidgets.QVBoxLayout
-        QHBoxLayout = _QtWidgets.QHBoxLayout
-        QSplitter = _QtWidgets.QSplitter
-        QTableView = _QtWidgets.QTableView
-        QLineEdit = _QtWidgets.QLineEdit
-        QPushButton = _QtWidgets.QPushButton
-        QLabel = _QtWidgets.QLabel
-        QComboBox = _QtWidgets.QComboBox
-        QCheckBox = _QtWidgets.QCheckBox
-        QGroupBox = _QtWidgets.QGroupBox
-        QStatusBar = _QtWidgets.QStatusBar
-        QMenuBar = _QtWidgets.QMenuBar
-        QMenu = _QtWidgets.QMenu
-        QProgressBar = _QtWidgets.QProgressBar
-        QTextEdit = _QtWidgets.QTextEdit
-        QAbstractItemView = _QtWidgets.QAbstractItemView
-        QHeaderView = _QtWidgets.QHeaderView
-        QMessageBox = _QtWidgets.QMessageBox
-        QSizePolicy = _QtWidgets.QSizePolicy
-        QDockWidget = _QtWidgets.QDockWidget
-        QFileDialog = _QtWidgets.QFileDialog
-        QProgressDialog = _QtWidgets.QProgressDialog
-        QStyledItemDelegate = _QtWidgets.QStyledItemDelegate
-        QStyleOptionViewItem = _QtWidgets.QStyleOptionViewItem
-
-        Qt = _QtCore.Qt
-        QTimer = _QtCore.QTimer
-        QThread = _QtCore.QThread
-        Signal = getattr(_QtCore, "pyqtSignal", getattr(_QtCore, "Signal", None))
-        QObject = _QtCore.QObject
-        QAbstractTableModel = _QtCore.QAbstractTableModel
-        QModelIndex = _QtCore.QModelIndex
-        QSortFilterProxyModel = _QtCore.QSortFilterProxyModel
-        QSize = _QtCore.QSize
-        QProcess = _QtCore.QProcess
-
-        QIcon = _QtGui.QIcon
-        QFont = _QtGui.QFont
-        QPixmap = _QtGui.QPixmap
-        QAction = _QtGui.QAction
-        # Rich text rendering helpers used by highlight delegate
-        QTextDocument = _QtGui.QTextDocument
-        QAbstractTextDocumentLayout = _QtGui.QAbstractTextDocumentLayout
-        QPalette = _QtGui.QPalette
-
-        QT_AVAILABLE = True
-    except ImportError as _exc:
-        raise ImportError(
-            "Qt libraries are required by dbutils.gui.qt_app.\n"
-            "Please install PySide6 or PyQt6 (e.g. `pip install PySide6`)."
-        ) from _exc
+QT_AVAILABLE = True
 
 # Core helpers & data types from library
 from dbutils.catalog import get_all_tables_and_columns
@@ -1338,13 +1274,7 @@ class DataLoaderProcess(QObject):
             self._proc.start("uv", args[1:])
         else:
             # Set up environment with proper Python path
-            try:
-                from PySide6.QtCore import QProcessEnvironment
-            except ImportError:
-                try:
-                    from PyQt6.QtCore import QProcessEnvironment
-                except ImportError:
-                    QProcessEnvironment = None
+            from PySide6.QtCore import QProcessEnvironment
 
             if QProcessEnvironment:
                 env = QProcessEnvironment.systemEnvironment()
@@ -1518,7 +1448,7 @@ class QtDBBrowser(QMainWindow):
             QMessageBox.critical(
                 None,
                 "Error",
-                "Qt libraries not found. Please install PySide6 or PyQt6:\npip install PySide6\nor\npip install PyQt6",
+                "Qt libraries not found. Please install PySide6:\npip install PySide6",
             )
             sys.exit(1)
 
@@ -4195,10 +4125,7 @@ def main(args=None):
     try:
         from PySide6.QtCore import QCoreApplication
     except ImportError:
-        try:
-            from PyQt6.QtCore import QCoreApplication
-        except ImportError:
-            QCoreApplication = None
+        from PySide6.QtCore import QCoreApplication
 
     app = QCoreApplication.instance() if QCoreApplication else None
     if app is None:
