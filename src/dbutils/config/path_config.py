@@ -11,6 +11,8 @@ import os
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from .schema_config import validate_path_config
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -65,8 +67,22 @@ class PathConfig:
             return
 
         try:
+            # First validate the configuration file
+            is_valid, validation_msg = validate_path_config(config_file)
+            if not is_valid:
+                logger.error(f"Path configuration validation failed: {validation_msg}")
+                # Only warn and continue, don't fail completely to maintain backward compatibility
+                logger.warning(f"Loading config from {config_file} without validation")
+
             with open(config_file, "r", encoding="utf-8") as f:
                 file_config = json.load(f)
+
+                # Additional in-code validation to ensure required fields are present
+                required_keys = ["driver_dirs", "search_paths", "custom_paths"]
+                for key in required_keys:
+                    if key not in file_config:
+                        logger.warning(f"Missing required key '{key}' in {config_file}, using defaults")
+                        file_config[key] = []
 
                 if "driver_dirs" in file_config and isinstance(file_config["driver_dirs"], list):
                     config["driver_dirs"].extend(file_config["driver_dirs"])

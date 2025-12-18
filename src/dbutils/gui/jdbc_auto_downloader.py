@@ -196,13 +196,17 @@ def get_version_with_fallback(db_type: str, requested_version: str = "latest") -
 
 def resolve_version_with_strategy(db_type: str, requested_version: str = "latest") -> str:
     """Resolve version using configured strategy with fallback mechanisms."""
+    from dbutils.config.migration_config import load_and_migrate_config_file
+
     # Get version resolution strategy from config
     try:
         config_file = os.path.join(os.path.dirname(__file__), "..", "..", "..", "config", "auto_download_config.json")
         if os.path.exists(config_file):
-            with open(config_file, "r") as f:
-                config_data = json.load(f)
-            strategy = config_data.get("version_management", {}).get("version_resolution_strategy", "latest_first")
+            config_data = load_and_migrate_config_file(config_file, "auto_download")
+            if config_data:
+                strategy = config_data.get("version_management", {}).get("version_resolution_strategy", "latest_first")
+            else:
+                strategy = "latest_first"
         else:
             strategy = "latest_first"
     except Exception:

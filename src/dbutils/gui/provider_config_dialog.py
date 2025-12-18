@@ -171,10 +171,23 @@ if QT_BINDINGS:
             self.jar_download_btn = QPushButton("Download…")
             self.jar_download_btn.clicked.connect(self.download_jdbc_driver_gui)
 
+            # Add history button for download history
+            self.jar_history_btn = QPushButton("History…")
+            self.jar_history_btn.clicked.connect(self.show_download_history)
+
             jar_layout = QHBoxLayout()
             jar_layout.addWidget(self.jar_path_input)
             jar_layout.addWidget(self.jar_browse_btn)
             jar_layout.addWidget(self.jar_download_btn)
+            jar_layout.addWidget(self.jar_history_btn)
+
+            # Add loading indicator for download process
+            self.download_loading_indicator = QLabel()
+            self.download_loading_indicator.setVisible(False)
+            self.download_loading_indicator.setText("Loading download options...")
+            self.download_loading_indicator.setStyleSheet("color: #666; font-style: italic;")
+
+            jar_layout.addWidget(self.download_loading_indicator)
 
             self.driver_layout.addRow("Driver Class*", self.driver_class_input)
             self.driver_layout.addRow("JAR File*", jar_layout)
@@ -558,6 +571,131 @@ if QT_BINDINGS:
 
             super().accept()
 
+        def show_download_history(self):
+            """Show a dialog with download history information."""
+            from .download_history import get_recent_downloads, get_download_stats, download_history
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Download History")
+            dialog.resize(600, 500)
+
+            layout = QVBoxLayout(dialog)
+
+            # Create tab widget for different history views
+            tab_widget = QTabWidget()
+
+            # Recent downloads tab
+            recent_tab = QWidget()
+            recent_layout = QVBoxLayout(recent_tab)
+
+            recent_label = QLabel("Recent Downloads:")
+            recent_label.setStyleSheet("font-weight: bold; font-size: 12px;")
+            recent_layout.addWidget(recent_label)
+
+            # Table for recent downloads
+            recent_table = QTableWidget()
+            recent_table.setColumnCount(5)
+            recent_table.setHorizontalHeaderLabels(["Type", "Date", "Version", "Size", "Status"])
+            recent_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)  # Make read-only
+            recent_table.horizontalHeader().setStretchLastSection(True)
+
+            # Populate recent downloads
+            recent_downloads = get_recent_downloads(20)  # Get last 20 downloads
+            recent_table.setRowCount(len(recent_downloads))
+
+            for row, record in enumerate(recent_downloads):
+                # Type
+                type_item = QTableWidgetItem(record.database_type)
+                type_item.setToolTip(record.database_type)
+                recent_table.setItem(row, 0, type_item)
+
+                # Date
+                date_str = record.downloaded_at.strftime('%Y-%m-%d %H:%M:%S') if record.downloaded_at else 'N/A'
+                date_item = QTableWidgetItem(date_str)
+                recent_table.setItem(row, 1, date_item)
+
+                # Version
+                version_item = QTableWidgetItem(record.version or 'N/A')
+                recent_table.setItem(row, 2, version_item)
+
+                # Size
+                size_str = f"{record.file_size / (1024*1024):.1f}MB" if record.file_size else 'N/A'
+                size_item = QTableWidgetItem(size_str)
+                recent_table.setItem(row, 3, size_item)
+
+                # Status
+                status_str = "Success" if record.success else f"Failed: {record.error_message or 'Unknown'}"
+                status_item = QTableWidgetItem(status_str)
+                status_color = QColor(0, 200, 0) if record.success else QColor(200, 0, 0)  # Green for success, red for failure
+                status_item.setBackground(status_color)
+                status_item.setForeground(QColor(255, 255, 255))  # White text for contrast
+                recent_table.setItem(row, 4, status_item)
+
+            recent_table.resizeColumnsToContents()
+            recent_layout.addWidget(recent_table)
+            tab_widget.addTab(recent_tab, "Recent Downloads")
+
+            # Statistics tab
+            stats_tab = QWidget()
+            stats_layout = QVBoxLayout(stats_tab)
+
+            stats = get_download_stats()
+            stats_text = QTextEdit()
+            stats_text.setReadOnly(True)
+
+            stats_content = f"""Download Statistics
+
+Total Downloads: {stats['total_downloads']}
+Successful Downloads: {stats['successful_downloads']}
+Failed Downloads: {stats['failed_downloads']}
+Success Rate: {stats['success_rate_percent']:.1f}%
+
+Average Download Duration: {stats['average_duration_seconds']:.2f}s (if available)
+
+Downloads by Type:
+"""
+            for db_type, count in stats['downloads_by_type'].items():
+                stats_content += f"- {db_type}: {count}\n"
+
+            stats_text.setPlainText(stats_content)
+            stats_layout.addWidget(stats_text)
+            tab_widget.addTab(stats_tab, "Statistics")
+
+            # Add clear history button
+            button_layout = QHBoxLayout()
+            button_layout.addStretch()
+
+            clear_btn = QPushButton("Clear History")
+            clear_btn.clicked.connect(lambda: self.clear_download_history(dialog))
+            button_layout.addWidget(clear_btn)
+
+            close_btn = QPushButton("Close")
+            close_btn.clicked.connect(dialog.accept)
+            button_layout.addWidget(close_btn)
+
+            layout.addWidget(tab_widget)
+            layout.addLayout(button_layout)
+
+            dialog.exec()
+
+        def clear_download_history(self, parent_dialog):
+            """Clear download history after confirmation."""
+            from .download_history import clear_download_history
+
+            reply = QMessageBox.question(
+                parent_dialog,
+                "Confirm Clear",
+                "Are you sure you want to clear all download history? This cannot be undone.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+
+            if reply == QMessageBox.StandardButton.Yes:
+                if clear_download_history():
+                    QMessageBox.information(parent_dialog, "History Cleared", "Download history has been cleared.")
+                    parent_dialog.close()  # Close the history dialog
+                else:
+                    QMessageBox.critical(parent_dialog, "Error", "Failed to clear download history.")
+
         def reset_defaults(self):
             """Reset to default providers."""
             reply = QMessageBox.question(
@@ -580,6 +718,11 @@ if QT_BINDINGS:
         def download_jdbc_driver_gui(self):
             """Download JDBC driver for the selected category with enhanced UI feedback."""
             from .jdbc_auto_downloader import find_existing_drivers
+
+            # Show loading indicator immediately
+            self.download_loading_indicator.setVisible(True)
+            self.download_loading_indicator.setText("Loading download options...")
+            QApplication.processEvents()  # Force UI update
 
             category = self.category_input.currentText()
             # Normalize category to lowercase for download manager (expects 'postgresql', 'mysql', etc.)
@@ -631,6 +774,9 @@ if QT_BINDINGS:
                         "Select Category",
                         suggestion_msg + "\nPlease select a database category or update the driver class field.",
                     )
+                    # Hide loading indicator before returning
+                    self.download_loading_indicator.setVisible(False)
+                    QApplication.processEvents()  # Force UI update
                     return
             else:
                 # Use lowercase version for download manager
@@ -662,6 +808,9 @@ if QT_BINDINGS:
                             if selected_driver == os.path.basename(full_path):
                                 self.jar_path_input.setText(full_path)
                                 break
+                    # Hide loading indicator before returning (whether user selected or cancelled)
+                    self.download_loading_indicator.setVisible(False)
+                    QApplication.processEvents()  # Force UI update
                     return
 
             # Build dialog (use helper so tests can inspect controls)
@@ -670,11 +819,18 @@ if QT_BINDINGS:
             # If running under test mode, avoid blocking GUI; return the dialog and controls so tests
             # can interact with the returned widgets directly without opening a native modal dialog.
             if os.environ.get("DBUTILS_TEST_MODE"):
+                # Hide loading indicator before returning
+                self.download_loading_indicator.setVisible(False)
+                QApplication.processEvents()  # Force UI update
                 # Return controls for inspection by tests
                 return dialog, download_btn, manual_btn, license_checkbox
 
             # Show modal dialog otherwise with proper error handling
             try:
+                # Hide loading indicator before showing the dialog
+                self.download_loading_indicator.setVisible(False)
+                QApplication.processEvents()  # Force UI update
+
                 if dialog.exec() == QDialog.DialogCode.Accepted:
                     # User chose to download automatically
                     # Read any pending options captured when Download/Manual was clicked
@@ -683,6 +839,9 @@ if QT_BINDINGS:
                         version = self._pending_download_options.get("version")
                     self.perform_jdbc_download(category_lower, version=version)
             except Exception as e:
+                # Hide loading indicator on error
+                self.download_loading_indicator.setVisible(False)
+                QApplication.processEvents()  # Force UI update
                 QMessageBox.critical(self, "Download Dialog Error", f"Failed to open download dialog: {e}")
             finally:
                 # Clean up dialog resources
@@ -694,12 +853,13 @@ if QT_BINDINGS:
             Returns a tuple: (dialog, download_button, manual_button, license_checkbox_or_None)
             """
             from .jdbc_driver_downloader import JDBCDriverRegistry
+            from .download_history import get_driver_download_info
 
             dialog = QDialog(self)
             # Set as modal dialog with proper parent window for Qt lifecycle management
             dialog.setModal(True)
             dialog.setWindowTitle(f"Download {category} JDBC Driver")
-            dialog.resize(500, 400)
+            dialog.resize(550, 500)  # Increased size to accommodate history section
 
             layout = QVBoxLayout(dialog)
 
@@ -712,9 +872,34 @@ if QT_BINDINGS:
                 info_label.setWordWrap(True)
                 info_label.setAlignment(Qt.AlignmentFlag.AlignTop)
                 info_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+                layout.addWidget(QLabel("Driver Information:"))
                 layout.addWidget(info_label)
             else:
                 layout.addWidget(QLabel(f"No specific download information available for {category}."))
+
+            # Show history information if available
+            hist_info = get_driver_download_info(category)
+            if hist_info:
+                hist_label_text = f"Download History:\n"
+                hist_label_text += f"  • Latest version: {hist_info.get('latest_downloaded_version', 'Never downloaded')}\n"
+                last_downloaded = hist_info.get('last_downloaded_at')
+                if last_downloaded:
+                    from datetime import datetime
+                    try:
+                        dt = datetime.fromisoformat(last_downloaded.replace('Z', '+00:00'))
+                        hist_label_text += f"  • Last downloaded: {dt.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                    except ValueError:
+                        hist_label_text += f"  • Last downloaded: {last_downloaded}\n"
+                hist_label_text += f"  • Success rate: {'Success' if hist_info.get('last_download_success') else 'Failed' if hist_info.get('last_download_success') is not None else 'Not attempted'}\n"
+                if hist_info.get('last_file_size'):
+                    size_mb = hist_info['last_file_size'] / (1024 * 1024)
+                    hist_label_text += f"  • Last file size: {size_mb:.1f} MB\n"
+
+                hist_label = QLabel(hist_label_text)
+                hist_label.setWordWrap(True)
+                hist_label.setAlignment(Qt.AlignmentFlag.AlignTop)
+                layout.addWidget(QLabel("Previous Download Info:"))
+                layout.addWidget(hist_label)
 
             # Progress bar
             self.download_progress = QProgressBar()
@@ -941,6 +1126,7 @@ if QT_BINDINGS:
         def perform_jdbc_download(self, category, version: str | None = None):
             """Actually perform the JDBC driver download with enhanced feedback."""
             import os
+            import time
 
             # Prefer richer manager which supports maven artifacts and multi-jar downloads
             from .jdbc_driver_manager import download_jdbc_driver as download_auto
@@ -958,16 +1144,55 @@ if QT_BINDINGS:
 
             # Show progress
             self.download_progress.setVisible(True)
-            self.download_progress.setRange(0, 0)  # Indeterminate progress
+            self.download_progress.setRange(0, 0)  # Indeterminate progress initially
             if hasattr(self, "download_status_label") and self.download_status_label is not None:
                 self.download_status_label.setVisible(True)
                 self.download_status_label.setText("Preparing download...")
             QApplication.processEvents()  # Update UI
 
+            # Track download timing for speed calculation
+            start_time = time.time()
+            last_update_time = start_time
+            last_downloaded = 0
+
             def progress_callback(downloaded, total):
+                nonlocal last_update_time, last_downloaded
                 if total > 0:
                     self.download_progress.setRange(0, total)
                     self.download_progress.setValue(downloaded)
+
+                    # Calculate download speed and ETA
+                    current_time = time.time()
+                    if current_time - last_update_time >= 0.5:  # Update every 0.5 seconds
+                        elapsed_since_last = current_time - last_update_time
+                        if elapsed_since_last > 0:
+                            # Calculate speed based on data downloaded since last update
+                            bytes_since_last = downloaded - last_downloaded
+                            speed_bps = bytes_since_last / elapsed_since_last
+                            speed_mbps = speed_bps / (1024 * 1024)  # Convert to MB/s
+
+                            # Calculate ETA
+                            remaining_bytes = total - downloaded
+                            if speed_bps > 0:
+                                eta_seconds = remaining_bytes / speed_bps
+                                eta_str = self._format_time(eta_seconds)
+                                progress_percent = (downloaded / total) * 100
+
+                                if hasattr(self, "download_status_label") and self.download_status_label is not None:
+                                    size_mb = total / (1024 * 1024)
+                                    downloaded_mb = downloaded / (1024 * 1024)
+                                    status_msg = f"Downloading: {downloaded_mb:.1f}MB / {size_mb:.1f}MB ({progress_percent:.1f}%) at {speed_mbps:.2f}MB/s - ETA: {eta_str}"
+                                    self.download_status_label.setText(status_msg)
+
+                            last_downloaded = downloaded
+                            last_update_time = current_time
+                else:
+                    # For indeterminate progress (total unknown)
+                    if hasattr(self, "download_status_label") and self.download_status_label is not None:
+                        # Show that we're still downloading without specific progress
+                        elapsed = current_time - start_time
+                        status_msg = f"Downloading... (elapsed: {self._format_time(elapsed)})"
+                        self.download_status_label.setText(status_msg)
                 QApplication.processEvents()
 
             def status_callback(message):
@@ -994,10 +1219,12 @@ if QT_BINDINGS:
                         )
                     else:
                         self.jar_path_input.setText(result)
+                        # Show more detailed success message with file size
+                        file_size_mb = os.path.getsize(result) / (1024 * 1024) if os.path.exists(result) else 0
                         QMessageBox.information(
                             self,
                             "Download Complete",
-                            f"Successfully downloaded JDBC driver to:\n{os.path.basename(result)}",
+                            f"Successfully downloaded JDBC driver to:\n{os.path.basename(result)} ({file_size_mb:.1f}MB)",
                         )
                 else:
                     QMessageBox.warning(
@@ -1012,6 +1239,21 @@ if QT_BINDINGS:
                 self.download_progress.setVisible(False)
                 if hasattr(self, "download_status_label") and self.download_status_label is not None:
                     self.download_status_label.setVisible(False)
+
+        def _format_time(self, seconds: float) -> str:
+            """Format time in seconds to human-readable format."""
+            if seconds < 0:
+                return "Unknown"
+            elif seconds < 60:
+                return f"{int(seconds)}s"
+            elif seconds < 3600:
+                mins = int(seconds // 60)
+                secs = int(seconds % 60)
+                return f"{mins}m {secs}s"
+            else:
+                hours = int(seconds // 3600)
+                mins = int((seconds % 3600) // 60)
+                return f"{hours}h {mins}m"
 
 
 def handle_missing_jdbc_driver_auto_download(provider_name: str, parent_widget=None) -> bool:
@@ -1056,6 +1298,8 @@ def handle_missing_jdbc_driver_auto_download(provider_name: str, parent_widget=N
             category = "oracle"
         elif "sqlserver" in provider.driver_class.lower() or "mssql" in provider.driver_class.lower():
             category = "sqlserver"
+        elif "as400" in provider.driver_class.lower() or "jt400" in provider.driver_class.lower():
+            category = "jt400"
         elif "db2" in provider.driver_class.lower():
             category = "db2"
         elif "mariadb" in provider.driver_class.lower():

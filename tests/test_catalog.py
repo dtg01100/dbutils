@@ -42,7 +42,7 @@ def test_foreign_keys_mock():
 def test_get_all_tables_and_columns_calls_db_browser(monkeypatch):
     fake_called = {"called": False}
 
-    def fake_browser(schema_filter, use_mock, use_cache, limit, offset):
+    def fake_browser(schema_filter, use_mock, use_cache, limit, offset, use_heavy_mock):
         fake_called["called"] = True
         return ([{"TABNAME": "A"}], [{"COLNAME": "C"}])
 

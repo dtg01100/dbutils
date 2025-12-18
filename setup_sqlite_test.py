@@ -8,6 +8,8 @@ import subprocess
 import sys
 from typing import Any, Dict, Optional
 
+import pytest
+
 
 def check_dependencies() -> Dict[str, bool]:
     """Check if required dependencies are installed."""
@@ -209,6 +211,7 @@ def setup_test_environment() -> Dict[str, str]:
     return env_vars
 
 
+@pytest.mark.timeout(60)
 def test_sqlite_connection() -> bool:
     """Test the SQLite JDBC connection."""
     import sys

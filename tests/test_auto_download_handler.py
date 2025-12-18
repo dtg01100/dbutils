@@ -34,7 +34,7 @@ def test_handle_missing_jdbc_driver_provider_not_found():
     assert result is False
 
 
-def test_missing_driver_detection_workflow():
+def test_missing_driver_detection_workflow(mock_jdbc_connection):
     """Test the complete workflow of detecting missing driver and triggering download."""
     from dbutils.jdbc_provider import JDBCConnection, JDBCProvider, MissingJDBCDriverError
     
@@ -46,7 +46,7 @@ def test_missing_driver_detection_workflow():
         url_template="jdbc:sqlite:{database}",
     )
     
-    # Create connection
+    # Create connection (with mocked jpype/jaydebeapi from fixture)
     conn = JDBCConnection(provider, {"database": ":memory:"})
     
     # Verify that attempting to connect raises MissingJDBCDriverError

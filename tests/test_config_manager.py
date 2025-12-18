@@ -30,6 +30,8 @@ class ConfigSource(Enum):
 class TestConfig:
     """Data class to hold test configuration."""
 
+    __test__ = False  # Mark as non-test class to prevent pytest collection warnings
+
     # Database configurations
     databases: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
@@ -51,6 +53,8 @@ class TestConfig:
 
 class TestConfigManager:
     """Centralized test configuration management system."""
+
+    __test__ = False  # Mark as non-test class to prevent pytest collection warnings
 
     def __init__(self):
         self.config = TestConfig()

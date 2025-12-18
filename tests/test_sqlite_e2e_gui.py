@@ -243,6 +243,7 @@ def e2e_database(e2e_sqlite_env) -> Iterator[str]:
         pass
 
 
+@pytest.mark.timeout(60)
 def test_e2e_database_creation_and_schema(e2e_database):
     """Verify the database was created with correct schema."""
     db_path = e2e_database
@@ -293,6 +294,7 @@ def test_e2e_database_creation_and_schema(e2e_database):
     conn.close()
 
 
+@pytest.mark.timeout(90)
 def test_e2e_jdbc_query_and_modify(e2e_sqlite_env, e2e_database):
     """Execute JDBC operations and verify persistence to SQLite file."""
     db_path = e2e_database
@@ -348,6 +350,7 @@ def test_e2e_jdbc_query_and_modify(e2e_sqlite_env, e2e_database):
     native_conn.close()
 
 
+@pytest.mark.timeout(90)
 def test_e2e_complex_joins_and_aggregation(e2e_sqlite_env, e2e_database):
     """Test complex queries showing multi-table relationships."""
     db_path = e2e_database
@@ -409,6 +412,7 @@ def test_e2e_complex_joins_and_aggregation(e2e_sqlite_env, e2e_database):
 
 
 @pytest.mark.skipif(QApplication is None, reason="PySide6 not available")
+@pytest.mark.timeout(120)
 def test_e2e_gui_table_loading(e2e_sqlite_env, e2e_database):
     """Test GUI loads and displays table data from the database."""
     db_path = e2e_database
@@ -483,9 +487,10 @@ def test_e2e_gui_table_loading(e2e_sqlite_env, e2e_database):
     print(f"[E2E Test 4] Customers model: {cust_model.rowCount()} rows")
     assert cust_model.rowCount() == 4
 
-    conn.close()
+    conn1.close()
 
 
+@pytest.mark.timeout(120)
 def test_e2e_concurrent_access_and_isolation(e2e_sqlite_env, e2e_database):
     """Test multiple JDBC connections reading/writing the same database."""
     db_path = e2e_database

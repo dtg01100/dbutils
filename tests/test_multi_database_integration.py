@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 # Import dbutils modules
 from dbutils import catalog
+from dbutils.config_manager import get_default_config_manager
 from dbutils.jdbc_provider import JDBCConnection, JDBCProvider, ProviderRegistry
 
 # Test configuration
@@ -100,6 +101,26 @@ def check_multi_database_dependencies():
         missing_providers = [p for p in required_providers if p not in registry.providers]
         if missing_providers:
             pytest.skip(f"Missing database providers: {', '.join(missing_providers)}")
+
+        # Ensure jar paths are available; attempt to resolve via config manager
+        cfg = get_default_config_manager()
+        missing_jars = []
+        for name in required_providers:
+            provider = registry.providers.get(name)
+            if provider is None:
+                continue
+            jar_path = provider.jar_path
+            if not jar_path:
+                alt = cfg.get_jar_path(name.split()[0].lower()) or cfg.get_jar_path(provider.name.split()[0].lower())
+                if alt:
+                    provider.jar_path = alt
+                    registry.add_or_update(provider)
+                    jar_path = alt
+            if not jar_path or not os.path.exists(jar_path):
+                missing_jars.append(f"{name} (jar not found)")
+
+        if missing_jars:
+            pytest.skip(f"Missing JDBC driver jars: {', '.join(missing_jars)}")
     except Exception as e:
         pytest.skip(f"Cannot access provider registry: {e}")
 

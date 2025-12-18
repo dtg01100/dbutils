@@ -19,6 +19,8 @@ import subprocess
 import sys
 from typing import Any, Dict, Optional
 
+import pytest
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -270,6 +272,7 @@ def setup_test_environment() -> Dict[str, str]:
     return env_vars
 
 
+@pytest.mark.timeout(120)
 def test_database_connections() -> Dict[str, bool]:
     """Test JDBC connections for all configured databases with graceful fallback."""
     import sys

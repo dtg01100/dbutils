@@ -96,6 +96,11 @@ def validate_repository_url(url: str) -> Tuple[bool, str]:
     if not url.startswith(("http://", "https://")):
         return False, "URL must start with http:// or https://"
 
+    # In test mode, avoid making external network calls; assume repository is valid
+    # so UI flows that depend on validation can continue deterministically.
+    if os.environ.get("DBUTILS_TEST_MODE"):
+        return True, f"DBUTILS_TEST_MODE: skipped network validation for {url}"
+
     try:
         # Test connectivity with a simple HEAD request
         req = urllib.request.Request(url, method="HEAD")

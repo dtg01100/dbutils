@@ -71,6 +71,8 @@ class ProgressTracker:
 class TestResults:
     """Track test results."""
 
+    __test__ = False  # Mark as non-test class to prevent pytest collection warnings
+
     def __init__(self):
         self.passed = 0
         self.failed = 0

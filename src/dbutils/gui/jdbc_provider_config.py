@@ -40,6 +40,7 @@ class AutoDownloadProviderConfig:
         self.providers_file = os.path.join(self.config_dir, "providers.json")
 
         # Initialize configuration systems
+        from dbutils.config.migration_config import load_and_migrate_config_file
         self.url_config = URLConfig()
         self.path_config = PathConfig()
 
@@ -52,8 +53,11 @@ class AutoDownloadProviderConfig:
         config_file = os.path.join(os.path.dirname(__file__), "..", "..", "config", "auto_download_config.json")
 
         try:
-            with open(config_file, "r") as f:
-                config_data = json.load(f)
+            # Use migration utility to load and potentially migrate config
+            config_data = load_and_migrate_config_file(config_file, "auto_download")
+            if config_data is None:
+                logger.warning("Could not load auto-download config from file after migration attempt")
+                return {}
         except Exception as e:
             logger.warning(f"Could not load auto-download config from file: {e}")
             return {}

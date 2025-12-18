@@ -166,8 +166,11 @@ def test_validate_repository_url_invalid():
     assert not valid
 
 
-def test_validate_repository_url_unreachable():
+def test_validate_repository_url_unreachable(monkeypatch):
     """Test validation of unreachable repository URLs."""
+    # Ensure we run real network validation for this test by clearing test-mode
+    monkeypatch.delenv("DBUTILS_TEST_MODE", raising=False)
+
     # Test with a URL that should be unreachable
     valid, message = validate_repository_url("https://this-should-not-exist-12345.invalid/")
     assert not valid

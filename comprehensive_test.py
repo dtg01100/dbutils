@@ -3,9 +3,12 @@
 
 import time
 
+import pytest
+
 from dbutils.utils import edit_distance, fuzzy_match
 
 
+@pytest.mark.timeout(120)
 def test_fuzzy_match_performance():
     """Test fuzzy match performance with the optimized edit_distance."""
     print("Testing fuzzy_match performance after optimization...")
@@ -34,6 +37,7 @@ def test_fuzzy_match_performance():
     return fuzzy_time
 
 
+@pytest.mark.timeout(120)
 def test_edit_distance_performance():
     """Test edit distance performance directly."""
     print("\nTesting edit_distance performance after optimization...")
@@ -59,6 +63,7 @@ def test_edit_distance_performance():
     return edit_time
 
 
+@pytest.mark.timeout(30)
 def test_edge_cases():
     """Test edge cases to ensure correctness."""
     print("\nTesting edge cases...")

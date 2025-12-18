@@ -28,7 +28,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 # Import Qt components for responsive design
 from PySide6.QtCore import QObject, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QGuiApplication, QScreen
-from PySide6.QtWidgets import QApplication, QDesktopWidget, QWidget
+from PySide6.QtWidgets import QApplication, QWidget
 
 QT_AVAILABLE = True
 
@@ -105,7 +105,7 @@ class ResponsiveManager:
 
         # Connect to screen change signals if available
         if hasattr(QApplication, "primaryScreenChanged"):
-            QApplication.primaryScreenChanged.connect(self._on_screen_changed)
+            QApplication.instance().primaryScreenChanged.connect(self._on_screen_changed)
 
         # Setup timer for periodic checks
         from PySide6.QtCore import QTimer

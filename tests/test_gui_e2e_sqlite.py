@@ -171,6 +171,7 @@ def gui_test_database(gui_e2e_env) -> str:
 @pytest.mark.skipif(
     QApplication is None, reason="PySide6 not available"
 )
+@pytest.mark.timeout(60)
 def test_gui_browser_launch_and_table_list(gui_test_database):
     """Test that the GUI browser launches and shows table list."""
     db_path = gui_test_database
@@ -208,6 +209,7 @@ def test_gui_browser_launch_and_table_list(gui_test_database):
 @pytest.mark.skipif(
     QApplication is None, reason="PySide6 not available"
 )
+@pytest.mark.timeout(60)
 def test_gui_database_info_extraction(gui_test_database):
     """Test extracting database schema information via GUI."""
     db_path = gui_test_database
@@ -253,6 +255,7 @@ def test_gui_database_info_extraction(gui_test_database):
     conn.close()
 
 
+@pytest.mark.timeout(90)
 def test_gui_filter_and_search_via_sql(gui_e2e_env, gui_test_database):
     """Test filtering and searching using SQL queries via JDBC."""
     db_path = gui_test_database
@@ -314,6 +317,7 @@ def test_gui_filter_and_search_via_sql(gui_e2e_env, gui_test_database):
     conn.close()
 
 
+@pytest.mark.timeout(90)
 def test_gui_data_modification_and_persistence(gui_e2e_env, gui_test_database):
     """Test that GUI modifications persist back to the SQLite file."""
     db_path = gui_test_database

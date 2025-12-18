@@ -520,6 +520,8 @@ if QT_BINDINGS:
                 category = "oracle"
             elif "sqlserver" in driver_class or "microsoft" in driver_class:
                 category = "sqlserver"
+            elif "as400" in driver_class or "jt400" in driver_class:
+                category = "jt400"
             elif "db2" in driver_class:
                 category = "db2"
             elif "sqlite" in driver_class:

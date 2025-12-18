@@ -11,6 +11,8 @@ import os
 import urllib.parse
 from typing import Dict, List, Optional, Tuple
 
+from .schema_config import validate_url_config
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -66,8 +68,25 @@ class URLConfig:
             return
 
         try:
+            # First validate the configuration file
+            is_valid, validation_msg = validate_url_config(config_file)
+            if not is_valid:
+                logger.error(f"URL configuration validation failed: {validation_msg}")
+                # Only warn and continue, don't fail completely to maintain backward compatibility
+                logger.warning(f"Loading config from {config_file} without validation")
+
             with open(config_file, "r", encoding="utf-8") as f:
                 file_config = json.load(f)
+
+                # Additional in-code validation to ensure required fields are present
+                required_keys = ["maven_repos", "custom_repos", "url_patterns", "download_sources"]
+                for key in required_keys:
+                    if key not in file_config:
+                        logger.warning(f"Missing required key '{key}' in {config_file}, using defaults")
+                        if key in ["maven_repos", "custom_repos"]:
+                            file_config[key] = []
+                        elif key in ["url_patterns", "download_sources"]:
+                            file_config[key] = {}
 
                 if "maven_repos" in file_config and isinstance(file_config["maven_repos"], list):
                     config["maven_repos"].extend(file_config["maven_repos"])

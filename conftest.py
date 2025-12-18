@@ -299,6 +299,34 @@ def disable_qt_message_boxes(monkeypatch):
     yield
 
 
+@pytest.fixture(autouse=True)
+def cleanup_qt_windows(qapp):
+    """Aggressively clean up Qt windows after each test to prevent hanging.
+    
+    This fixture runs after every test and forces all Qt windows to close
+    and be deleted, preventing GUI tests from blocking the test suite.
+    """
+    yield
+    
+    try:
+        from PySide6.QtWidgets import QApplication
+        
+        # Close all top-level windows
+        for widget in QApplication.topLevelWidgets():
+            try:
+                widget.close()
+                widget.deleteLater()
+            except RuntimeError:
+                pass  # Widget already deleted
+        
+        # Process events to ensure cleanup happens
+        for _ in range(10):
+            QApplication.processEvents()
+            
+    except Exception:
+        pass  # Qt not available or already cleaned up
+
+
 @pytest.fixture
 def sample_sql_query():
     """Provide sample SQL query for testing."""
@@ -603,3 +631,61 @@ def test_path_config(test_config):
 def test_behavior_config(test_config):
     """Provide behavior configuration from centralized test config."""
     return test_config.get_behavior_setting
+
+
+def pytest_configure(config):
+    """Configure pytest with timeout settings.
+    
+    This hook automatically applies timeout marks to all tests based on their type.
+    GUI/integration tests get longer timeouts to avoid premature cancellation.
+    """
+    config.addinivalue_line(
+        "markers",
+        "timeout(seconds): set timeout for a test in seconds (pytest-timeout plugin)"
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """Automatically adjust collected tests.
+
+    - Skip GUI tests if PySide6 is not available.
+    - Apply per-test timeout marks based on test characteristics.
+
+    This consolidates hook logic to avoid duplicate hook definitions.
+    """
+    # Determine if Qt is available
+    try:
+        import PySide6  # noqa: F401
+        pyqt_available = True
+    except ImportError:
+        pyqt_available = False
+
+    for item in items:
+        # Skip GUI-related tests when Qt is unavailable
+        if not pyqt_available:
+            if "gui" in str(item.nodeid).lower() or "widget" in str(item.nodeid).lower():
+                item.add_marker(pytest.mark.skip(reason="PySide6 not available"))
+
+        # Do not overwrite explicit timeout markers
+        if item.get_closest_marker("timeout"):
+            continue
+
+        # Determine timeout based on test path/name
+        test_path = str(item.fspath).lower()
+        is_slow_category = any(
+            pattern in test_path
+            for pattern in ["e2e", "gui", "qt_", "integration", "worker", "download"]
+        )
+
+        # Longer timeout for GUI/E2E/integration, shorter for unit tests
+        timeout_seconds = 120 if is_slow_category else 30
+
+        # Allow env override for CI scenarios
+        try:
+            env_override = os.environ.get("DBUTILS_TEST_TIMEOUT")
+            if env_override:
+                timeout_seconds = int(env_override)
+        except Exception:
+            pass
+
+        item.add_marker(pytest.mark.timeout(timeout_seconds))

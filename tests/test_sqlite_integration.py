@@ -125,28 +125,50 @@ def mock_sqlite_connection(sqlite_test_db):
         mock_jpype.isJVMStarted.return_value = False
         mock_jpype.getDefaultJVMPath.return_value = "/fake/java/path"
 
-        # Setup mock JayDeBeApi connection
+        # Setup mock JayDeBeApi connection backed by a real sqlite3 database for realistic behavior
+        real_conn = sqlite3.connect(sqlite_test_db)
+        real_cursor = real_conn.cursor()
+        in_transaction = False
+
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
+        mock_conn.close.side_effect = real_conn.close
 
-        # Mock query results
         def mock_execute(sql):
-            # Simulate SQLite query results
-            if "SELECT name FROM sqlite_master WHERE type='table'" in sql:
-                mock_cursor.description = [("name",), ("type",)]
-                mock_cursor.fetchall.return_value = [("users", "table"), ("orders", "table"), ("products", "table")]
-            elif "SELECT COUNT(*) as count FROM users" in sql:
-                mock_cursor.description = [("count",)]
-                mock_cursor.fetchall.return_value = [(2,)]
-            elif "SELECT * FROM users" in sql:
-                mock_cursor.description = [("id",), ("name",), ("email",), ("created_at",)]
-                mock_cursor.fetchall.return_value = [
-                    (1, "John Doe", "john@example.com", None),
-                    (2, "Jane Smith", "jane@example.com", None),
-                ]
-            else:
+            nonlocal in_transaction
+            normalized = sql.strip().upper()
+
+            if normalized.startswith("BEGIN"):
+                in_transaction = True
+                real_cursor.execute(sql)
                 mock_cursor.description = []
+                mock_cursor.fetchall.return_value = []
+                return
+            if normalized.startswith("COMMIT"):
+                real_conn.commit()
+                in_transaction = False
+                mock_cursor.description = []
+                mock_cursor.fetchall.return_value = []
+                return
+            if normalized.startswith("ROLLBACK"):
+                real_conn.rollback()
+                in_transaction = False
+                mock_cursor.description = []
+                mock_cursor.fetchall.return_value = []
+                return
+
+            # Execute against the real sqlite database to mirror behavior
+            real_cursor.execute(sql)
+
+            if not in_transaction:
+                real_conn.commit()
+
+            mock_cursor.description = real_cursor.description or []
+            # Ensure fetchall works even for statements without results
+            try:
+                mock_cursor.fetchall.return_value = real_cursor.fetchall()
+            except sqlite3.ProgrammingError:
                 mock_cursor.fetchall.return_value = []
 
         mock_cursor.execute.side_effect = mock_execute
@@ -159,6 +181,8 @@ def mock_sqlite_connection(sqlite_test_db):
             "cursor": mock_cursor,
             "db_path": sqlite_test_db,
         }
+
+        real_conn.close()
 
 
 def test_sqlite_jdbc_driver_connection_setup():
@@ -393,11 +417,16 @@ def test_sqlite_integration_with_catalog_functions(mock_sqlite_connection):
     with patch("dbutils.jdbc_provider.connect") as mock_connect:
         # Setup mock connection
         mock_conn = MagicMock()
-        mock_conn.query.return_value = [
-            {"TABNAME": "users", "TABLE_SCHEMA": "main"},
-            {"TABNAME": "orders", "TABLE_SCHEMA": "main"},
-            {"TABNAME": "products", "TABLE_SCHEMA": "main"},
+        table_rows = [
+            {"TABNAME": "users", "TABSCHEMA": "main", "TYPE": "T", "REMARKS": ""},
+            {"TABNAME": "orders", "TABSCHEMA": "main", "TYPE": "T", "REMARKS": ""},
+            {"TABNAME": "products", "TABSCHEMA": "main", "TYPE": "T", "REMARKS": ""},
         ]
+        column_rows = [
+            {"TABSCHEMA": "main", "TABNAME": "users", "COLNAME": "id", "DATA_TYPE": "INTEGER", "LENGTH": 4, "SCALE": 0},
+            {"TABSCHEMA": "main", "TABNAME": "users", "COLNAME": "name", "DATA_TYPE": "TEXT", "LENGTH": 0, "SCALE": 0},
+        ]
+        mock_conn.query.side_effect = [table_rows, column_rows]
         mock_connect.return_value = mock_conn
 
         # Test catalog functions
@@ -443,7 +472,7 @@ def create_complex_sqlite_schema(conn):
             price DECIMAL(10,2),
             quantity INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             is_active BOOLEAN DEFAULT 1,
             metadata TEXT,
             CONSTRAINT chk_price CHECK (price >= 0),

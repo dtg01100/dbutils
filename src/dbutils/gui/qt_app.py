@@ -80,8 +80,7 @@ QPalette = _QtGui.QPalette
 QT_AVAILABLE = True
 
 # Core helpers & data types from library
-from dbutils.catalog import get_all_tables_and_columns
-from dbutils.db_browser import TableInfo, ColumnInfo
+from dbutils.db_browser import TableInfo, ColumnInfo, get_all_tables_and_columns
 from .widgets.enhanced_widgets import BusyOverlay
 
 # Try to import accelerated C extensions for performance (optional)
@@ -1122,6 +1121,7 @@ class DataLoaderWorker(QObject):
     missing_driver_detected = Signal(str)  # Emits provider_name when missing JDBC driver is detected
     progress_updated = Signal(str)
     progress_value = Signal(int, int)  # (current, total)
+    finished = Signal()  # Signal emitted when loading is complete
 
     def __init__(self):
         super().__init__()
@@ -1207,6 +1207,8 @@ class DataLoaderWorker(QObject):
             # Final completion signal (aggregate not required, UI already holds accumulated state)
             self.progress_value.emit(3, 3)
             self.data_loaded.emit([], [], all_schemas)
+            # Signal that loading is complete
+            self.finished.emit()
         except Exception as e:
             # Check if this is a missing JDBC driver error
             if e.__class__.__name__ == "MissingJDBCDriverError":
@@ -1215,6 +1217,8 @@ class DataLoaderWorker(QObject):
                 self.missing_driver_detected.emit(provider_name)
             else:
                 self.error_occurred.emit(str(e))
+            # Signal that loading is complete (even with error)
+            self.finished.emit()
 
 
 class DataLoaderProcess(QObject):
@@ -1482,14 +1486,24 @@ class QtDBBrowser(QMainWindow):
         self.contents_worker = None
         self.contents_thread = None
 
+        # Global closing flag to prevent late timers/threads from re-starting
+        self._closing = False
+
         self.setup_ui()
         self.setup_menu()
         self.setup_status_bar()
 
-        # Show window immediately, then load data in background
+        # Show window immediately
         self.show()
-        # Start loading immediately for fastest possible startup
-        QTimer.singleShot(0, self.load_data)
+        # Automatically start loading in normal runtime. In test mode avoid starting
+        # heavy background loaders unless we're explicitly using mock data which is
+        # safe and deterministic for tests.
+        import os
+        if not os.environ.get("DBUTILS_TEST_MODE") or self.use_mock or self.use_heavy_mock:
+            # Start loading immediately for fastest possible startup
+            QTimer.singleShot(0, self.load_data)
+        else:
+            logger.debug("DBUTILS_TEST_MODE set - skipping automatic data load")
 
     def setup_ui(self):
         """Setup the main user interface."""
@@ -2154,10 +2168,22 @@ class QtDBBrowser(QMainWindow):
 
     def load_data(self):
         """Load database data using a separate process (preferred) or thread fallback."""
-        self.status_label.setText("Loading data...")
-        self.progress_bar.setVisible(True)
-        self.progress_bar.setRange(0, 100)  # Determinate progress
-        self.progress_bar.setValue(0)
+        # Update status/progress only if the UI elements exist (tests may mock them out)
+        if getattr(self, "status_label", None):
+            try:
+                self.status_label.setText("Loading data...")
+            except Exception:
+                logger.exception("Failed to set status_label text")
+        else:
+            logger.info("Loading data... (no status_label)")
+
+        if getattr(self, "progress_bar", None):
+            try:
+                self.progress_bar.setVisible(True)
+                self.progress_bar.setRange(0, 100)  # Determinate progress
+                self.progress_bar.setValue(0)
+            except Exception:
+                logger.exception("Failed to initialize progress_bar")
 
         # Show overlays and disable inputs to indicate background work (defer to avoid blocking)
         try:
@@ -2166,10 +2192,12 @@ class QtDBBrowser(QMainWindow):
             if getattr(self, "columns_overlay", None):
                 QTimer.singleShot(0, lambda: self.columns_overlay.show_with_message("Preparing view…"))
             # Disable primary inputs during load (deferred)
-            QTimer.singleShot(0, lambda: self.search_input.setEnabled(False))
-            QTimer.singleShot(0, lambda: self.schema_combo.setEnabled(False))
+            if getattr(self, "search_input", None):
+                QTimer.singleShot(0, lambda: self.search_input.setEnabled(False))
+            if getattr(self, "schema_combo", None):
+                QTimer.singleShot(0, lambda: self.schema_combo.setEnabled(False))
         except Exception:
-            pass
+            logger.exception("Failed to defer UI changes during load")
 
         # Cancel any existing data loader thread/process
         if self.data_loader_worker:
@@ -2188,7 +2216,7 @@ class QtDBBrowser(QMainWindow):
                     self.data_loader_proc._proc.terminate()
                     # Don't block with waitForFinished - let it terminate async
             except Exception:
-                pass
+                logger.exception("Failed to terminate existing data loader process")
             self.data_loader_proc = None
 
         # Compute a resume offset so re-starting the loader (for example
@@ -2200,14 +2228,30 @@ class QtDBBrowser(QMainWindow):
         # Use thread-based worker (disable subprocess for now due to path issues)
         self.data_loader_worker = DataLoaderWorker()
         self.data_loader_thread = QThread()
+        self.data_loader_worker.moveToThread(self.data_loader_thread)
         self.data_loader_worker.data_loaded.connect(self.on_data_loaded)
         self.data_loader_worker.chunk_loaded.connect(self.on_data_chunk)
         self.data_loader_worker.error_occurred.connect(self.on_data_load_error)
         self.data_loader_worker.missing_driver_detected.connect(self.on_missing_jdbc_driver)
-        self.data_loader_worker.progress_updated.connect(self.status_label.setText)
+        # Connect progress updates safely; if status_label is missing, log instead
+        if getattr(self, "status_label", None):
+            self.data_loader_worker.progress_updated.connect(self.status_label.setText)
+        else:
+            self.data_loader_worker.progress_updated.connect(lambda msg: logger.info(f"Progress: {msg}"))
         self.data_loader_worker.progress_value.connect(self.on_data_progress)
+        self.data_loader_worker.finished.connect(self.data_loader_thread.quit)
+        self.data_loader_worker.finished.connect(self.data_loader_worker.deleteLater)
+        self.data_loader_thread.finished.connect(self.data_loader_thread.deleteLater)
+        
+        # Capture worker reference in lambda to avoid NoneType issues
+        worker = self.data_loader_worker
+        thread_schema = self.schema_filter
+        thread_use_mock = self.use_mock
+        thread_use_heavy_mock = self.use_heavy_mock
+        thread_db_file = self.db_file
+        
         self.data_loader_thread.started.connect(
-            lambda: self.data_loader_worker.load_data(self.schema_filter, self.use_mock, start_offset=start_offset, use_heavy_mock=self.use_heavy_mock, db_file=self.db_file)
+            lambda: worker.load_data(thread_schema, thread_use_mock, start_offset=start_offset, use_heavy_mock=thread_use_heavy_mock, db_file=thread_db_file)
         )
         self.data_loader_thread.start()
 
@@ -2470,6 +2514,9 @@ class QtDBBrowser(QMainWindow):
     def _update_model(self):
         """Deferred model update to avoid blocking during chunk processing."""
         try:
+            # If window is closing, do not update the model
+            if getattr(self, "_closing", False):
+                return
             # Update model with current data
             if hasattr(self, "tables") and hasattr(self, "table_columns"):
                 self.tables_model.set_data(self.tables, self.table_columns)
@@ -2482,6 +2529,9 @@ class QtDBBrowser(QMainWindow):
     def _deferred_search_update(self):
         """Deferred search update to avoid blocking during chunk loading."""
         try:
+            # Ignore if the app is closing
+            if getattr(self, "_closing", False):
+                return
             if hasattr(self, "search_query") and self.search_query and self.search_query.strip():
                 # Clear cache for current query
                 cache_key = f"{self.search_mode}:{self.search_query.lower()}"
@@ -2582,6 +2632,9 @@ class QtDBBrowser(QMainWindow):
 
     def on_search_changed(self, text: str):
         """Handle search input changes with debouncing to prevent UI locking and implement caching."""
+        # If app is closing, ignore search changes
+        if getattr(self, "_closing", False):
+            return
         self.search_query = text
 
         # Check if we have cached results for this query
@@ -2639,6 +2692,22 @@ class QtDBBrowser(QMainWindow):
 
     def start_streaming_search(self):
         """Start streaming search in worker thread."""
+        # Do not start new searches when window is closing
+        if getattr(self, "_closing", False):
+            return
+
+        # Ensure any previous search thread has actually stopped before starting a new one
+        try:
+            if hasattr(self, "search_thread") and self.search_thread:
+                if hasattr(self.search_thread, 'isRunning') and self.search_thread.isRunning():
+                    try:
+                        self.search_thread.quit()
+                        # Wait briefly to allow clean shutdown to avoid Qt aborts
+                        self.search_thread.wait(500)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
         self.status_label.setText("Searching...")
         self.search_progress.setVisible(True)
         self.search_progress.setRange(0, 100)
@@ -2688,8 +2757,23 @@ class QtDBBrowser(QMainWindow):
 
     def _trigger_incremental_search(self):
         """Trigger search immediately without debounce - used for incremental updates during data loading."""
+        # Do not start new searches when window is closing
+        if getattr(self, "_closing", False):
+            return
         if not self.search_query or not self.search_query.strip():
             return
+
+        # Ensure previous search thread is stopped before starting a new one
+        try:
+            if hasattr(self, "search_thread") and self.search_thread:
+                if hasattr(self.search_thread, 'isRunning') and self.search_thread.isRunning():
+                    try:
+                        self.search_thread.quit()
+                        self.search_thread.wait(500)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
         # Cancel any existing search
         if self.search_worker:
@@ -3395,11 +3479,19 @@ class QtDBBrowser(QMainWindow):
         if self.search_mode == "tables":
             self.search_mode = "columns"
             self.mode_button.setText("🔍 Columns")
-            self.search_input.setPlaceholderText("Search columns by name, type, or description...")
+            if getattr(self, "search_input", None):
+                try:
+                    self.search_input.setPlaceholderText("Search columns by name, type, or description...")
+                except Exception:
+                    logger.exception("Failed to set search_input placeholder for columns mode")
         else:
             self.search_mode = "tables"
             self.mode_button.setText("📋 Tables")
-            self.search_input.setPlaceholderText("Search tables by name or description...")
+            if getattr(self, "search_input", None):
+                try:
+                    self.search_input.setPlaceholderText("Search tables by name or description...")
+                except Exception:
+                    logger.exception("Failed to set search_input placeholder for tables mode")
 
         # Clear the cache when search mode changes to avoid showing wrong cached results
         self.search_results_cache.clear()
@@ -3409,8 +3501,16 @@ class QtDBBrowser(QMainWindow):
             self.start_streaming_search()
         else:
             # If no query, clear search results
-            self.tables_model.set_search_results([])
-            self.columns_model.set_columns([])
+            if getattr(self, "tables_model", None):
+                try:
+                    self.tables_model.set_search_results([])
+                except Exception:
+                    logger.exception("Failed to clear tables_model search results")
+            if getattr(self, "columns_model", None):
+                try:
+                    self.columns_model.set_columns([])
+                except Exception:
+                    logger.exception("Failed to clear columns_model columns")
 
     def clear_search(self):
         """Clear the search."""
@@ -4050,46 +4150,150 @@ class QtDBBrowser(QMainWindow):
 
     def closeEvent(self, event):
         """Handle window close event and cleanup threads."""
-        # Cancel any ongoing search
-        if self.search_worker:
-            self.search_worker.cancel_search()
+        logger.info("QtDBBrowser.closeEvent() called - starting cleanup")
 
-        if self.search_thread:
+        # Set closing flag so deferred timers/handlers bail out
+        try:
+            self._closing = True
+        except Exception:
+            pass
+
+        # Helper: stop and clear a QTimer attribute if present
+        def _stop_timer(attr_name: str):
+            try:
+                t = getattr(self, attr_name, None)
+                if t:
+                    try:
+                        t.stop()
+                    except Exception:
+                        pass
+                    try:
+                        t.deleteLater()
+                    except Exception:
+                        pass
+                setattr(self, attr_name, None)
+            except Exception:
+                setattr(self, attr_name, None)
+
+        # Stop any internal timers that might schedule work during shutdown
+        _stop_timer("_search_timer")
+        _stop_timer("_search_update_timer")
+        _stop_timer("_model_update_timer")
+
+        # Cancel any ongoing search - check if worker exists first
+        if hasattr(self, "search_worker") and self.search_worker:
+            logger.debug("Cancelling search worker")
+            try:
+                self.search_worker.cancel_search()
+            except Exception as e:
+                logger.warning(f"Error cancelling search worker: {e}")
+
+        # Clean up search thread with proper null checks
+        if hasattr(self, "search_thread") and self.search_thread:
+            logger.debug("Cleaning up search thread")
             try:
                 # Check if thread is still valid and running
                 if hasattr(self.search_thread, 'isRunning') and self.search_thread.isRunning():
+                    logger.debug("Search thread is running, attempting to quit")
                     self.search_thread.quit()
-                    self.search_thread.wait(3000)  # Wait up to 3 seconds
-                # Clean up the thread reference
+                    # Use non-blocking wait to avoid hanging
+                    if not self.search_thread.wait(1000):  # Wait up to 1 second
+                        logger.warning("Search thread did not quit in time, forcing cleanup")
+                else:
+                    logger.debug("Search thread is not running")
+                # Clean up the thread reference safely
                 self.search_thread.deleteLater()
-            except Exception:
+                logger.debug("Search thread cleanup completed")
+            except Exception as e:
                 # Thread may already be deleted or invalid, ignore gracefully
-                pass
+                logger.warning(f"Error cleaning up search thread: {e}")
+            finally:
+                # Ensure thread reference is cleared
+                self.search_thread = None
 
         # Cancel table contents worker if running
         if hasattr(self, "contents_worker") and self.contents_worker:
-            if hasattr(self.contents_worker, "cancel"):
-                self.contents_worker.cancel()
+            logger.debug("Cancelling contents worker")
+            try:
+                if hasattr(self.contents_worker, "cancel"):
+                    self.contents_worker.cancel()
+            except Exception as e:
+                logger.warning(f"Error cancelling contents worker: {e}")
+            finally:
+                # Clean up worker reference
+                self.contents_worker = None
 
-        if hasattr(self, "contents_thread") and self.contents_thread and self.contents_thread.isRunning():
-            self.contents_thread.quit()
-            self.contents_thread.wait(3000)
+        # Clean up contents thread with proper null checks
+        if hasattr(self, "contents_thread") and self.contents_thread:
+            logger.debug("Cleaning up contents thread")
+            try:
+                if self.contents_thread.isRunning():
+                    logger.debug("Contents thread is running, attempting to quit")
+                    self.contents_thread.quit()
+                    # Use non-blocking wait
+                    if not self.contents_thread.wait(1000):
+                        logger.warning("Contents thread did not quit in time, forcing cleanup")
+                else:
+                    logger.debug("Contents thread is not running")
+            except Exception as e:
+                logger.warning(f"Error cleaning up contents thread: {e}")
+            finally:
+                # Ensure thread reference is cleared
+                self.contents_thread = None
 
         # Cancel data loading if in progress
-        if self.data_loader_thread and self.data_loader_thread.isRunning():
-            self.data_loader_thread.quit()
-            self.data_loader_thread.wait(3000)  # Wait up to 3 seconds
+        if hasattr(self, "data_loader_worker") and self.data_loader_worker:
+            logger.debug("Cancelling data loader worker")
+            try:
+                # DataLoaderWorker doesn't have a cancel method, just clean up
+                pass
+            except Exception as e:
+                logger.warning(f"Error cleaning up data loader worker: {e}")
+            finally:
+                # Clean up worker reference
+                self.data_loader_worker = None
 
-        # Terminate subprocess if used
-        if self.data_loader_proc and QT_AVAILABLE:
+        # Clean up data loader thread with proper null checks
+        if hasattr(self, "data_loader_thread") and self.data_loader_thread:
+            logger.debug("Cleaning up data loader thread")
+            try:
+                if self.data_loader_thread.isRunning():
+                    logger.debug("Data loader thread is running, attempting to quit")
+                    self.data_loader_thread.quit()
+                    # Use non-blocking wait
+                    if not self.data_loader_thread.wait(1000):
+                        logger.warning("Data loader thread did not quit in time, forcing cleanup")
+                else:
+                    logger.debug("Data loader thread is not running")
+            except Exception as e:
+                logger.warning(f"Error cleaning up data loader thread: {e}")
+            finally:
+                # Ensure thread reference is cleared
+                self.data_loader_thread = None
+
+        # Terminate subprocess if used - with proper null checks
+        if hasattr(self, "data_loader_proc") and self.data_loader_proc and QT_AVAILABLE:
+            logger.debug("Cleaning up data loader process")
             try:
                 if hasattr(self.data_loader_proc, "_proc") and self.data_loader_proc._proc:
-                    self.data_loader_proc._proc.terminate()
-                    self.data_loader_proc._proc.waitForFinished(2000)
-            except Exception:
-                pass
-            self.data_loader_proc = None
+                    logger.debug("Data loader process exists, attempting to terminate")
+                    # Check if process is actually running before terminating
+                    if self.data_loader_proc._proc.state() != QProcess.ProcessState.NotRunning:
+                        self.data_loader_proc._proc.terminate()
+                        # Use non-blocking wait
+                        if not self.data_loader_proc._proc.waitForFinished(1000):
+                            logger.warning("Data loader process did not terminate in time")
+                    else:
+                        logger.debug("Data loader process is not running")
+                else:
+                    logger.debug("Data loader process does not exist")
+            except Exception as e:
+                logger.warning(f"Error terminating data loader process: {e}")
+            finally:
+                # Ensure process reference is cleared
+                self.data_loader_proc = None
 
+        logger.info("QtDBBrowser.closeEvent() completed - cleanup finished")
         event.accept()
 
 
@@ -4133,6 +4337,11 @@ def main(args=None):
         app = QApplication(sys.argv)
         app.setApplicationName("DB Browser")
         app.setOrganizationName("DBUtils")
+        # Ensure the application quits when the last window closes
+        try:
+            app.setQuitOnLastWindowClosed(True)
+        except Exception:
+            pass
     else:
         # Use existing application instance
         print("Using existing QApplication instance")

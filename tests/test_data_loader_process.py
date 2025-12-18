@@ -594,4 +594,9 @@ def test_cache_compression_performance(tmp_path):
     with gzip.open(compressed_file, "rt", encoding="utf-8") as f:
         compressed_data = json.load(f)
 
+    # The 'cached_at' timestamp may differ by a small amount between calls; ignore it
+    # when comparing the uncompressed and compressed cache contents for equality.
+    uncompressed_data.pop("cached_at", None)
+    compressed_data.pop("cached_at", None)
+
     assert uncompressed_data == compressed_data

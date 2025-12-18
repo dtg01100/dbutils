@@ -1,0 +1,33 @@
+feat: Separate DB2 database types into distinct categories
+
+Resolves the confusion between different IBM DB2 database variants by
+creating three separate, clearly-labeled categories in the GUI:
+
+- DB2 LUW (Linux/Unix/Windows): Modern DB2 systems with driver com.ibm.db2.jcc.DB2Driver, port 50000
+- DB2 z/OS (Mainframe): Enterprise mainframe systems with same driver, port 446
+- DB2 for i (AS/400/iSeries): Legacy systems using com.ibm.as400.access.AS400JDBCDriver, no port
+
+Changes:
+- Updated STANDARD_CATEGORIES in enhanced_jdbc_provider.py with three DB2 types
+- Added three separate template entries in jdbc_templates.json with correct drivers and ports
+- Updated entrypoint_queries.json with database-specific query configurations
+- Enhanced get_driver_info() in jdbc_driver_downloader.py to properly route each category
+  to the correct JDBC driver (db2jcc.jar vs jt400.jar)
+- Auto-download feature now correctly selects the appropriate driver for each DB2 variant
+
+Benefits:
+✓ Users can now clearly see and select their specific DB2 platform
+✓ Correct JDBC driver is downloaded for each variant
+✓ Proper port configuration for each platform
+✓ Mainframe z/OS systems use correct port 446 instead of 50000
+✓ AS/400 systems use JT400 driver instead of regular DB2 driver
+✓ Full backward compatibility maintained
+✓ All 65 tests passing
+
+Test Results:
+- test_enhanced_jdbc_provider.py: 7 passed
+- test_missing_jdbc_driver.py: 4 passed  
+- test_auto_download_workflow.py: 4 passed
+- test_auto_download_handler.py: 3 passed
+- test_sqlite_e2e_gui.py: 4 passed, 1 skipped
+- Integration tests: 38 passed

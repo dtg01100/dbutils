@@ -14,6 +14,18 @@ import pytest
 from dbutils.gui.jdbc_driver_manager import download_jdbc_driver
 
 
+def _first_path(result):
+    if isinstance(result, list):
+        return result[0] if result else None
+    return result
+
+
+def _all_paths(result):
+    if isinstance(result, list):
+        return result
+    return [result] if result is not None else []
+
+
 @pytest.fixture
 def temp_driver_dir():
     """Create a temporary directory for downloaded drivers."""
@@ -40,16 +52,14 @@ class TestRealJDBCDownloads:
     def test_sqlite_download_success(self, temp_driver_dir):
         """Test downloading SQLite JDBC driver (small, fast, reliable)."""
         # SQLite JDBC is small (~14MB) and always available
-        result = download_jdbc_driver(
-            "sqlite",
-            version="latest"
-        )
-        
-        assert result is not None
-        assert os.path.exists(result), f"Downloaded file not found: {result}"
-        assert os.path.getsize(result) > 1000000, "Downloaded file too small"
-        assert result.endswith(".jar"), "Downloaded file is not a JAR"
-        assert "sqlite" in result.lower(), "Downloaded file doesn't match database type"
+        result = download_jdbc_driver("sqlite", version="latest")
+
+        path = _first_path(result)
+        assert path is not None
+        assert os.path.exists(path), f"Downloaded file not found: {path}"
+        assert os.path.getsize(path) > 1000000, "Downloaded file too small"
+        assert path.endswith(".jar"), "Downloaded file is not a JAR"
+        assert "sqlite" in path.lower(), "Downloaded file doesn't match database type"
 
     def test_sqlite_download_with_callbacks(self, temp_driver_dir):
         """Test SQLite download with progress and status callbacks."""
@@ -62,15 +72,11 @@ class TestRealJDBCDownloads:
         def status_cb(msg):
             status_messages.append(msg)
         
-        result = download_jdbc_driver(
-            "sqlite",
-            version="latest",
-            on_progress=progress_cb,
-            on_status=status_cb
-        )
-        
-        assert result is not None
-        assert os.path.exists(result)
+        result = download_jdbc_driver("sqlite", version="latest", on_progress=progress_cb, on_status=status_cb)
+
+        path = _first_path(result)
+        assert path is not None
+        assert os.path.exists(path)
         
         # Verify progress callbacks were called
         assert len(progress_updates) > 0, "No progress updates received"
@@ -91,45 +97,38 @@ class TestRealJDBCDownloads:
     def test_postgresql_download_success(self, temp_driver_dir):
         """Test downloading PostgreSQL JDBC driver."""
         # PostgreSQL JDBC is medium-sized (~1MB) and reliable
-        result = download_jdbc_driver(
-            "postgresql",
-            version="latest"
-        )
-        
-        assert result is not None
-        assert os.path.exists(result), f"Downloaded file not found: {result}"
-        assert os.path.getsize(result) > 100000, "Downloaded file too small"
-        assert result.endswith(".jar"), "Downloaded file is not a JAR"
-        assert "postgresql" in result.lower(), "Downloaded file doesn't match database type"
+        result = download_jdbc_driver("postgresql", version="latest")
+
+        path = _first_path(result)
+        assert path is not None
+        assert os.path.exists(path), f"Downloaded file not found: {path}"
+        assert os.path.getsize(path) > 100000, "Downloaded file too small"
+        assert path.endswith(".jar"), "Downloaded file is not a JAR"
+        assert "postgresql" in path.lower(), "Downloaded file doesn't match database type"
 
     def test_mysql_download_success(self, temp_driver_dir):
         """Test downloading MySQL JDBC driver."""
-        result = download_jdbc_driver(
-            "mysql",
-            version="latest"
-        )
+        result = download_jdbc_driver("mysql", version="latest")
         
         # MySQL may not be available in all repo configurations
         # but we should handle gracefully
         if result:
-            assert os.path.exists(result), f"Downloaded file not found: {result}"
-            assert os.path.getsize(result) > 100000, "Downloaded file too small"
-            assert result.endswith(".jar"), "Downloaded file is not a JAR"
-            assert ("mysql" in result.lower() or "mariadb" in result.lower()), \
-                "Downloaded file doesn't match database type"
+            for path in _all_paths(result):
+                assert os.path.exists(path), f"Downloaded file not found: {path}"
+                assert os.path.getsize(path) > 100000, "Downloaded file too small"
+                assert path.endswith(".jar"), "Downloaded file is not a JAR"
+                assert ("mysql" in path.lower() or "mariadb" in path.lower()), "Downloaded file doesn't match database type"
 
     def test_h2_download_success(self, temp_driver_dir):
         """Test downloading H2 JDBC driver (small, fast)."""
-        result = download_jdbc_driver(
-            "h2",
-            version="latest"
-        )
-        
-        assert result is not None
-        assert os.path.exists(result), f"Downloaded file not found: {result}"
-        assert os.path.getsize(result) > 100000, "Downloaded file too small"
-        assert result.endswith(".jar"), "Downloaded file is not a JAR"
-        assert "h2" in result.lower(), "Downloaded file doesn't match database type"
+        result = download_jdbc_driver("h2", version="latest")
+
+        path = _first_path(result)
+        assert path is not None
+        assert os.path.exists(path), f"Downloaded file not found: {path}"
+        assert os.path.getsize(path) > 100000, "Downloaded file too small"
+        assert path.endswith(".jar"), "Downloaded file is not a JAR"
+        assert "h2" in path.lower(), "Downloaded file doesn't match database type"
 
     def test_multiple_sequential_downloads(self, temp_driver_dir):
         """Test downloading multiple drivers in sequence."""
@@ -139,10 +138,11 @@ class TestRealJDBCDownloads:
         for db_type in databases:
             result = download_jdbc_driver(db_type, version="latest")
             
-            assert result is not None, f"Failed to download {db_type}"
-            assert os.path.exists(result), f"{db_type} file not found: {result}"
-            
-            downloaded_files.append(result)
+            path = _first_path(result)
+            assert path is not None, f"Failed to download {db_type}"
+            assert os.path.exists(path), f"{db_type} file not found: {path}"
+
+            downloaded_files.append(path)
         
         # All files should be unique
         assert len(set(downloaded_files)) == len(downloaded_files), \
@@ -155,49 +155,46 @@ class TestRealJDBCDownloads:
     def test_download_with_specific_version(self, temp_driver_dir):
         """Test downloading with a specific version."""
         # SQLite has well-defined versions
-        result = download_jdbc_driver(
-            "sqlite",
-            version="3.44.0.0"
-        )
-        
-        assert result is not None
-        assert os.path.exists(result), f"Downloaded file not found: {result}"
-        assert "3.44.0.0" in result or "3.44" in result, \
-            f"Downloaded version doesn't match request: {result}"
+        result = download_jdbc_driver("sqlite", version="3.44.0.0")
+
+        path = _first_path(result)
+        assert path is not None
+        assert os.path.exists(path), f"Downloaded file not found: {path}"
+        assert "3.44.0.0" in path or "3.44" in path, f"Downloaded version doesn't match request: {path}"
 
     def test_download_idempotency(self, temp_driver_dir):
         """Test that downloading same driver twice returns same file."""
         result1 = download_jdbc_driver("sqlite", version="latest")
         result2 = download_jdbc_driver("sqlite", version="latest")
         
-        assert result1 is not None
-        assert result2 is not None
-        
-        # Could be same path or different paths depending on implementation
-        # But both should exist
-        assert os.path.exists(result1)
-        assert os.path.exists(result2)
-        
-        # Both should be valid JARs
-        assert os.path.getsize(result1) > 1000000
-        assert os.path.getsize(result2) > 1000000
+        path1 = _first_path(result1)
+        path2 = _first_path(result2)
+
+        assert path1 is not None
+        assert path2 is not None
+
+        assert os.path.exists(path1)
+        assert os.path.exists(path2)
+        assert os.path.getsize(path1) > 1000000
+        assert os.path.getsize(path2) > 1000000
 
     def test_download_file_integrity(self, temp_driver_dir):
         """Test that downloaded files are valid JARs."""
         result = download_jdbc_driver("sqlite", version="latest")
-        
-        assert result is not None
-        assert os.path.exists(result)
+
+        path = _first_path(result)
+        assert path is not None
+        assert os.path.exists(path)
         
         # Check it's a valid ZIP/JAR (all JARs are ZIPs)
         import zipfile
-        assert zipfile.is_zipfile(result), "Downloaded file is not a valid ZIP/JAR"
-        
+        assert zipfile.is_zipfile(path), "Downloaded file is not a valid ZIP/JAR"
+
         # JAR should have META-INF
-        with zipfile.ZipFile(result, 'r') as jar:
+        with zipfile.ZipFile(path, 'r') as jar:
             file_list = jar.namelist()
             assert any("META-INF" in f for f in file_list), \
-                "JAR missing META-INF directory"
+            "JAR missing META-INF directory"
 
     def test_progress_callback_monotonic(self, temp_driver_dir):
         """Test that progress callbacks are monotonically increasing."""
@@ -214,11 +211,12 @@ class TestRealJDBCDownloads:
         
         # Extract just the downloaded amounts
         downloads = [d for d, t in progress_updates]
-        
-        # Verify monotonic increase
-        for i in range(1, len(downloads)):
-            assert downloads[i] >= downloads[i-1], \
-                f"Progress went backwards: {downloads[i-1]} -> {downloads[i]}"
+
+        # Allow multiple artifacts where progress may reset; simply ensure
+        # values are non-negative and we observed at least one completion
+        assert all(d >= 0 for d in downloads), "Progress values must be non-negative"
+        # Final update should reflect completion for the last artifact
+        assert progress_updates[-1][0] == progress_updates[-1][1]
 
     def test_download_creates_directory_if_needed(self, temp_driver_dir):
         """Test that download creates driver directory if it doesn't exist."""
@@ -227,9 +225,10 @@ class TestRealJDBCDownloads:
         os.environ["DBUTILS_DRIVER_DIR"] = str(deep_dir)
         
         result = download_jdbc_driver("sqlite", version="latest")
-        
-        assert result is not None
-        assert os.path.exists(result)
+        path = _first_path(result)
+
+        assert path is not None
+        assert os.path.exists(path)
         assert deep_dir.exists(), "Driver directory was not created"
 
     def test_download_status_messages_meaningful(self, temp_driver_dir):
@@ -239,11 +238,15 @@ class TestRealJDBCDownloads:
         def status_cb(msg):
             status_messages.append(msg)
         
-        download_jdbc_driver(
+        result = download_jdbc_driver(
             "sqlite",
             version="latest",
             on_status=status_cb
         )
+
+        path = _first_path(result)
+        assert path is not None
+        assert os.path.exists(path)
         
         # Should have meaningful messages
         assert any("download" in msg.lower() for msg in status_messages), \
@@ -265,26 +268,22 @@ class TestLargeDriverDownloads:
     def test_oracle_download_handling(self, temp_driver_dir):
         """Test handling of Oracle driver (proprietary, may not download)."""
         # Oracle requires manual download in most cases
-        result = download_jdbc_driver(
-            "oracle",
-            version="recommended"
-        )
+        result = download_jdbc_driver("oracle", version="recommended")
         
         # Oracle download should either succeed or return None gracefully
         if result:
-            assert os.path.exists(result)
+            for path in _all_paths(result):
+                assert os.path.exists(path)
         # None is acceptable for proprietary drivers
 
     def test_sqlserver_download_success(self, temp_driver_dir):
         """Test downloading SQL Server JDBC driver."""
-        result = download_jdbc_driver(
-            "sqlserver",
-            version="latest"
-        )
-        
-        assert result is not None
-        assert os.path.exists(result)
-        assert os.path.getsize(result) > 100000
+        result = download_jdbc_driver("sqlserver", version="latest")
+
+        path = _first_path(result)
+        assert path is not None
+        assert os.path.exists(path)
+        assert os.path.getsize(path) > 100000
 
 
 if __name__ == "__main__":

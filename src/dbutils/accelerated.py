@@ -10,6 +10,9 @@ from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
+# Global variable to track Cython availability
+HAS_CYTHON = False
+
 # Try to import the fast Cython version
 try:
     from .fast_ops import (
@@ -47,6 +50,12 @@ except ImportError:
     def fast_intern_string(s: str) -> str:
         """Pure Python string interning fallback."""
         return s
+
+    def fast_string_normalize(text: str) -> str:
+        """Pure Python string normalization fallback."""
+        if not text:
+            return ""
+        return text.lower().replace("_", " ")
 
     def fast_string_normalize(text: str) -> str:
         """Pure Python string normalization fallback."""

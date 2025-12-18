@@ -30,8 +30,10 @@ def test_launch_qt_interface_import_error(monkeypatch):
     class Args:
         schema = None
 
-    # Running launch_qt_interface should call qt_main; simulate missing module by removing it
-    # We capture stdout and return code
+    # Simulate missing module by making importlib.util.find_spec return None
+    monkeypatch.setattr("importlib.util.find_spec", lambda name: None)
+
+    # Running launch_qt_interface should exit with SystemExit when module isn't available
     with pytest.raises(SystemExit):
         main_launcher.launch_qt_interface(Args())
 
